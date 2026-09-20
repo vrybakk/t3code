@@ -1,4 +1,9 @@
-import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  BriefcaseBusinessIcon,
+  ChartNoAxesColumnIcon,
+  SettingsIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
 import { Link, useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
@@ -138,7 +143,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         ? "settings"
         : /^\/projects\/[^/]+\/?$/.test(location.pathname)
           ? "project-settings"
-          : location.pathname === "/usage"
+          : location.pathname === "/usage" || location.pathname === "/work"
             ? "usage"
             : location.pathname === "/pull-requests"
               ? "pull-requests"
@@ -173,6 +178,10 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     }
     void navigate({ to: "/usage" });
   }, [isMobile, navigate, setOpenMobile]);
+  const handleWorkClick = useCallback(() => {
+    closeMobileSidebar();
+    void navigate({ to: "/work" });
+  }, [closeMobileSidebar, navigate]);
 
   const handleBackClick = useCallback(() => {
     closeMobileSidebar();
@@ -210,6 +219,11 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             icon={<ChartNoAxesColumnIcon />}
             label="Usage"
             onClick={handleUsageClick}
+          />
+          <SidebarUtilityItem
+            icon={<BriefcaseBusinessIcon />}
+            label="Work"
+            onClick={handleWorkClick}
           />
         </>
       )}

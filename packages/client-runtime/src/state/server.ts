@@ -933,6 +933,9 @@ export function createServerEnvironmentAtoms<R, E>(
       );
     }).pipe(Atom.withLabel(`environment-data:server:usage-prices:${environmentId}`)),
   );
+  const workRevisionAtom = Atom.family((environmentId: EnvironmentId) =>
+    Atom.make(0).pipe(Atom.withLabel(`environment-data:work:revision:${environmentId}`)),
+  );
   const providersValueAtom = Atom.family((environmentId: EnvironmentId) =>
     Atom.make((get) => get(configValueAtom(environmentId))?.providers ?? null).pipe(
       Atom.withLabel(`environment-data:server:providers:${environmentId}`),
@@ -965,6 +968,7 @@ export function createServerEnvironmentAtoms<R, E>(
     updateStateAtom,
     settingsValueAtom,
     providersValueAtom,
+    workRevisionAtom,
     providerAuthState: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:provider:auth-state",
       tag: WS_METHODS.providerAuthSubscribe,
@@ -1047,6 +1051,73 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverGetUsageSummary,
       staleTimeMs: 60_000,
       refreshTrigger: ({ environmentId }) => usagePricesAtom(environmentId),
+    }),
+    workOverview: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:work:overview",
+      tag: WS_METHODS.workGetOverview,
+      staleTimeMs: 15_000,
+      refreshIntervalMs: 10_000,
+      refreshTrigger: ({ environmentId }) => workRevisionAtom(environmentId),
+    }),
+    workRepositoryDiscovery: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:work:repository-discovery",
+      tag: WS_METHODS.workDiscoverRepositories,
+      staleTimeMs: 60_000,
+      refreshTrigger: ({ environmentId }) => workRevisionAtom(environmentId),
+    }),
+    workReportSnapshot: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:work:report-snapshot",
+      tag: WS_METHODS.workGetReportSnapshot,
+      staleTimeMs: 60_000,
+      refreshTrigger: ({ environmentId }) => workRevisionAtom(environmentId),
+    }),
+    upsertWorkProfile: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:upsert-profile",
+      tag: WS_METHODS.workUpsertProfile,
+    }),
+    upsertWorkProject: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:upsert-project",
+      tag: WS_METHODS.workUpsertProject,
+    }),
+    upsertWorkRepository: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:upsert-repository",
+      tag: WS_METHODS.workUpsertRepository,
+    }),
+    upsertWorkManualEntry: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:upsert-manual-entry",
+      tag: WS_METHODS.workUpsertManualEntry,
+    }),
+    markWorkDelivery: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:mark-delivery",
+      tag: WS_METHODS.workMarkDelivery,
+    }),
+    reopenWorkDelivery: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:reopen-delivery",
+      tag: WS_METHODS.workReopenDelivery,
+    }),
+    createWorkReport: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:create-report",
+      tag: WS_METHODS.workCreateReport,
+    }),
+    transitionWorkReport: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:transition-report",
+      tag: WS_METHODS.workTransitionReport,
+    }),
+    exportWorkJson: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:export-json",
+      tag: WS_METHODS.workExportJson,
+    }),
+    importWorkJson: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:import-json",
+      tag: WS_METHODS.workImportJson,
+    }),
+    exportWorkCsv: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:export-csv",
+      tag: WS_METHODS.workExportCsv,
+    }),
+    exportWorkReportCsv: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:work:export-report-csv",
+      tag: WS_METHODS.workExportReportCsv,
     }),
     configProjection,
     welcome,
