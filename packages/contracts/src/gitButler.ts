@@ -1,9 +1,9 @@
 import * as Schema from "effect/Schema";
 
-import { NonNegativeInt, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NonNegativeInt, PositiveInt, ProjectId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 export const GitButlerWorkspaceInput = Schema.Struct({
-  cwd: TrimmedNonEmptyString,
+  projectId: ProjectId,
 });
 export type GitButlerWorkspaceInput = typeof GitButlerWorkspaceInput.Type;
 
@@ -49,6 +49,8 @@ export const GitButlerWorkspaceStatus = Schema.Union([
   Schema.Struct({
     status: Schema.Literal("ready"),
     version: TrimmedNonEmptyString,
+    /** The server bounded this response before it crossed the WebSocket. */
+    truncated: Schema.Boolean,
     unassignedChanges: Schema.Array(GitButlerFileChange),
     conflictedFiles: Schema.Array(TrimmedNonEmptyString),
     stacks: Schema.Array(GitButlerStack),

@@ -4,12 +4,14 @@ import { describe, expect, it } from "vite-plus/test";
 import { GitButlerWorkspaceInput, GitButlerWorkspaceStatus } from "./gitButler.ts";
 
 const decodeInput = Schema.decodeSync(GitButlerWorkspaceInput);
+const decodeUnknownInput = Schema.decodeUnknownSync(GitButlerWorkspaceInput);
 const decodeStatus = Schema.decodeSync(GitButlerWorkspaceStatus);
 const encodeInput = Schema.encodeSync(GitButlerWorkspaceInput);
 const encodeStatus = Schema.encodeSync(GitButlerWorkspaceStatus);
 const readyStatus = {
   status: "ready" as const,
   version: "0.22.3",
+  truncated: false,
   unassignedChanges: [],
   conflictedFiles: [],
   stacks: [],
@@ -20,14 +22,14 @@ const readyStatus = {
 
 describe("GitButler contracts", () => {
   it("normalizes workspace input and decodes a ready status", () => {
-    const input = decodeInput({ cwd: " /workspace/project " });
+    const input = decodeInput({ projectId: " project-1 " });
     const status = decodeStatus({
       ...readyStatus,
       conflictedFiles: ["src/conflict.ts"],
     });
 
-    expect(input).toEqual({ cwd: "/workspace/project" });
-    expect(encodeInput(input)).toEqual({ cwd: "/workspace/project" });
+    expect(input).toEqual({ projectId: "project-1" });
+    expect(encodeInput(input)).toEqual({ projectId: "project-1" });
     expect(status).toMatchObject({
       status: "ready",
       conflictedFiles: ["src/conflict.ts"],
@@ -40,6 +42,8 @@ describe("GitButler contracts", () => {
   });
 
   it("rejects invalid upstream and review numbers", () => {
+    const legacyInput: unknown = { cwd: "/workspace/project" };
+    expect(() => decodeUnknownInput(legacyInput)).toThrow();
     expect(() => decodeStatus({ ...readyStatus, upstreamBehind: -1 })).toThrow();
     expect(() =>
       decodeStatus({

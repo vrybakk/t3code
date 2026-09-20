@@ -2564,10 +2564,28 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
-        [WS_METHODS.gitButlerWorkspaceStatus]: ({ cwd }) =>
-          observeRpcEffect(WS_METHODS.gitButlerWorkspaceStatus, gitButlerWorkspace.read(cwd), {
-            "rpc.aggregate": "gitbutler",
-          }),
+        [WS_METHODS.gitButlerWorkspaceStatus]: ({ projectId }) =>
+          observeRpcEffect(
+            WS_METHODS.gitButlerWorkspaceStatus,
+            projectionSnapshotQuery.getProjectShellById(projectId).pipe(
+              Effect.flatMap(
+                Option.match({
+                  onNone: () =>
+                    Effect.succeed({
+                      status: "notConfigured" as const,
+                      detail:
+                        "GitButler workspace details are only available for an active T3 Code project.",
+                    }),
+                  onSome: (project) => gitButlerWorkspace.read(project.workspaceRoot),
+                }),
+              ),
+              Effect.orElseSucceed(() => ({
+                status: "error" as const,
+                detail: "T3 Code could not resolve this project's workspace.",
+              })),
+            ),
+            { "rpc.aggregate": "gitbutler" },
+          ),
         [WS_METHODS.serverGetTraceDiagnostics]: (_input) =>
           observeRpcEffect(
             WS_METHODS.serverGetTraceDiagnostics,

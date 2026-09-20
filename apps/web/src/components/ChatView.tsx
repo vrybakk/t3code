@@ -9725,11 +9725,11 @@ export default function ChatView(props: ChatViewProps) {
       <Suspense fallback={null}>
         <GitButlerUnavailableState />
       </Suspense>
-    ) : renderedRightPanelSurface?.kind === "gitbutler" && activeWorkspaceRoot ? (
+    ) : renderedRightPanelSurface?.kind === "gitbutler" && activeProject ? (
       <Suspense fallback={null}>
         <GitButlerPanel
           environmentId={activeThreadRef.environmentId}
-          cwd={activeWorkspaceRoot}
+          projectId={activeProject.id}
           repositoryStatus={gitStatusQuery.data}
           workspaceMutationId={workspaceMutationId}
           onOpenReview={supportsPullRequests ? openProjectPullRequest : undefined}

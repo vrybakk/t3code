@@ -17,6 +17,20 @@ import * as GitButlerProjectRegistry from "./GitButlerProjectRegistry.ts";
 
 const GITBUTLER_STATUS_TIMEOUT_MS = 15_000;
 const GITBUTLER_STATUS_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+// `but status` can describe every file in a large workspace. Keep the RPC
+// response independently bounded so a valid CLI response cannot monopolize a
+// WebSocket frame or the renderer's state cache.
+const GITBUTLER_RESPONSE_LIMITS = {
+  text: 256,
+  author: 128,
+  unassignedChanges: 100,
+  conflictedFiles: 100,
+  stacks: 4,
+  assignedChanges: 20,
+  branches: 6,
+  commits: 10,
+  commitChanges: 20,
+} as const;
 const NOT_CONFIGURED_DETAIL =
   "Open this repository in GitButler and configure its target branch before viewing its workspace here.";
 
@@ -128,6 +142,68 @@ function toStack(stack: RawStackValue): GitButlerStack {
     assignedChanges: toFileChanges(stack.assignedChanges),
     branches: stack.branches.map(toBranch),
   };
+}
+
+function boundWorkspaceStatus(
+  input: Omit<Extract<GitButlerWorkspaceStatus, { status: "ready" }>, "truncated">,
+): Extract<GitButlerWorkspaceStatus, { status: "ready" }> {
+  let truncated = false;
+  const take = <A>(items: ReadonlyArray<A>, limit: number) => {
+    if (items.length > limit) truncated = true;
+    return items.slice(0, limit);
+  };
+  const text = (value: string, limit: number = GITBUTLER_RESPONSE_LIMITS.text) => {
+    if (value.length <= limit) return value;
+    truncated = true;
+    return value.slice(0, limit);
+  };
+  const changes = (items: ReadonlyArray<GitButlerFileChange>, limit: number) =>
+    take(items, limit).map((change) => ({
+      filePath: text(change.filePath),
+      changeType: text(change.changeType),
+    }));
+  const commit = (value: GitButlerCommit) => ({
+    commitId: text(value.commitId),
+    createdAt: text(value.createdAt),
+    message: text(value.message),
+    authorName: text(value.authorName, GITBUTLER_RESPONSE_LIMITS.author),
+    conflicted: value.conflicted,
+    reviewId: value.reviewId === null ? null : text(value.reviewId),
+    changes: changes(value.changes, GITBUTLER_RESPONSE_LIMITS.commitChanges),
+  });
+  const branch = (value: GitButlerBranch) => ({
+    name: text(value.name),
+    branchStatus: text(value.branchStatus),
+    reviewId: value.reviewId === null ? null : text(value.reviewId),
+    reviewNumber: value.reviewNumber,
+    reviewStatus: value.reviewStatus,
+    commits: take(value.commits, GITBUTLER_RESPONSE_LIMITS.commits).map(commit),
+    upstreamCommits: take(value.upstreamCommits, GITBUTLER_RESPONSE_LIMITS.commits).map(commit),
+  });
+
+  const result = {
+    ...input,
+    version: text(input.version),
+    unassignedChanges: changes(
+      input.unassignedChanges,
+      GITBUTLER_RESPONSE_LIMITS.unassignedChanges,
+    ),
+    conflictedFiles: take(input.conflictedFiles, GITBUTLER_RESPONSE_LIMITS.conflictedFiles).map(
+      (filePath) => text(filePath),
+    ),
+    stacks: take(input.stacks, GITBUTLER_RESPONSE_LIMITS.stacks).map((stack) => ({
+      id: text(stack.id),
+      assignedChanges: changes(stack.assignedChanges, GITBUTLER_RESPONSE_LIMITS.assignedChanges),
+      branches: take(stack.branches, GITBUTLER_RESPONSE_LIMITS.branches).map(branch),
+    })),
+    mergeBaseCommitId: text(input.mergeBaseCommitId),
+    upstreamLastFetched:
+      input.upstreamLastFetched === null ? null : text(input.upstreamLastFetched),
+    truncated,
+  } satisfies GitButlerWorkspaceStatus;
+  // Fields can be shortened while mapping nested records, so materialize the
+  // final flag after all bounded transforms have run.
+  return { ...result, truncated } as Extract<GitButlerWorkspaceStatus, { status: "ready" }>;
 }
 
 export class GitButlerWorkspace extends Context.Service<
@@ -248,18 +324,20 @@ export const make = Effect.gen(function* () {
       })
       .pipe(
         Effect.flatMap((result) => decodeRawStatus(result.stdout)),
-        Effect.map((status): GitButlerWorkspaceStatus => ({
-          status: "ready",
-          version,
-          unassignedChanges: toFileChanges(status.uncommittedChanges),
-          conflictedFiles: (status.conflictedFiles ?? [])
-            .map((path) => path.trim())
-            .filter(Boolean),
-          stacks: status.stacks.map(toStack),
-          mergeBaseCommitId: requiredText(status.mergeBase.commitId, "unknown"),
-          upstreamBehind: Math.max(0, Math.trunc(status.upstreamState.behind)),
-          upstreamLastFetched: nullableText(status.upstreamState.lastFetched),
-        })),
+        Effect.map((status): GitButlerWorkspaceStatus =>
+          boundWorkspaceStatus({
+            status: "ready",
+            version,
+            unassignedChanges: toFileChanges(status.uncommittedChanges),
+            conflictedFiles: (status.conflictedFiles ?? [])
+              .map((path) => path.trim())
+              .filter(Boolean),
+            stacks: status.stacks.map(toStack),
+            mergeBaseCommitId: requiredText(status.mergeBase.commitId, "unknown"),
+            upstreamBehind: Math.max(0, Math.trunc(status.upstreamState.behind)),
+            upstreamLastFetched: nullableText(status.upstreamState.lastFetched),
+          }),
+        ),
         Effect.catch((cause) =>
           Effect.succeed({
             status: "error" as const,

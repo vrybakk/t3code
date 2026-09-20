@@ -191,6 +191,7 @@ it.effect("returns a ready empty workspace", () =>
     assert.deepStrictEqual(result, {
       status: "ready",
       version: "0.22.3",
+      truncated: false,
       unassignedChanges: [],
       conflictedFiles: [],
       stacks: [],
@@ -203,6 +204,44 @@ it.effect("returns a ready empty workspace", () =>
       testLayer({
         statusOutput:
           '{"uncommittedChanges":[],"stacks":[],"mergeBase":{"commitId":"base123","createdAt":"2026-09-08T10:00:00Z","message":"base","authorName":"Maintainer","conflicted":null,"reviewId":null,"changes":null},"upstreamState":{"behind":0,"lastFetched":null}}',
+      }),
+    ),
+  ),
+);
+
+it.effect("bounds a large GitButler status response and marks it truncated", () =>
+  Effect.gen(function* () {
+    const workspace = yield* GitButlerWorkspace.GitButlerWorkspace;
+    const result = yield* workspace.read(workspaceRoot);
+
+    assert.strictEqual(result.status, "ready");
+    if (result.status !== "ready") return;
+    assert.strictEqual(result.truncated, true);
+    assert.strictEqual(result.unassignedChanges.length, 100);
+    assert.strictEqual(result.stacks.length, 4);
+    assert.strictEqual(result.stacks[0]?.branches.length, 6);
+  }).pipe(
+    Effect.provide(
+      testLayer({
+        statusOutput: JSON.stringify({
+          ...JSON.parse(readyStatus),
+          uncommittedChanges: Array.from({ length: 101 }, (_, index) => ({
+            filePath: `src/${"x".repeat(300)}-${index}.ts`,
+            changeType: "modified",
+          })),
+          stacks: Array.from({ length: 5 }, (_, stack) => ({
+            cliId: `stack-${stack}`,
+            assignedChanges: [],
+            branches: Array.from({ length: 7 }, (_, branch) => ({
+              name: `branch-${branch}`,
+              commits: [],
+              upstreamCommits: [],
+              branchStatus: "unpushed",
+              reviewId: null,
+              ci: null,
+            })),
+          })),
+        }),
       }),
     ),
   ),

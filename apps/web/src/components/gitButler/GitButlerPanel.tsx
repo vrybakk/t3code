@@ -1,4 +1,9 @@
-import type { EnvironmentId, GitButlerWorkspaceStatus, VcsStatusResult } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  GitButlerWorkspaceStatus,
+  ProjectId,
+  VcsStatusResult,
+} from "@t3tools/contracts";
 
 import { Button } from "~/components/ui/button";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
@@ -34,6 +39,7 @@ export function GitButlerPanelView({
                   ? "Refreshing · "
                   : ""}
               CLI {query.data.version}
+              {query.data.truncated ? " · Some workspace details omitted" : ""}
             </p>
           ) : null}
         </div>
@@ -74,27 +80,27 @@ export function GitButlerPanelView({
 
 export function GitButlerPanel({
   environmentId,
-  cwd,
+  projectId,
   repositoryStatus,
   workspaceMutationId,
   onOpenReview,
   onOpenFile,
 }: {
   readonly environmentId: EnvironmentId;
-  readonly cwd: string;
+  readonly projectId: ProjectId;
   readonly repositoryStatus: VcsStatusResult | null;
   readonly workspaceMutationId: string | null;
   readonly onOpenReview?: ((reviewNumber: number) => void) | undefined;
   readonly onOpenFile?: ((filePath: string) => void) | undefined;
 }) {
   const query = useEnvironmentQuery(
-    sourceControlEnvironment.gitButlerWorkspace({ environmentId, input: { cwd } }),
+    sourceControlEnvironment.gitButlerWorkspace({ environmentId, input: { projectId } }),
   );
   useGitButlerRepositoryStatusRefresh({ repositoryStatus, refresh: query.refresh });
   useWorkspaceMutationRefresh({
     mutationId: workspaceMutationId,
     refresh: query.refresh,
-    resourceKey: `gitbutler:${environmentId}:${cwd}`,
+    resourceKey: `gitbutler:${environmentId}:${projectId}`,
   });
 
   return <GitButlerPanelView query={query} onOpenReview={onOpenReview} onOpenFile={onOpenFile} />;

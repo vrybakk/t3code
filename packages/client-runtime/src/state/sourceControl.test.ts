@@ -1,5 +1,6 @@
 import {
   EnvironmentId,
+  ProjectId,
   WS_METHODS,
   type SourceControlPublishRepositoryResult,
 } from "@t3tools/contracts";
@@ -82,9 +83,9 @@ describe("source control environment atoms", () => {
         const remoteCalls = new Array<string>();
         const makeClient = (calls: Array<string>) =>
           ({
-            [WS_METHODS.gitButlerWorkspaceStatus]: (input: { readonly cwd: string }) =>
+            [WS_METHODS.gitButlerWorkspaceStatus]: (input: { readonly projectId: string }) =>
               Effect.sync(() => {
-                calls.push(input.cwd);
+                calls.push(input.projectId);
                 return {
                   status: "notConfigured" as const,
                   detail: "Open this repository in GitButler first.",
@@ -157,7 +158,7 @@ describe("source control environment atoms", () => {
         );
         const workspace = atoms.gitButlerWorkspace({
           environmentId: REMOTE_TARGET.environmentId,
-          input: { cwd: "/remote/workspace" },
+          input: { projectId: ProjectId.make("project-remote") },
         });
         const unmount = registry.mount(workspace);
         yield* Effect.addFinalizer(() => Effect.sync(unmount));
@@ -166,7 +167,7 @@ describe("source control environment atoms", () => {
 
         expect(AsyncResult.isSuccess(result)).toBe(true);
         expect(localCalls).toEqual([]);
-        expect(remoteCalls).toEqual(["/remote/workspace"]);
+        expect(remoteCalls).toEqual(["project-remote"]);
       }),
     ),
   );

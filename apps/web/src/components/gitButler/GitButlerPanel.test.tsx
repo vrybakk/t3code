@@ -14,6 +14,7 @@ setupReactTestRenderer();
 const readyStatus: Extract<GitButlerWorkspaceStatus, { status: "ready" }> = {
   status: "ready",
   version: "0.22.3",
+  truncated: false,
   unassignedChanges: [{ filePath: "src/unassigned.ts", changeType: "modified" }],
   conflictedFiles: ["src/conflict.ts"],
   stacks: [
@@ -115,6 +116,22 @@ describe("GitButlerPanelContent", () => {
 
     expect(text).toContain("No GitButler branches or changes");
     expect(text).toContain("Up to date with upstream");
+  });
+
+  it("explains when the server omitted workspace details", () => {
+    const text = renderText(
+      <GitButlerPanelView
+        query={{
+          data: { ...readyStatus, truncated: true },
+          error: null,
+          isPending: false,
+          isSuccess: true,
+          refresh: () => undefined,
+        }}
+      />,
+    );
+
+    expect(text).toContain("Some workspace details omitted");
   });
 
   it("renders an unknown label for an invalid upstream timestamp", () => {
