@@ -160,6 +160,8 @@ import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
 import { pullRequestSyncKey } from "./pullRequest/pullRequestSyncKey.ts";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as PullRequestSyncReactor from "./orchestration/PullRequestSyncReactor.ts";
+import * as GitButlerProjectRegistry from "./gitButler/GitButlerProjectRegistry.ts";
+import * as GitButlerWorkspace from "./gitButler/GitButlerWorkspace.ts";
 import * as SourceControlDiscovery from "./sourceControl/SourceControlDiscovery.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as AzureDevOpsCli from "./sourceControl/AzureDevOpsCli.ts";
@@ -642,6 +644,7 @@ const makeWsRpcLayer = (
       );
       const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
       const sourceControlDiscovery = yield* SourceControlDiscovery.SourceControlDiscovery;
+      const gitButlerWorkspace = yield* GitButlerWorkspace.GitButlerWorkspace;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -2561,6 +2564,28 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
+        [WS_METHODS.gitButlerWorkspaceStatus]: ({ projectId }) =>
+          observeRpcEffect(
+            WS_METHODS.gitButlerWorkspaceStatus,
+            projectionSnapshotQuery.getProjectShellById(projectId).pipe(
+              Effect.flatMap(
+                Option.match({
+                  onNone: () =>
+                    Effect.succeed({
+                      status: "notConfigured" as const,
+                      detail:
+                        "GitButler workspace details are only available for an active T3 Code project.",
+                    }),
+                  onSome: (project) => gitButlerWorkspace.read(project.workspaceRoot),
+                }),
+              ),
+              Effect.orElseSucceed(() => ({
+                status: "error" as const,
+                detail: "T3 Code could not resolve this project's workspace.",
+              })),
+            ),
+            { "rpc.aggregate": "gitbutler" },
+          ),
         [WS_METHODS.serverGetTraceDiagnostics]: (_input) =>
           observeRpcEffect(
             WS_METHODS.serverGetTraceDiagnostics,
@@ -3794,6 +3819,9 @@ export const websocketRpcRouteLayer = Layer.unwrap(
                     ),
                   ),
                 ),
+              ),
+              Layer.provide(
+                GitButlerWorkspace.layer.pipe(Layer.provide(GitButlerProjectRegistry.layer)),
               ),
             ),
           ),
