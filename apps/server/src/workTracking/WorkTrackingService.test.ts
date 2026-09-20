@@ -70,12 +70,12 @@ it.effect("keeps manual, main, and task totals distinct while source records sta
       inputTokens: 1,
       cachedInputTokens: 0,
       outputTokens: 2,
-      reasoningTokens: null,
+      reasoningTokens: 3,
       elapsedMs: 300,
       taskMs: null,
       model: null,
       effort: null,
-      toolUses: null,
+      toolUses: 4,
     };
     yield* work.recordAutomatic({ ...automatic, kind: "agent-turn" });
     yield* work.recordAutomatic({ ...automatic, kind: "agent-turn" });
@@ -93,8 +93,66 @@ it.effect("keeps manual, main, and task totals distinct while source records sta
     assert.equal(overview.totals.manualMs, 600);
     assert.equal(overview.totals.agentElapsedMs, 300);
     assert.equal(overview.totals.agentTaskMs, 200);
+    assert.equal(overview.totals.inputTokens, 2);
+    assert.equal(overview.totals.cachedInputTokens, 0);
+    assert.equal(overview.totals.outputTokens, 4);
+    assert.equal(overview.totals.reasoningTokens, 6);
+    assert.equal(overview.totals.toolUses, 8);
     assert.equal(overview.totals.records, 3);
   }).pipe(Effect.provide(testLayer)),
+);
+
+it.effect("attributes automatic work to one repository or cross-repository evidence", () =>
+  Effect.gen(function* () {
+    yield* runMigrations({ toMigrationInclusive: 54 });
+    const sql = yield* SqlClient.SqlClient;
+    const work = yield* WorkTrackingService;
+    yield* work.upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true });
+    yield* sql`INSERT INTO projection_projects(project_id, title, workspace_root, scripts_json, created_at, updated_at) VALUES ('t3-project', 'Project', '/workspace', '[]', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`;
+    const project = yield* work.upsertProject({
+      name: "Ledger",
+      t3ProjectIds: [ProjectId.make("t3-project")],
+      trackingEnabled: true,
+    });
+    yield* sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES ('repository-a', ${project.id}, '/workspace/repository-a', NULL, 'included', 'manual', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'), ('repository-b', ${project.id}, '/workspace/repository-b', NULL, 'included', 'manual', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`;
+    const automatic = {
+      kind: "agent-turn" as const,
+      projectId: "t3-project",
+      threadId: "thread",
+      turnId: "turn",
+      occurredAt: "2026-09-01T12:00:00.000Z",
+      provider: "codex",
+      outcome: "succeeded" as const,
+      coverage: "complete" as const,
+      inputTokens: null,
+      cachedInputTokens: null,
+      outputTokens: null,
+      reasoningTokens: null,
+      elapsedMs: 100,
+      taskMs: null,
+      model: null,
+      effort: null,
+      toolUses: null,
+    };
+    yield* work.recordAutomatic({ ...automatic, sourceEventId: "event-cross-repository" });
+    yield* sql`DELETE FROM work_repositories WHERE id = 'repository-b'`;
+    yield* work.recordAutomatic({ ...automatic, sourceEventId: "event-single-repository" });
+    const records = (yield* work.overview({
+      since: "2026-09-01T00:00:00.000Z",
+      until: "2026-09-02T00:00:00.000Z",
+    })).records;
+    const crossRepository = records.find(
+      (record) => record.sourceEventId === "event-cross-repository",
+    );
+    const singleRepository = records.find(
+      (record) => record.sourceEventId === "event-single-repository",
+    );
+
+    assert.equal(crossRepository?.repositoryId, null);
+    assert.equal(crossRepository?.crossRepository, true);
+    assert.equal(singleRepository?.repositoryId, "repository-a");
+    assert.equal(singleRepository?.crossRepository, false);
+  }).pipe(Effect.provide(makeTestLayer())),
 );
 
 it.effect(
@@ -117,7 +175,7 @@ it.effect(
       yield* Effect.forEach(
         Array.from({ length: 501 }, (_, index) => index),
         (index) =>
-          sql`INSERT INTO work_records(id, kind, tracking_project_id, cross_repository, occurred_at, elapsed_ms, active_ms, outcome, coverage, revision, created_at, updated_at) VALUES (${`turn-${index}`}, 'agent-turn', ${project.id}, 0, ${`2026-09-01T00:${String(Math.floor(index / 60)).padStart(2, "0")}:${String(index % 60).padStart(2, "0")}.000Z`}, 1, ${index === 0 ? null : 1}, 'succeeded', 'complete', 0, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`,
+          sql`INSERT INTO work_records(id, kind, tracking_project_id, cross_repository, occurred_at, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, tool_usage_json, elapsed_ms, active_ms, outcome, coverage, revision, created_at, updated_at) VALUES (${`turn-${index}`}, 'agent-turn', ${project.id}, 0, ${`2026-09-01T00:${String(Math.floor(index / 60)).padStart(2, "0")}:${String(index % 60).padStart(2, "0")}.000Z`}, 1, 2, 3, 4, '{"uses":5}', 1, ${index === 0 ? null : 1}, 'succeeded', 'complete', 0, '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`,
       );
       const overview = yield* work.overview({
         since: "2026-09-01T00:00:00.000Z",
@@ -126,10 +184,89 @@ it.effect(
       assert.equal(typeof overview.profile?.trackingEnabled, "boolean");
       assert.equal(typeof overview.projects[0]?.trackingEnabled, "boolean");
       assert.equal(overview.records.length, 500);
+      assert.equal(overview.totals.inputTokens, 501);
+      assert.equal(overview.totals.cachedInputTokens, 1_002);
+      assert.equal(overview.totals.outputTokens, 1_503);
+      assert.equal(overview.totals.reasoningTokens, 2_004);
+      assert.equal(overview.totals.toolUses, 2_505);
       assert.equal(overview.timeCoverage.active, "partial");
       assert.equal(overview.timeCoverage.waiting, "unavailable");
       assert.ok(yield* encodeWorkOverview(overview));
     }).pipe(Effect.provide(makeTestLayer())),
+);
+
+it.effect("keeps token and tool-use totals with immutable report membership", () =>
+  Effect.gen(function* () {
+    yield* runMigrations({ toMigrationInclusive: 54 });
+    const work = yield* WorkTrackingService;
+    yield* work.upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true });
+    const project = yield* work.upsertProject({
+      name: "Ledger",
+      t3ProjectIds: [ProjectId.make("t3-project")],
+      trackingEnabled: true,
+    });
+    yield* work.recordAutomatic({
+      kind: "agent-turn",
+      projectId: "t3-project",
+      threadId: "thread",
+      turnId: "turn",
+      sourceEventId: "event-analytics",
+      occurredAt: "2026-09-01T12:00:00.000Z",
+      provider: "codex",
+      outcome: "succeeded",
+      coverage: "complete",
+      inputTokens: 10,
+      cachedInputTokens: 4,
+      outputTokens: 6,
+      reasoningTokens: 2,
+      elapsedMs: 60,
+      taskMs: null,
+      model: null,
+      effort: null,
+      toolUses: 3,
+    });
+    const report = yield* work.createReport({ trackingProjectId: project.id, month: "2026-09" });
+    const snapshot = yield* work.getReportSnapshot({ id: report.id });
+    assert.deepEqual(snapshot.totals, {
+      manualMs: 0,
+      agentElapsedMs: 60,
+      agentActiveMs: 0,
+      agentWaitingMs: 0,
+      agentTaskMs: 0,
+      inputTokens: 10,
+      cachedInputTokens: 4,
+      outputTokens: 6,
+      reasoningTokens: 2,
+      toolUses: 3,
+      records: 1,
+    });
+  }).pipe(Effect.provide(makeTestLayer())),
+);
+
+it.effect("returns every manual entry in a month beyond the overview page cap", () =>
+  Effect.gen(function* () {
+    yield* runMigrations({ toMigrationInclusive: 54 });
+    const work = yield* WorkTrackingService;
+    const project = yield* work.upsertProject({
+      name: "Ledger",
+      t3ProjectIds: [],
+      trackingEnabled: true,
+    });
+    yield* Effect.forEach(Array.from({ length: 501 }), () =>
+      work.upsertManualEntry({
+        trackingProjectId: project.id,
+        occurredAt: "2026-09-01T12:00:00.000Z",
+        durationMs: 60,
+      }),
+    );
+    const input = {
+      since: "2026-09-01T00:00:00.000Z",
+      until: "2026-10-01T00:00:00.000Z",
+    };
+
+    assert.equal((yield* work.overview(input)).records.length, 500);
+    assert.equal((yield* work.manualRecords(input)).length, 501);
+  }).pipe(Effect.provide(makeTestLayer())),
 );
 
 it.effect("rejects ambiguous T3 project bindings before replacing bindings", () =>

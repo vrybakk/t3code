@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 
-import { WorkImportInput, WorkManualEntryInput, WorkProfile } from "./workTracking.ts";
+import { WorkImportInput, WorkManualEntryInput, WorkProfile, WorkTotals } from "./workTracking.ts";
 
 describe("work tracking contracts", () => {
   it("requires a tracking project for manual developer time", () => {
@@ -33,5 +33,24 @@ describe("work tracking contracts", () => {
     };
     expect(decode({ mode: "merge", backup })).toEqual({ mode: "merge", backup });
     expect(() => decode({ mode: "replace", backup })).toThrow();
+  });
+
+  it("requires complete local token and tool-use totals", () => {
+    const decode = Schema.decodeUnknownSync(WorkTotals);
+    const totals = {
+      manualMs: 0,
+      agentElapsedMs: 0,
+      agentActiveMs: 0,
+      agentWaitingMs: 0,
+      agentTaskMs: 0,
+      inputTokens: 10,
+      cachedInputTokens: 2,
+      outputTokens: 5,
+      reasoningTokens: 3,
+      toolUses: 4,
+      records: 1,
+    };
+    expect(decode(totals)).toEqual(totals);
+    expect(() => decode({ ...totals, toolUses: undefined })).toThrow();
   });
 });

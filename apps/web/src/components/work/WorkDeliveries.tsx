@@ -1,6 +1,6 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import type { ThreadId, WorkDelivery, WorkTrackingProject } from "@t3tools/contracts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
@@ -25,6 +25,11 @@ export function WorkDeliveries({
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [threadId, setThreadId] = useState("");
+  useEffect(() => {
+    if (projects.some((project) => project.id === projectId)) return;
+    setProjectId(projects[0]?.id ?? "");
+    setThreadId("");
+  }, [projectId, projects]);
   const selectedProject = projects.find((project) => project.id === projectId);
   const visibleThreads = threads.filter((thread) =>
     selectedProject?.t3ProjectIds.includes(thread.projectId),

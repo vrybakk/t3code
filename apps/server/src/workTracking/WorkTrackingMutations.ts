@@ -275,9 +275,27 @@ export const makeWorkTrackingMutations = ({
       }>`SELECT tracking_project_id AS id FROM work_tracking_project_bindings JOIN work_tracking_projects ON work_tracking_projects.id = tracking_project_id WHERE project_id = ${input.projectId} AND work_tracking_projects.tracking_enabled = 1 LIMIT 1`,
     ).pipe(Effect.map((rows) => rows[0]));
     if (!project) return;
+    const repositoryCandidates = yield* mapSqlError(
+      sql<{
+        readonly id: string;
+        readonly localRoot: string;
+        readonly workspaceRoot: string;
+      }>`SELECT repositories.id, repositories.local_root AS "localRoot", projects.workspace_root AS "workspaceRoot" FROM work_repositories AS repositories JOIN work_tracking_project_bindings AS bindings ON bindings.tracking_project_id = repositories.tracking_project_id JOIN projection_projects AS projects ON projects.project_id = bindings.project_id WHERE repositories.tracking_project_id = ${project.id} AND bindings.project_id = ${input.projectId} AND repositories.inclusion = 'included' AND projects.deleted_at IS NULL`,
+    );
+    const repositoryIds = [
+      ...new Set(
+        repositoryCandidates
+          .filter((repository) =>
+            isWithinWorkspaceRoot(repository.workspaceRoot, repository.localRoot),
+          )
+          .map((repository) => repository.id),
+      ),
+    ];
+    const repositoryId = repositoryIds.length === 1 ? repositoryIds[0] : null;
+    const crossRepository = repositoryIds.length > 1;
     const id = yield* crypto.randomUUIDv4;
     yield* mapSqlError(
-      sql`INSERT INTO work_records(id, kind, tracking_project_id, project_id, thread_id, turn_id, cross_repository, occurred_at, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, elapsed_ms, task_ms, provider, model, effort, tool_usage_json, outcome, coverage, source_event_id, revision, created_at, updated_at) VALUES (${id}, ${input.kind}, ${project.id}, ${input.projectId}, ${input.threadId}, ${input.turnId}, 0, ${input.occurredAt}, ${input.inputTokens}, ${input.cachedInputTokens}, ${input.outputTokens}, ${input.reasoningTokens}, ${input.elapsedMs}, ${input.taskMs}, ${input.provider}, ${input.model}, ${input.effort}, ${input.toolUses === null ? null : encodeToolUsage({ uses: input.toolUses })}, ${input.outcome}, ${input.coverage}, ${input.sourceEventId}, 0, ${input.occurredAt}, ${input.occurredAt}) ON CONFLICT(source_event_id) DO NOTHING`,
+      sql`INSERT INTO work_records(id, kind, tracking_project_id, project_id, thread_id, turn_id, repository_id, cross_repository, occurred_at, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, elapsed_ms, task_ms, provider, model, effort, tool_usage_json, outcome, coverage, source_event_id, revision, created_at, updated_at) VALUES (${id}, ${input.kind}, ${project.id}, ${input.projectId}, ${input.threadId}, ${input.turnId}, ${repositoryId}, ${crossRepository ? 1 : 0}, ${input.occurredAt}, ${input.inputTokens}, ${input.cachedInputTokens}, ${input.outputTokens}, ${input.reasoningTokens}, ${input.elapsedMs}, ${input.taskMs}, ${input.provider}, ${input.model}, ${input.effort}, ${input.toolUses === null ? null : encodeToolUsage({ uses: input.toolUses })}, ${input.outcome}, ${input.coverage}, ${input.sourceEventId}, 0, ${input.occurredAt}, ${input.occurredAt}) ON CONFLICT(source_event_id) DO NOTHING`,
     );
   });
   const readDelivery = (id: string) =>

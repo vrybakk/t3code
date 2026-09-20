@@ -12,17 +12,27 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 
+export function isValidWorkMonth(value: string): boolean {
+  return /^\d{4}-(?:0[1-9]|1[0-2])$/u.test(value);
+}
+
 export function WorkManualEntries({
   projects,
   threads,
   records,
+  month,
+  monthLoading,
   pending,
+  onMonthChange,
   onSave,
 }: {
   readonly projects: ReadonlyArray<WorkTrackingProject>;
   readonly threads: ReadonlyArray<EnvironmentThreadShell>;
   readonly records: ReadonlyArray<WorkRecord>;
+  readonly month: string;
+  readonly monthLoading: boolean;
   readonly pending: boolean;
+  readonly onMonthChange: (month: string) => void;
   readonly onSave: (input: {
     id?: WorkRecord["id"];
     trackingProjectId: WorkTrackingProject["id"];
@@ -92,7 +102,8 @@ export function WorkManualEntries({
         Developer time
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Manual entries are the only developer-time records.
+        Manual developer entries are editable. Agent metrics are captured automatically and stay
+        immutable.
       </p>
       {projects.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
@@ -218,11 +229,26 @@ export function WorkManualEntries({
         </form>
       )}
       <div className="mt-5 space-y-2">
-        <h3 className="text-sm font-medium">Recent manual entries</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">Manual entries</h3>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Month
+            <Input
+              aria-label="Manual entry month"
+              className="h-8 w-auto"
+              type="month"
+              value={month}
+              onChange={(event) => {
+                if (isValidWorkMonth(event.target.value)) onMonthChange(event.target.value);
+              }}
+            />
+          </label>
+        </div>
+        {monthLoading ? <p className="text-sm text-muted-foreground">Loading month…</p> : null}
         {manual.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No manual entries in this window.</p>
+          <p className="text-sm text-muted-foreground">No manual entries in this month.</p>
         ) : (
-          manual.slice(0, 12).map((record) => (
+          manual.map((record) => (
             <div
               key={record.id}
               className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"

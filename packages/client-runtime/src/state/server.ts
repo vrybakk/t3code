@@ -1059,6 +1059,13 @@ export function createServerEnvironmentAtoms<R, E>(
       refreshIntervalMs: 10_000,
       refreshTrigger: ({ environmentId }) => workRevisionAtom(environmentId),
     }),
+    workManualRecords: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:work:manual-records",
+      tag: WS_METHODS.workGetManualRecords,
+      staleTimeMs: 15_000,
+      refreshIntervalMs: 10_000,
+      refreshTrigger: ({ environmentId }) => workRevisionAtom(environmentId),
+    }),
     workRepositoryDiscovery: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:work:repository-discovery",
       tag: WS_METHODS.workDiscoverRepositories,

@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import { serverEnvironment } from "../../state/server";
 
 const minutes = (value: number | null) => (value === null ? "—" : `${Math.round(value / 60_000)}m`);
+const count = (value: number) => value.toLocaleString();
 
 export const shouldPrintSnapshot = (snapshot: WorkReportSnapshot | null, reportId: WorkReportId) =>
   snapshot?.report.id === reportId;
@@ -44,6 +45,12 @@ export function WorkReportSnapshotPrint({
       <p>
         Developer {minutes(snapshot.totals.manualMs)} · Agent elapsed{" "}
         {minutes(snapshot.totals.agentElapsedMs)} · Task time {minutes(snapshot.totals.agentTaskMs)}
+      </p>
+      <p>
+        Tokens · Input {count(snapshot.totals.inputTokens)} · Cached input{" "}
+        {count(snapshot.totals.cachedInputTokens)} · Output {count(snapshot.totals.outputTokens)} ·{" "}
+        Reasoning {count(snapshot.totals.reasoningTokens)} · Tool uses{" "}
+        {count(snapshot.totals.toolUses)}
       </p>
       <table className="mt-4 w-full border-collapse text-left text-sm">
         <thead>

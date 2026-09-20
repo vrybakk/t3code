@@ -38,14 +38,20 @@ describe("shouldPrintSnapshot", () => {
         agentActiveMs: 0,
         agentWaitingMs: 0,
         agentTaskMs: 0,
+        inputTokens: 10,
+        cachedInputTokens: 2,
+        outputTokens: 4,
+        reasoningTokens: 1,
+        toolUses: 3,
         records: 0,
       },
     } as never);
     const print = vi.fn();
     vi.stubGlobal("window", { print });
     const firstComplete = vi.fn();
+    let renderer: ReturnType<typeof create>;
     await act(async () => {
-      create(
+      renderer = create(
         createElement(WorkReportSnapshotPrint, {
           environmentId: "environment" as never,
           reportId,
@@ -53,6 +59,12 @@ describe("shouldPrintSnapshot", () => {
         }),
       );
     });
+    const tokenSummary = renderer!.root
+      .findAllByType("p")
+      .find((paragraph) => paragraph.children.join("").startsWith("Tokens"));
+    expect(tokenSummary?.children.join("")).toBe(
+      "Tokens · Input 10 · Cached input 2 · Output 4 · Reasoning 1 · Tool uses 3",
+    );
     expect(print).toHaveBeenCalledOnce();
     expect(firstComplete).toHaveBeenCalledOnce();
 

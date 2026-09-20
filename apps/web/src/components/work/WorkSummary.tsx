@@ -1,6 +1,7 @@
 import type { WorkOverview } from "@t3tools/contracts";
 
 const duration = (value: number) => `${Math.round(value / 60_000)}m`;
+const count = (value: number) => value.toLocaleString();
 
 export function WorkSummary({
   summaries,
@@ -16,13 +17,22 @@ export function WorkSummary({
         <div key={label} className="rounded-lg border p-4">
           <h2 className="font-medium">{label}</h2>
           {overview ? (
-            <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-              <Metric label="Developer" value={duration(overview.totals.manualMs)} />
-              <Metric label="Agent elapsed" value={duration(overview.totals.agentElapsedMs)} />
-              <Metric label="Task time" value={duration(overview.totals.agentTaskMs)} />
-              <AvailabilityMetric overview={overview} field="activeMs" label="Active" />
-              <AvailabilityMetric overview={overview} field="waitingMs" label="Waiting" />
-            </div>
+            <>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                <Metric label="Developer" value={duration(overview.totals.manualMs)} />
+                <Metric label="Agent elapsed" value={duration(overview.totals.agentElapsedMs)} />
+                <Metric label="Task time" value={duration(overview.totals.agentTaskMs)} />
+                <AvailabilityMetric overview={overview} field="activeMs" label="Active" />
+                <AvailabilityMetric overview={overview} field="waitingMs" label="Waiting" />
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Tokens · Input {count(overview.totals.inputTokens)} · Cached input{" "}
+                {count(overview.totals.cachedInputTokens)} · Output{" "}
+                {count(overview.totals.outputTokens)} · Reasoning{" "}
+                {count(overview.totals.reasoningTokens)} · Tool uses{" "}
+                {count(overview.totals.toolUses)}
+              </p>
+            </>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">No data is available.</p>
           )}

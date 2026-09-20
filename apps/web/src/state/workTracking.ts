@@ -18,8 +18,11 @@ import { appAtomRegistry } from "../rpc/atomRegistry";
 import { serverEnvironment } from "./server";
 import { useAtomCommand } from "./use-atom-command";
 
-export const workWindow = (kind: WorkWindowKind = "month", timeZone = browserTimeZone()) =>
-  workTimeWindow(kind, timeZone);
+export const workWindow = (
+  kind: WorkWindowKind = "month",
+  timeZone = browserTimeZone(),
+  referenceDate = new Date(),
+) => workTimeWindow(kind, timeZone, referenceDate);
 
 export const parseDurationMinutes = (value: string): number | null => {
   const minutes = Number(value);

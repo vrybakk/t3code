@@ -61,6 +61,9 @@ export interface AutomaticWorkRecordInput {
 type WorkError = WorkTrackingError;
 export interface WorkTrackingServiceShape {
   readonly overview: (input: WorkOverviewInput) => Effect.Effect<WorkOverview, WorkError>;
+  readonly manualRecords: (
+    input: WorkOverviewInput,
+  ) => Effect.Effect<ReadonlyArray<WorkRecord>, WorkError>;
   readonly upsertProfile: (input: WorkProfileInput) => Effect.Effect<WorkProfile, WorkError>;
   readonly upsertProject: (
     input: WorkProjectInput,
@@ -172,6 +175,12 @@ export const layer = Layer.effect(
           Record<string, unknown>
         >`SELECT id, kind, tracking_project_id AS "trackingProjectId", project_id AS "projectId", thread_id AS "threadId", turn_id AS "turnId", repository_id AS "repositoryId", cross_repository = 1 AS "crossRepository", occurred_at AS "occurredAt", duration_ms AS "durationMs", elapsed_ms AS "elapsedMs", active_ms AS "activeMs", waiting_ms AS "waitingMs", task_ms AS "taskMs", provider, model, effort, surface, json_object('inputTokens', input_tokens, 'cachedInputTokens', cached_input_tokens, 'outputTokens', output_tokens, 'reasoningTokens', reasoning_tokens) AS tokens, tool_usage_json AS "toolUsage", outcome, coverage, category, note, source_event_id AS "sourceEventId", revision, supersedes_id AS "supersedesId", created_at AS "createdAt", updated_at AS "updatedAt" FROM work_records WHERE occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} ORDER BY occurred_at DESC ${limited ? sql`LIMIT 500` : sql``}`,
       ).pipe(Effect.flatMap(decodeRecords));
+    const manualRecords = (input: WorkOverviewInput) =>
+      mapSqlError(
+        sql<
+          Record<string, unknown>
+        >`SELECT id, kind, tracking_project_id AS "trackingProjectId", project_id AS "projectId", thread_id AS "threadId", turn_id AS "turnId", repository_id AS "repositoryId", cross_repository = 1 AS "crossRepository", occurred_at AS "occurredAt", duration_ms AS "durationMs", elapsed_ms AS "elapsedMs", active_ms AS "activeMs", waiting_ms AS "waitingMs", task_ms AS "taskMs", provider, model, effort, surface, json_object('inputTokens', input_tokens, 'cachedInputTokens', cached_input_tokens, 'outputTokens', output_tokens, 'reasoningTokens', reasoning_tokens) AS tokens, tool_usage_json AS "toolUsage", outcome, coverage, category, note, source_event_id AS "sourceEventId", revision, supersedes_id AS "supersedesId", created_at AS "createdAt", updated_at AS "updatedAt" FROM work_records WHERE kind = 'manual' AND occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} ORDER BY occurred_at DESC`,
+      ).pipe(Effect.flatMap(decodeRecords));
     const readAdjustments = (input: WorkOverviewInput) =>
       mapSqlError(
         sql<
@@ -180,7 +189,7 @@ export const layer = Layer.effect(
       ).pipe(Effect.flatMap(decodeRecords));
     const readProjectTotals = (input: WorkOverviewInput) =>
       mapSqlError(
-        sql<WorkProjectTotals>`SELECT tracking_project_id AS "trackingProjectId", json_object('manualMs', COALESCE(SUM(CASE WHEN kind = 'manual' THEN duration_ms ELSE 0 END), 0), 'agentElapsedMs', COALESCE(SUM(CASE WHEN kind = 'agent-turn' THEN elapsed_ms ELSE 0 END), 0), 'agentActiveMs', COALESCE(SUM(CASE WHEN kind = 'agent-turn' THEN active_ms ELSE 0 END), 0), 'agentWaitingMs', COALESCE(SUM(CASE WHEN kind = 'agent-turn' THEN waiting_ms ELSE 0 END), 0), 'agentTaskMs', COALESCE(SUM(CASE WHEN kind = 'agent-task' THEN task_ms ELSE 0 END), 0), 'records', COUNT(*)) AS totals FROM work_records WHERE occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} GROUP BY tracking_project_id`,
+        sql<WorkProjectTotals>`SELECT tracking_project_id AS "trackingProjectId", json_object('manualMs', COALESCE(SUM(CASE WHEN kind = 'manual' THEN duration_ms ELSE 0 END), 0), 'agentElapsedMs', COALESCE(SUM(CASE WHEN kind = 'agent-turn' THEN elapsed_ms ELSE 0 END), 0), 'agentActiveMs', COALESCE(SUM(CASE WHEN kind = 'agent-turn' THEN active_ms ELSE 0 END), 0), 'agentWaitingMs', COALESCE(SUM(CASE WHEN kind = 'agent-turn' THEN waiting_ms ELSE 0 END), 0), 'agentTaskMs', COALESCE(SUM(CASE WHEN kind = 'agent-task' THEN task_ms ELSE 0 END), 0), 'inputTokens', COALESCE(SUM(input_tokens), 0), 'cachedInputTokens', COALESCE(SUM(cached_input_tokens), 0), 'outputTokens', COALESCE(SUM(output_tokens), 0), 'reasoningTokens', COALESCE(SUM(reasoning_tokens), 0), 'toolUses', COALESCE(SUM(COALESCE((SELECT SUM(value) FROM json_each(tool_usage_json)), 0)), 0), 'records', COUNT(*)) AS totals FROM work_records WHERE occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} GROUP BY tracking_project_id`,
       ).pipe(
         Effect.map((rows) =>
           rows.map(
@@ -272,6 +281,11 @@ export const layer = Layer.effect(
           agentActiveMs: total.agentActiveMs + project.totals.agentActiveMs,
           agentWaitingMs: total.agentWaitingMs + project.totals.agentWaitingMs,
           agentTaskMs: total.agentTaskMs + project.totals.agentTaskMs,
+          inputTokens: total.inputTokens + project.totals.inputTokens,
+          cachedInputTokens: total.cachedInputTokens + project.totals.cachedInputTokens,
+          outputTokens: total.outputTokens + project.totals.outputTokens,
+          reasoningTokens: total.reasoningTokens + project.totals.reasoningTokens,
+          toolUses: total.toolUses + project.totals.toolUses,
           records: total.records + project.totals.records,
         }),
         {
@@ -280,6 +294,11 @@ export const layer = Layer.effect(
           agentActiveMs: 0,
           agentWaitingMs: 0,
           agentTaskMs: 0,
+          inputTokens: 0,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningTokens: 0,
+          toolUses: 0,
           records: 0,
         },
       );
@@ -305,6 +324,7 @@ export const layer = Layer.effect(
     const backup = makeWorkTrackingBackup(sql);
     return WorkTrackingService.of({
       overview,
+      manualRecords,
       ...mutations,
       ...discovery,
       ...reporting,

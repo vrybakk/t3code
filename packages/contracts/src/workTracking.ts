@@ -185,6 +185,11 @@ export const WorkTotals = Schema.Struct({
   agentActiveMs: NonNegativeInt,
   agentWaitingMs: NonNegativeInt,
   agentTaskMs: NonNegativeInt,
+  inputTokens: NonNegativeInt,
+  cachedInputTokens: NonNegativeInt,
+  outputTokens: NonNegativeInt,
+  reasoningTokens: NonNegativeInt,
+  toolUses: NonNegativeInt,
   records: NonNegativeInt,
 });
 export type WorkTotals = typeof WorkTotals.Type;

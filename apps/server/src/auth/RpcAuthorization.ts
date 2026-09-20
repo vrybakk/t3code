@@ -60,6 +60,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.serverGetUsageSummary]: AuthOrchestrationReadScope,
   [WS_METHODS.serverRefreshUsageRates]: AuthOrchestrationReadScope,
   [WS_METHODS.workGetOverview]: AuthOrchestrationReadScope,
+  [WS_METHODS.workGetManualRecords]: AuthOrchestrationReadScope,
   [WS_METHODS.workDiscoverRepositories]: AuthOrchestrationReadScope,
   [WS_METHODS.workExportJson]: AuthOrchestrationReadScope,
   [WS_METHODS.workImportJson]: AuthOrchestrationOperateScope,

@@ -69,6 +69,15 @@ export function WorkPage() {
   const projects = useProjects().filter((project) => project.environmentId === environmentId);
   const threads = useThreadShells().filter((thread) => thread.environmentId === environmentId);
   const mutations = useWorkMutations(environmentId);
+  const [manualMonth, setManualMonth] = useState(() => monthInTimeZone(browserZone));
+  const manualWindow = useMemo(
+    () => workWindow("month", timeZone, new Date(`${manualMonth}-15T12:00:00.000Z`)),
+    [manualMonth, timeZone],
+  );
+  const manualMonthResult = useAtomValue(
+    serverEnvironment.workManualRecords({ environmentId, input: manualWindow }),
+  );
+  const manualMonthRecords = Option.getOrNull(AsyncResult.value(manualMonthResult)) ?? [];
   const [selectedId, setSelectedId] = useState<WorkTrackingProject["id"] | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -158,11 +167,14 @@ export function WorkPage() {
               />
             ) : null}
             <WorkManualEntries
-              key={`manual-entries:${overview.projects.map((project) => project.id).join(":")}`}
+              key={`manual-entries:${manualMonth}:${overview.projects.map((project) => project.id).join(":")}`}
               projects={overview.projects}
               threads={threads}
-              records={overview.records}
+              records={manualMonthRecords}
+              month={manualMonth}
+              monthLoading={manualMonthResult.waiting}
               pending={pending}
+              onMonthChange={setManualMonth}
               onSave={async (input) =>
                 (await perform(() => mutations.saveManual(input as never))) !== null
               }

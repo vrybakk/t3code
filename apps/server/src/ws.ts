@@ -2623,6 +2623,12 @@ const makeWsRpcLayer = (
             withWorkTracking((service) => service.overview(input)),
             { "rpc.aggregate": "work" },
           ),
+        [WS_METHODS.workGetManualRecords]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workGetManualRecords,
+            withWorkTracking((service) => service.manualRecords(input)),
+            { "rpc.aggregate": "work" },
+          ),
         [WS_METHODS.workUpsertProfile]: (input) =>
           observeRpcEffect(
             WS_METHODS.workUpsertProfile,

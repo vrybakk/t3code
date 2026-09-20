@@ -410,6 +410,7 @@ export const WS_METHODS = {
   serverGetUsageSummary: "server.getUsageSummary",
   serverRefreshUsageRates: "server.refreshUsageRates",
   workGetOverview: "work.getOverview",
+  workGetManualRecords: "work.getManualRecords",
   workUpsertProfile: "work.upsertProfile",
   workUpsertProject: "work.upsertProject",
   workUpsertRepository: "work.upsertRepository",
@@ -691,6 +692,11 @@ const WorkError = Schema.Union([EnvironmentAuthorizationError, WorkTrackingError
 const WsWorkGetOverviewRpc = Rpc.make(WS_METHODS.workGetOverview, {
   payload: WorkOverviewInput,
   success: WorkOverview,
+  error: WorkError,
+});
+const WsWorkGetManualRecordsRpc = Rpc.make(WS_METHODS.workGetManualRecords, {
+  payload: WorkOverviewInput,
+  success: Schema.Array(WorkRecord),
   error: WorkError,
 });
 const WsWorkUpsertProfileRpc = Rpc.make(WS_METHODS.workUpsertProfile, {
@@ -1538,6 +1544,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsWorkGetOverviewRpc,
+  WsWorkGetManualRecordsRpc,
   WsWorkUpsertProfileRpc,
   WsWorkUpsertProjectRpc,
   WsWorkUpsertRepositoryRpc,

@@ -1,5 +1,5 @@
 import type { WorkReport, WorkTrackingProject } from "@t3tools/contracts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { workReportActions } from "../../state/workTracking";
 import { Button } from "../ui/button";
@@ -39,6 +39,14 @@ export function WorkReports({
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [month, setMonth] = useState(defaultMonth);
+  useEffect(() => {
+    if (!validMonth(defaultMonth)) return;
+    setMonth((current) => current || defaultMonth);
+  }, [defaultMonth]);
+  useEffect(() => {
+    if (projects.some((project) => project.id === projectId)) return;
+    setProjectId(projects[0]?.id ?? "");
+  }, [projectId, projects]);
   const [reference, setReference] = useState("");
   const [reportReferences, setReportReferences] = useState<Record<string, string>>({});
   const [error, setError] = useState("");

@@ -20,6 +20,8 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
+import { encodeCsvRow, WORK_RECORD_CSV_HEADER, workRecordCsvValues } from "./WorkTrackingCsv.ts";
+
 const nowIso = (milliseconds: number) => DateTime.formatIso(DateTime.makeUnsafe(milliseconds));
 const failure = (message: string) => new WorkTrackingError({ message });
 const mapSqlError = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -38,6 +40,15 @@ const recordTotals = (records: ReadonlyArray<WorkRecord>) =>
       agentWaitingMs:
         totals.agentWaitingMs + (record.kind === "agent-turn" ? (record.waitingMs ?? 0) : 0),
       agentTaskMs: totals.agentTaskMs + (record.kind === "agent-task" ? (record.taskMs ?? 0) : 0),
+      inputTokens: totals.inputTokens + (record.tokens.inputTokens ?? 0),
+      cachedInputTokens: totals.cachedInputTokens + (record.tokens.cachedInputTokens ?? 0),
+      outputTokens: totals.outputTokens + (record.tokens.outputTokens ?? 0),
+      reasoningTokens: totals.reasoningTokens + (record.tokens.reasoningTokens ?? 0),
+      toolUses:
+        totals.toolUses +
+        (record.toolUsage === null
+          ? 0
+          : Object.values(record.toolUsage).reduce((total, value) => total + value, 0)),
       records: totals.records + 1,
     }),
     {
@@ -46,6 +57,11 @@ const recordTotals = (records: ReadonlyArray<WorkRecord>) =>
       agentActiveMs: 0,
       agentWaitingMs: 0,
       agentTaskMs: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      toolUses: 0,
       records: 0,
     },
   );
@@ -174,29 +190,11 @@ export const makeWorkTrackingReporting = ({
       until: window.until,
       trackingProjectId: trackingProjectId as never,
     });
-    const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
     return {
       filename: `work-${month}.csv`,
       content: [
-        "occurred_at,kind,duration_ms,elapsed_ms,active_ms,waiting_ms,task_ms,provider,model,outcome,coverage,note",
-        ...records.map((record) =>
-          [
-            record.occurredAt,
-            record.kind,
-            record.durationMs ?? "",
-            record.elapsedMs ?? "",
-            record.activeMs ?? "",
-            record.waitingMs ?? "",
-            record.taskMs ?? "",
-            record.provider ?? "",
-            record.model ?? "",
-            record.outcome,
-            record.coverage,
-            record.note ?? "",
-          ]
-            .map(escape)
-            .join(","),
-        ),
+        WORK_RECORD_CSV_HEADER.join(","),
+        ...records.map((record) => encodeCsvRow(workRecordCsvValues(record))),
       ].join("\n"),
     };
   });
@@ -213,47 +211,36 @@ export const makeWorkTrackingReporting = ({
     ))[0];
     if (!report) return yield* Effect.fail(failure("Report not found."));
     const rows = yield* mapSqlError(
-      sql<{
-        readonly occurredAt: string;
-        readonly kind: string;
-        readonly durationMs: number | null;
-        readonly elapsedMs: number | null;
-        readonly activeMs: number | null;
-        readonly waitingMs: number | null;
-        readonly taskMs: number | null;
-        readonly provider: string | null;
-        readonly model: string | null;
-        readonly outcome: string;
-        readonly coverage: string;
-        readonly note: string | null;
-      }>`SELECT records.occurred_at AS "occurredAt", records.kind, records.duration_ms AS "durationMs", records.elapsed_ms AS "elapsedMs", records.active_ms AS "activeMs", records.waiting_ms AS "waitingMs", records.task_ms AS "taskMs", records.provider, records.model, records.outcome, records.coverage, records.note FROM work_report_records AS members JOIN work_records AS records ON records.id = members.record_id WHERE members.report_id = ${input.id} ORDER BY records.occurred_at, records.id`,
+      sql<
+        Record<string, unknown>
+      >`SELECT records.id, records.kind, records.tracking_project_id AS "trackingProjectId", records.project_id AS "projectId", records.thread_id AS "threadId", records.turn_id AS "turnId", records.repository_id AS "repositoryId", records.cross_repository = 1 AS "crossRepository", records.occurred_at AS "occurredAt", records.duration_ms AS "durationMs", records.elapsed_ms AS "elapsedMs", records.active_ms AS "activeMs", records.waiting_ms AS "waitingMs", records.task_ms AS "taskMs", records.provider, records.model, records.effort, records.surface, json_object('inputTokens', records.input_tokens, 'cachedInputTokens', records.cached_input_tokens, 'outputTokens', records.output_tokens, 'reasoningTokens', records.reasoning_tokens) AS tokens, records.tool_usage_json AS "toolUsage", records.outcome, records.coverage, records.category, records.note, records.source_event_id AS "sourceEventId", records.revision, records.supersedes_id AS "supersedesId", records.created_at AS "createdAt", records.updated_at AS "updatedAt" FROM work_report_records AS members JOIN work_records AS records ON records.id = members.record_id WHERE members.report_id = ${input.id} ORDER BY records.occurred_at, records.id`,
     );
-    const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+    const records = yield* Effect.forEach(rows, (row) =>
+      decodeWorkRecord({
+        ...row,
+        crossRepository: row.crossRepository === true || row.crossRepository === 1,
+        tokens: JSON.parse(String(row.tokens)),
+        toolUsage: row.toolUsage === null ? null : JSON.parse(String(row.toolUsage)),
+      }),
+    );
     return {
       filename: `work-report-${report.month}.csv`,
       content: [
-        "report_id,report_month,project_name,profile_name,occurred_at,kind,duration_ms,elapsed_ms,active_ms,waiting_ms,task_ms,provider,model,outcome,coverage,note",
-        ...rows.map((record) =>
-          [
+        [
+          "report_id",
+          "report_month",
+          "project_name",
+          "profile_name",
+          ...WORK_RECORD_CSV_HEADER,
+        ].join(","),
+        ...records.map((record) =>
+          encodeCsvRow([
             report.id,
             report.month,
             report.projectName ?? "",
             report.profileDisplayName ?? "",
-            record.occurredAt,
-            record.kind,
-            record.durationMs ?? "",
-            record.elapsedMs ?? "",
-            record.activeMs ?? "",
-            record.waitingMs ?? "",
-            record.taskMs ?? "",
-            record.provider ?? "",
-            record.model ?? "",
-            record.outcome,
-            record.coverage,
-            record.note ?? "",
-          ]
-            .map(escape)
-            .join(","),
+            ...workRecordCsvValues(record),
+          ]),
         ),
       ].join("\n"),
     };
