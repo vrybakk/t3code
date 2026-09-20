@@ -120,6 +120,18 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
+  it.effect("isolates packaged Nerd storage and app identity", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment({ appName: "T3 Code Nerd", isPackaged: true });
+
+      assert.equal(environment.isNerdEdition, true);
+      assert.equal(environment.displayName, "T3 Code Nerd");
+      assert.equal(environment.baseDir, "/Users/alice/.t3-nerd");
+      assert.equal(environment.userDataDirName, "t3code-nerd");
+      assert.equal(environment.appUserModelId, "com.vrybakk.t3code.nerd");
+    }),
+  );
+
   it.effect("uses the packaged Windows server sidecar as the backend root", () =>
     Effect.gen(function* () {
       const environment = yield* makeEnvironment({

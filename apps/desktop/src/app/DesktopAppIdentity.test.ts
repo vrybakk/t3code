@@ -157,6 +157,21 @@ describe("DesktopAppIdentity", () => {
     ),
   );
 
+  it.effect("never adopts Electron's product-name userdata directory for Nerd", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        const userDataPath = yield* identity.resolveUserDataPath;
+
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/t3code-nerd");
+      }),
+      {
+        environment: { appName: "T3 Code Nerd" },
+        legacyPathExists: true,
+      },
+    ),
+  );
+
   it.effect("preserves failures while inspecting the legacy userData path", () => {
     const legacyPath = "/Users/alice/Library/Application Support/T3 Code (Alpha)";
     const cause = PlatformError.systemError({

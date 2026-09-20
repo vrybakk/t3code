@@ -39,6 +39,7 @@ import {
   MacDesktopBuildPrerequisitesMissingError,
   MacPasskeySigningConfigurationResolutionError,
   MissingMacPasskeyProvisioningProfileError,
+  NerdDesktopBuildPlatformError,
   packWindowsServerAsar,
   preflightLinuxDesktopBuild,
   preflightMacDesktopBuild,
@@ -257,6 +258,52 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopProductName("0.0.17"), "T3 Code (Alpha)");
     assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "T3 Code (Nightly)");
   });
+
+  it.effect("builds an isolated unsigned Nerd macOS identity without an updater feed", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.2.3",
+        false,
+        false,
+        undefined,
+        undefined,
+        false,
+        "arm64",
+        "nerd",
+      );
+
+      assert.equal(config.appId, "com.vrybakk.t3code.nerd");
+      assert.equal(config.productName, "T3 Code Nerd");
+      assert.equal(config.artifactName, "T3-Code-Nerd-${version}-${arch}.${ext}");
+      assert.deepStrictEqual((config.mac as Record<string, unknown>).protocols, [
+        { name: "T3 Code Nerd", schemes: ["t3code-nerd"] },
+      ]);
+      assert.notProperty(config, "publish");
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
+
+  it.effect("adds the fork updater feed to signed Nerd macOS builds", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.2.3",
+        true,
+        false,
+        undefined,
+        undefined,
+        false,
+        "arm64",
+        "nerd",
+      );
+
+      assert.deepStrictEqual(config.publish, [
+        { provider: "github", owner: "vrybakk", repo: "t3code", releaseType: "release" },
+      ]);
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
 
   it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17"), {
@@ -1761,6 +1808,23 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
   });
 
+  it("uses the Nerd application identifier in macOS passkey entitlements", () => {
+    const configuration = resolveMacPasskeySigningConfiguration(
+      {
+        T3CODE_APPLE_TEAM_ID: "ABC1234567",
+        T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code-nerd.provisionprofile",
+        T3CODE_CLERK_PASSKEY_RP_DOMAINS: "example.clerk.accounts.dev",
+      },
+      "nerd",
+    );
+
+    assert.equal(configuration.appId, "com.vrybakk.t3code.nerd");
+    assert.include(
+      renderMacPasskeyEntitlements(configuration),
+      "<string>ABC1234567.com.vrybakk.t3code.nerd</string>",
+    );
+  });
+
   it("normalizes explicit macOS passkey RP domains and renders required entitlements", () => {
     const configuration = resolveMacPasskeySigningConfiguration({
       T3CODE_APPLE_TEAM_ID: "ABC1234567",
@@ -2165,6 +2229,32 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         assert.instanceOf(error, UnsupportedDesktopBuildArchitectureError);
         assert.deepStrictEqual(error.supportedArchitectures, ["x64", "arm64"]);
       }
+    }),
+  );
+
+  it.effect("rejects Nerd builds outside macOS before staging", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        resolveBuildOptions({
+          platform: Option.some("linux"),
+          target: Option.none(),
+          arch: Option.none(),
+          buildVersion: Option.none(),
+          edition: Option.some("nerd"),
+          outputDir: Option.none(),
+          skipBuild: Option.none(),
+          keepStage: Option.none(),
+          signed: Option.none(),
+          verbose: Option.none(),
+          mockUpdates: Option.none(),
+          mockUpdateServerPort: Option.none(),
+          wslRuntime: Option.none(),
+        }),
+      );
+
+      assert.instanceOf(error, NerdDesktopBuildPlatformError);
+      assert.equal(error.platform, "linux");
+      assert.equal(error.message, "The Nerd desktop edition is only available for macOS builds.");
     }),
   );
 
