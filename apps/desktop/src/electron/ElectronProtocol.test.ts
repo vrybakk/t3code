@@ -6,15 +6,22 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import { beforeEach, vi } from "vite-plus/test";
 
-const { handleMock, netFetchMock, unhandleMock } = vi.hoisted(() => ({
-  handleMock: vi.fn(),
-  netFetchMock: vi.fn(),
-  unhandleMock: vi.fn(),
-}));
+const { handleMock, netFetchMock, registerSchemesAsPrivilegedMock, unhandleMock } = vi.hoisted(
+  () => ({
+    handleMock: vi.fn(),
+    netFetchMock: vi.fn(),
+    registerSchemesAsPrivilegedMock: vi.fn(),
+    unhandleMock: vi.fn(),
+  }),
+);
 
 vi.mock("electron", () => ({
   net: { fetch: netFetchMock },
-  protocol: { handle: handleMock, unhandle: unhandleMock },
+  protocol: {
+    handle: handleMock,
+    registerSchemesAsPrivileged: registerSchemesAsPrivilegedMock,
+    unhandle: unhandleMock,
+  },
 }));
 
 import * as ElectronProtocol from "./ElectronProtocol.ts";
@@ -25,7 +32,20 @@ describe("ElectronProtocol", () => {
   beforeEach(() => {
     handleMock.mockReset();
     netFetchMock.mockReset();
+    registerSchemesAsPrivilegedMock.mockReset();
     unhandleMock.mockReset();
+  });
+
+  it("registers Nerd with the same pre-ready privileges as the official schemes", () => {
+    ElectronProtocol.registerDesktopSchemePrivilegesSync();
+
+    const schemes = registerSchemesAsPrivilegedMock.mock.calls[0]?.[0] as Array<{
+      readonly scheme: string;
+      readonly privileges: unknown;
+    }>;
+    const official = schemes.find((scheme) => scheme.scheme === "t3code");
+    const nerd = schemes.find((scheme) => scheme.scheme === "t3code-nerd");
+    assert.deepEqual(nerd?.privileges, official?.privileges);
   });
 
   it.effect("serves the bundled client from disk without a backend", () =>

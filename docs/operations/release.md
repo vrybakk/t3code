@@ -259,6 +259,27 @@ available.
 
 ## Desktop auto-update notes
 
+### T3 Code Nerd fork builds
+
+`T3 Code Nerd` is an opt-in macOS-only fork edition. It installs beside the official app, keeps
+its own application data and `~/.t3-nerd` state by default, uses `t3code-nerd://`, and checks
+only `vrybakk/t3code` for updates. The official app remains installed separately and continues
+to update from upstream.
+
+Before a fork release, sync upstream into the fork so the artifact includes the current official
+changes. For a local unsigned build, run:
+
+```sh
+vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --edition nerd
+```
+
+Unsigned artifacts are manual-install only; they do not provide working macOS auto-updates. Run
+the `Release T3 Code Nerd` workflow to keep an unsigned artifact, or set `signed` only when the
+fork has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`,
+`APPLE_API_ISSUER`, the `APPLE_TEAM_ID` variable, and `MACOS_PROVISIONING_PROFILE` configured.
+Only that signed/notarized path publishes the macOS updater
+payload and release metadata.
+
 - Updater runtime: `apps/desktop/src/updates/DesktopUpdates.ts`.
 - `electron-updater` adapter: `apps/desktop/src/electron/ElectronUpdater.ts`.
 - `apps/desktop/src/main.ts` only wires the updater layers into the desktop runtime.

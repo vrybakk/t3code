@@ -73,6 +73,9 @@ const desktopEnvironmentLayer = Layer.unwrap(
     const metadata = yield* Effect.service(ElectronApp.ElectronApp).pipe(
       Effect.flatMap((app) => app.metadata),
     );
+    const appName = yield* Effect.service(ElectronApp.ElectronApp).pipe(
+      Effect.flatMap((app) => app.name),
+    );
     const platform = yield* HostProcessPlatform;
     const processArch = yield* HostProcessArchitecture;
     return DesktopEnvironment.layer({
@@ -80,6 +83,7 @@ const desktopEnvironmentLayer = Layer.unwrap(
       homeDirectory: NodeOS.homedir(),
       platform,
       processArch,
+      appName,
       ...metadata,
     });
   }),
