@@ -79,6 +79,7 @@ import {
   WORKTREE_SETUP_ACTIVITY_KIND,
   worktreeSetupActivityId,
   type WorktreeSetupSnapshot,
+  WorkTrackingError,
 } from "@t3tools/contracts";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
 import { HttpRouter, HttpServerRequest, HttpServerRespondable } from "effect/unstable/http";
@@ -154,6 +155,7 @@ import * as HostResources from "./resourceTelemetry/HostResources.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as UsageService from "./usage/UsageService.ts";
+import * as WorkTrackingService from "./workTracking/WorkTrackingService.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
@@ -667,6 +669,17 @@ const makeWsRpcLayer = (
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
       const resourceTelemetry = yield* ResourceTelemetry.ResourceTelemetry;
       const usage = yield* UsageService.UsageService;
+      const workTracking = yield* Effect.serviceOption(WorkTrackingService.WorkTrackingService);
+      const withWorkTracking = <A, E>(
+        operation: (
+          service: WorkTrackingService.WorkTrackingService["Service"],
+        ) => Effect.Effect<A, E>,
+      ): Effect.Effect<A, E | WorkTrackingError> =>
+        Option.match(workTracking, {
+          onNone: () =>
+            Effect.fail(new WorkTrackingError({ message: "Work tracking is unavailable." })),
+          onSome: operation,
+        });
       const relayClient = yield* RelayClient.RelayClient;
       const authorizationError = (requiredScope: AuthEnvironmentScope) =>
         new EnvironmentAuthorizationError({
@@ -2629,6 +2642,104 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.serverRefreshUsageRates, usage.refreshRates, {
             "rpc.aggregate": "server",
           }),
+        [WS_METHODS.workGetOverview]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workGetOverview,
+            withWorkTracking((service) => service.overview(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workGetManualRecords]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workGetManualRecords,
+            withWorkTracking((service) => service.manualRecords(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workUpsertProfile]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workUpsertProfile,
+            withWorkTracking((service) => service.upsertProfile(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workUpsertProject]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workUpsertProject,
+            withWorkTracking((service) => service.upsertProject(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workUpsertRepository]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workUpsertRepository,
+            withWorkTracking((service) => service.upsertRepository(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workDiscoverRepositories]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workDiscoverRepositories,
+            withWorkTracking((service) => service.discoverRepositories(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workUpsertManualEntry]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workUpsertManualEntry,
+            withWorkTracking((service) => service.upsertManualEntry(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workMarkDelivery]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workMarkDelivery,
+            withWorkTracking((service) =>
+              service.markDelivery(input.trackingProjectId, input.threadId),
+            ),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workReopenDelivery]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workReopenDelivery,
+            withWorkTracking((service) => service.reopenDelivery(input.id)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workCreateReport]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workCreateReport,
+            withWorkTracking((service) => service.createReport(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workTransitionReport]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workTransitionReport,
+            withWorkTracking((service) => service.transitionReport(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workExportJson]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.workExportJson,
+            withWorkTracking((service) => service.exportJson),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workImportJson]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workImportJson,
+            withWorkTracking((service) => service.importJson(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workExportCsv]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workExportCsv,
+            withWorkTracking((service) => service.exportCsv(input.trackingProjectId, input.month)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workExportReportCsv]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workExportReportCsv,
+            withWorkTracking((service) => service.exportReportCsv(input)),
+            { "rpc.aggregate": "work" },
+          ),
+        [WS_METHODS.workGetReportSnapshot]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.workGetReportSnapshot,
+            withWorkTracking((service) => service.getReportSnapshot(input)),
+            { "rpc.aggregate": "work" },
+          ),
         [WS_METHODS.serverRetryResourceTelemetry]: (_input) =>
           observeRpcEffect(WS_METHODS.serverRetryResourceTelemetry, resourceTelemetry.retry, {
             "rpc.aggregate": "server",
@@ -3793,6 +3904,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
             ).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),
               Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
+              Layer.provide(WorkTrackingService.layer),
               Layer.provide(AgentSessionScanner.layer),
               Layer.provide(ProviderMaintenanceRunner.layer),
               Layer.provide(Layer.succeed(ServerSelfUpdate.ServerSelfUpdate, serverSelfUpdate)),

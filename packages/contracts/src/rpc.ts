@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NonNegativeInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import {
   ProviderAuthCancelInput,
   ProviderAuthCompleteInput,
@@ -252,6 +252,33 @@ import {
   ProviderConsumeResetCreditResult,
 } from "./providerUsageLimits.ts";
 import { UsagePricing, UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
+import {
+  WorkCsvExport,
+  WorkDelivery,
+  WorkExport,
+  WorkImportInput,
+  WorkManualEntryInput,
+  WorkOverview,
+  WorkOverviewInput,
+  WorkProfile,
+  WorkProfileInput,
+  WorkReport,
+  WorkReportCsvInput,
+  WorkReportSnapshot,
+  WorkReportSnapshotInput,
+  WorkReportInput,
+  WorkReportTransitionInput,
+  WorkRepository,
+  WorkRepositoryDiscovery,
+  WorkRepositoryDiscoveryInput,
+  WorkRepositoryInput,
+  WorkTrackingError,
+  WorkTrackingProject,
+  WorkRecord,
+  WorkDeliveryId,
+  WorkTrackingProjectId,
+  WorkProjectInput,
+} from "./workTracking.ts";
 import { ServerSettings, ServerSettingsError, ServerSettingsPatch } from "./settings.ts";
 import {
   ProjectCloneActionInput,
@@ -386,6 +413,22 @@ export const WS_METHODS = {
   serverGetBackgroundPolicy: "server.getBackgroundPolicy",
   serverGetUsageSummary: "server.getUsageSummary",
   serverRefreshUsageRates: "server.refreshUsageRates",
+  workGetOverview: "work.getOverview",
+  workGetManualRecords: "work.getManualRecords",
+  workUpsertProfile: "work.upsertProfile",
+  workUpsertProject: "work.upsertProject",
+  workUpsertRepository: "work.upsertRepository",
+  workDiscoverRepositories: "work.discoverRepositories",
+  workUpsertManualEntry: "work.upsertManualEntry",
+  workMarkDelivery: "work.markDelivery",
+  workReopenDelivery: "work.reopenDelivery",
+  workCreateReport: "work.createReport",
+  workTransitionReport: "work.transitionReport",
+  workExportJson: "work.exportJson",
+  workImportJson: "work.importJson",
+  workExportCsv: "work.exportCsv",
+  workExportReportCsv: "work.exportReportCsv",
+  workGetReportSnapshot: "work.getReportSnapshot",
 
   // Cloud environment methods
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
@@ -653,6 +696,94 @@ const WsServerRefreshUsageRatesRpc = Rpc.make(WS_METHODS.serverRefreshUsageRates
   payload: Schema.Struct({}),
   success: UsagePricing,
   error: EnvironmentAuthorizationError,
+});
+
+const WorkError = Schema.Union([EnvironmentAuthorizationError, WorkTrackingError]);
+const WsWorkGetOverviewRpc = Rpc.make(WS_METHODS.workGetOverview, {
+  payload: WorkOverviewInput,
+  success: WorkOverview,
+  error: WorkError,
+});
+const WsWorkGetManualRecordsRpc = Rpc.make(WS_METHODS.workGetManualRecords, {
+  payload: WorkOverviewInput,
+  success: Schema.Array(WorkRecord),
+  error: WorkError,
+});
+const WsWorkUpsertProfileRpc = Rpc.make(WS_METHODS.workUpsertProfile, {
+  payload: WorkProfileInput,
+  success: WorkProfile,
+  error: WorkError,
+});
+const WsWorkUpsertProjectRpc = Rpc.make(WS_METHODS.workUpsertProject, {
+  payload: WorkProjectInput,
+  success: WorkTrackingProject,
+  error: WorkError,
+});
+const WsWorkUpsertRepositoryRpc = Rpc.make(WS_METHODS.workUpsertRepository, {
+  payload: WorkRepositoryInput,
+  success: WorkRepository,
+  error: WorkError,
+});
+const WsWorkDiscoverRepositoriesRpc = Rpc.make(WS_METHODS.workDiscoverRepositories, {
+  payload: WorkRepositoryDiscoveryInput,
+  success: WorkRepositoryDiscovery,
+  error: WorkError,
+});
+const WsWorkUpsertManualEntryRpc = Rpc.make(WS_METHODS.workUpsertManualEntry, {
+  payload: WorkManualEntryInput,
+  success: WorkRecord,
+  error: WorkError,
+});
+const WsWorkMarkDeliveryRpc = Rpc.make(WS_METHODS.workMarkDelivery, {
+  payload: Schema.Struct({
+    trackingProjectId: WorkTrackingProjectId,
+    threadId: Schema.NullOr(ThreadId),
+  }),
+  success: WorkDelivery,
+  error: WorkError,
+});
+const WsWorkReopenDeliveryRpc = Rpc.make(WS_METHODS.workReopenDelivery, {
+  payload: Schema.Struct({ id: WorkDeliveryId }),
+  success: WorkDelivery,
+  error: WorkError,
+});
+const WsWorkCreateReportRpc = Rpc.make(WS_METHODS.workCreateReport, {
+  payload: WorkReportInput,
+  success: WorkReport,
+  error: WorkError,
+});
+const WsWorkTransitionReportRpc = Rpc.make(WS_METHODS.workTransitionReport, {
+  payload: WorkReportTransitionInput,
+  success: WorkReport,
+  error: WorkError,
+});
+const WsWorkExportJsonRpc = Rpc.make(WS_METHODS.workExportJson, {
+  payload: Schema.Struct({}),
+  success: WorkExport,
+  error: WorkError,
+});
+const WsWorkImportJsonRpc = Rpc.make(WS_METHODS.workImportJson, {
+  payload: WorkImportInput,
+  success: WorkExport,
+  error: WorkError,
+});
+const WsWorkExportCsvRpc = Rpc.make(WS_METHODS.workExportCsv, {
+  payload: Schema.Struct({
+    trackingProjectId: WorkTrackingProjectId,
+    month: TrimmedNonEmptyString,
+  }),
+  success: WorkCsvExport,
+  error: WorkError,
+});
+const WsWorkExportReportCsvRpc = Rpc.make(WS_METHODS.workExportReportCsv, {
+  payload: WorkReportCsvInput,
+  success: WorkCsvExport,
+  error: WorkError,
+});
+const WsWorkGetReportSnapshotRpc = Rpc.make(WS_METHODS.workGetReportSnapshot, {
+  payload: WorkReportSnapshotInput,
+  success: WorkReportSnapshot,
+  error: WorkError,
 });
 
 const WsServerSignalProcessRpc = Rpc.make(WS_METHODS.serverSignalProcess, {
@@ -1423,6 +1554,22 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerRetryResourceTelemetryRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
+  WsWorkGetOverviewRpc,
+  WsWorkGetManualRecordsRpc,
+  WsWorkUpsertProfileRpc,
+  WsWorkUpsertProjectRpc,
+  WsWorkUpsertRepositoryRpc,
+  WsWorkDiscoverRepositoriesRpc,
+  WsWorkUpsertManualEntryRpc,
+  WsWorkMarkDeliveryRpc,
+  WsWorkReopenDeliveryRpc,
+  WsWorkCreateReportRpc,
+  WsWorkTransitionReportRpc,
+  WsWorkExportJsonRpc,
+  WsWorkImportJsonRpc,
+  WsWorkExportCsvRpc,
+  WsWorkExportReportCsvRpc,
+  WsWorkGetReportSnapshotRpc,
   WsServerSignalProcessRpc,
   WsServerReportClientActivityRpc,
   WsServerReportHostPowerStateRpc,

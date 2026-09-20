@@ -35,6 +35,7 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Scope from "effect/Scope";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
 import { it as effectIt } from "@effect/vitest";
@@ -70,6 +71,7 @@ import { ServerConfig } from "../../config.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { makeSqlStatementCounter } from "../../../integration/SqlStatementCounter.integration.ts";
+import { WorkTrackingService } from "../../workTracking/WorkTrackingService.ts";
 
 function makeTestServerSettingsLayer(overrides: Partial<ServerSettings> = {}) {
   return ServerSettingsService.layerTest(overrides);
@@ -240,7 +242,11 @@ async function waitForThread(
 
 describe("ProviderRuntimeIngestion", () => {
   let runtime: ManagedRuntime.ManagedRuntime<
-    OrchestrationEngineService | ProviderRuntimeIngestionService | ProjectionSnapshotQuery,
+    | OrchestrationEngineService
+    | ProviderRuntimeIngestionService
+    | ProjectionSnapshotQuery
+    | WorkTrackingService
+    | SqlClient.SqlClient,
     unknown
   > | null = null;
   let scope: Scope.Closeable | null = null;
@@ -350,6 +356,8 @@ describe("ProviderRuntimeIngestion", () => {
     const engine = await testRuntime.runPromise(Effect.service(OrchestrationEngineService));
     const snapshotQuery = await testRuntime.runPromise(Effect.service(ProjectionSnapshotQuery));
     const ingestion = await testRuntime.runPromise(Effect.service(ProviderRuntimeIngestionService));
+    const workTracking = await testRuntime.runPromise(Effect.service(WorkTrackingService));
+    const sql = await testRuntime.runPromise(Effect.service(SqlClient.SqlClient));
     scope = await Effect.runPromise(Scope.make("sequential"));
     await testRuntime.runPromise(ingestion.start().pipe(Scope.provide(scope)));
     const drain = () => testRuntime.runPromise(ingestion.drain);
@@ -415,6 +423,8 @@ describe("ProviderRuntimeIngestion", () => {
 
     return {
       engine,
+      workTracking,
+      dropWorkRecords: () => testRuntime.runPromise(sql`DROP TABLE work_records`),
       dispatch,
       readModel: () => testRuntime.runPromise(snapshotQuery.getSnapshot()),
       readTurn: (turnId: TurnId) =>
@@ -480,6 +490,184 @@ describe("ProviderRuntimeIngestion", () => {
     );
     expect(thread.session?.status).toBe("error");
     expect(thread.session?.lastError).toBe("turn failed");
+  });
+
+  it("writes only enabled terminal agent work with projection elapsed time and typed task usage", async () => {
+    const harness = await createHarness();
+    const project = await harness.workTracking
+      .upsertProject({
+        name: "Tracked project",
+        t3ProjectIds: [asProjectId("project-1")],
+        trackingEnabled: true,
+      })
+      .pipe(Effect.runPromise);
+    await harness.workTracking
+      .upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: false })
+      .pipe(Effect.runPromise);
+    const started: LegacyProviderRuntimeEvent = {
+      type: "turn.started",
+      eventId: asEventId("work-turn-started"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("work-turn"),
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const terminal: LegacyProviderRuntimeEvent = {
+      type: "turn.completed",
+      eventId: asEventId("work-turn-terminal"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("work-turn"),
+      createdAt: "2026-01-01T00:00:02.000Z",
+      payload: {
+        state: "completed",
+        tokenUsage: {
+          usageStatus: "complete",
+          inputTokens: 3,
+          cachedInputTokens: 1,
+          outputTokens: 5,
+          reasoningTokens: 2,
+        },
+      },
+    };
+    await harness.emitAndDrain([started, terminal]);
+    let overview = await harness.workTracking
+      .overview({
+        trackingProjectId: project.id,
+        since: "2026-01-01T00:00:00.000Z",
+        until: "2026-01-02T00:00:00.000Z",
+      })
+      .pipe(Effect.runPromise);
+    expect(overview.records).toHaveLength(0);
+
+    await harness.workTracking
+      .upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true })
+      .pipe(Effect.runPromise);
+    await harness.emitAndDrain([started, terminal, terminal]);
+    await harness.emitAndDrain([
+      {
+        type: "task.completed",
+        eventId: asEventId("work-agent-task"),
+        provider: ProviderDriverKind.make("codex"),
+        threadId: asThreadId("thread-1"),
+        turnId: asTurnId("work-turn"),
+        createdAt: "2026-01-01T00:00:03.000Z",
+        payload: {
+          taskId: "agent-task",
+          taskType: "local_agent",
+          status: "completed",
+          model: "gpt-5-codex",
+          effort: "high",
+          typedUsage: {
+            inputTokens: 7,
+            cachedInputTokens: 2,
+            outputTokens: 11,
+            reasoningOutputTokens: 3,
+            durationMs: 400,
+            toolUses: 2,
+          },
+        },
+      },
+      {
+        type: "task.completed",
+        eventId: asEventId("work-monitor-task"),
+        provider: ProviderDriverKind.make("codex"),
+        threadId: asThreadId("thread-1"),
+        turnId: asTurnId("work-turn"),
+        createdAt: "2026-01-01T00:00:04.000Z",
+        payload: {
+          taskId: "monitor-task",
+          taskType: "monitor",
+          status: "completed",
+          typedUsage: { inputTokens: 100, outputTokens: 100, durationMs: 100 },
+        },
+      },
+    ]);
+    overview = await harness.workTracking
+      .overview({
+        trackingProjectId: project.id,
+        since: "2026-01-01T00:00:00.000Z",
+        until: "2026-01-02T00:00:00.000Z",
+      })
+      .pipe(Effect.runPromise);
+    expect(overview.records).toHaveLength(2);
+    expect(overview.totals.agentElapsedMs).toBe(2_000);
+    expect(overview.totals.agentTaskMs).toBe(400);
+    expect(overview.records.find((record) => record.kind === "agent-turn")?.tokens).toMatchObject({
+      inputTokens: 3,
+      cachedInputTokens: 1,
+      outputTokens: 5,
+      reasoningTokens: 2,
+    });
+    expect(overview.records.find((record) => record.kind === "agent-task")).toMatchObject({
+      model: "gpt-5-codex",
+      effort: "high",
+      taskMs: 400,
+    });
+    await harness.workTracking
+      .upsertProject({
+        id: project.id,
+        name: "Tracked project",
+        t3ProjectIds: [asProjectId("project-1")],
+        trackingEnabled: false,
+      })
+      .pipe(Effect.runPromise);
+    await harness.emitAndDrain([
+      {
+        ...started,
+        eventId: asEventId("work-disabled-started"),
+        turnId: asTurnId("work-disabled-turn"),
+        createdAt: "2026-01-01T00:00:05.000Z",
+      },
+      {
+        ...terminal,
+        eventId: asEventId("work-disabled-terminal"),
+        turnId: asTurnId("work-disabled-turn"),
+        createdAt: "2026-01-01T00:00:06.000Z",
+      },
+    ]);
+    overview = await harness.workTracking
+      .overview({
+        trackingProjectId: project.id,
+        since: "2026-01-01T00:00:00.000Z",
+        until: "2026-01-02T00:00:00.000Z",
+      })
+      .pipe(Effect.runPromise);
+    expect(overview.records).toHaveLength(2);
+  });
+
+  it("keeps task activity projection alive when work-ledger recording fails", async () => {
+    const harness = await createHarness();
+    await harness.workTracking
+      .upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true })
+      .pipe(Effect.runPromise);
+    await harness.workTracking
+      .upsertProject({
+        name: "Tracked project",
+        t3ProjectIds: [asProjectId("project-1")],
+        trackingEnabled: true,
+      })
+      .pipe(Effect.runPromise);
+    await harness.dropWorkRecords();
+    await harness.emitAndDrain([
+      {
+        type: "task.completed",
+        eventId: asEventId("work-failing-task"),
+        provider: ProviderDriverKind.make("codex"),
+        threadId: asThreadId("thread-1"),
+        turnId: asTurnId("turn-failing-task"),
+        createdAt: "2026-01-01T00:00:00.000Z",
+        payload: {
+          taskId: "failing-task",
+          taskType: "local_agent",
+          status: "completed",
+        },
+      },
+    ]);
+    const thread = await waitForThread(harness.readModel, (entry) =>
+      entry.activities.some((activity) => activity.id === "work-failing-task"),
+    );
+    expect(thread.activities.some((activity) => activity.id === "work-failing-task")).toBe(true);
   });
 
   it.each([

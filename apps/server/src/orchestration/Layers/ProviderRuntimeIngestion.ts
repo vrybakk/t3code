@@ -56,6 +56,7 @@ import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { canReplaceThreadTitle } from "../threadTitles.ts";
+import * as WorkTrackingService from "../../workTracking/WorkTrackingService.ts";
 
 const providerTurnKey = (threadId: ThreadId, turnId: TurnId) => `${threadId}:${turnId}`;
 // Suffixed, not prefixed: `clearTurnStateForSession` sweeps by thread prefix.
@@ -1029,10 +1030,129 @@ const make = Effect.gen(function* () {
   const projectionThreadActivityRepository = yield* ProjectionThreadActivityRepository;
   const serverSettingsService = yield* ServerSettingsService;
   const checkpointStore = yield* CheckpointStore.CheckpointStore;
+  const workTracking = yield* Effect.serviceOption(WorkTrackingService.WorkTrackingService);
   const providerCommandId = (event: ProviderRuntimeEvent, tag: string) =>
     crypto.randomUUIDv4.pipe(
       Effect.map((uuid) => CommandId.make(`provider:${event.eventId}:${tag}:${uuid}`)),
     );
+
+  const recordTerminalWork = Effect.fn("ProviderRuntimeIngestion.recordTerminalWork")(function* (
+    event: Extract<ProviderRuntimeEvent, { type: "turn.completed" | "turn.aborted" }>,
+    thread: { readonly projectId: ProjectId; readonly id: ThreadId },
+  ) {
+    const tokenUsage = event.payload.tokenUsage;
+    const outcome =
+      event.type === "turn.aborted"
+        ? "interrupted"
+        : normalizeRuntimeTurnState(event.payload.state) === "failed"
+          ? "failed"
+          : "succeeded";
+    const turnId = toTurnId(event.turnId);
+    const turn = turnId
+      ? yield* projectionTurnRepository.getByTurnId({ threadId: thread.id, turnId })
+      : Option.none();
+    const elapsedMs = Option.match(turn, {
+      onNone: () => null,
+      onSome: (value) =>
+        value.startedAt === null || value.completedAt === null
+          ? null
+          : DateTime.toEpochMillis(DateTime.makeUnsafe(value.completedAt)) -
+            DateTime.toEpochMillis(DateTime.makeUnsafe(value.startedAt)),
+    });
+    return yield* Option.match(workTracking, {
+      onNone: () => Effect.void,
+      onSome: (service) =>
+        service
+          .recordAutomatic({
+            kind: "agent-turn",
+            projectId: thread.projectId,
+            threadId: thread.id,
+            turnId: event.turnId ?? null,
+            sourceEventId: event.eventId,
+            occurredAt: event.createdAt,
+            provider: event.provider,
+            outcome,
+            coverage: tokenUsage?.usageStatus ?? "unavailable",
+            inputTokens: tokenUsage?.inputTokens ?? null,
+            cachedInputTokens: tokenUsage?.cachedInputTokens ?? null,
+            outputTokens: tokenUsage?.outputTokens ?? null,
+            reasoningTokens: tokenUsage?.reasoningTokens ?? null,
+            elapsedMs,
+            taskMs: null,
+            model: null,
+            effort: null,
+            toolUses: null,
+          })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning("work tracking did not record terminal turn", {
+                eventId: event.eventId,
+                cause: Cause.pretty(cause),
+              }),
+            ),
+          ),
+    });
+  });
+
+  const recordTerminalTaskWork = Effect.fn("ProviderRuntimeIngestion.recordTerminalTaskWork")(
+    function* (
+      event: Extract<ProviderRuntimeEvent, { type: "task.completed" }>,
+      thread: { readonly projectId: ProjectId; readonly id: ThreadId },
+    ) {
+      if (
+        classifyTaskAgentKind({
+          taskType: event.payload.taskType,
+          agentId: event.payload.agentId,
+        }) !== "agent"
+      ) {
+        return;
+      }
+      const usage = event.payload.typedUsage;
+      yield* Option.match(workTracking, {
+        onNone: () => Effect.void,
+        onSome: (service) =>
+          service
+            .recordAutomatic({
+              kind: "agent-task",
+              projectId: thread.projectId,
+              threadId: thread.id,
+              turnId: event.turnId ?? null,
+              sourceEventId: event.eventId,
+              occurredAt: event.createdAt,
+              provider: event.provider,
+              outcome:
+                event.payload.status === "completed"
+                  ? "succeeded"
+                  : event.payload.status === "failed"
+                    ? "failed"
+                    : "interrupted",
+              coverage:
+                usage?.inputTokens !== undefined && usage.outputTokens !== undefined
+                  ? "complete"
+                  : usage === undefined
+                    ? "unavailable"
+                    : "partial",
+              inputTokens: usage?.inputTokens ?? null,
+              cachedInputTokens: usage?.cachedInputTokens ?? null,
+              outputTokens: usage?.outputTokens ?? null,
+              reasoningTokens: usage?.reasoningOutputTokens ?? null,
+              elapsedMs: null,
+              taskMs: usage?.durationMs ?? null,
+              model: event.payload.model ?? null,
+              effort: event.payload.effort ?? null,
+              toolUses: usage?.toolUses ?? null,
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("work tracking did not record terminal task", {
+                  eventId: event.eventId,
+                  cause: Cause.pretty(cause),
+                }),
+              ),
+            ),
+      });
+    },
+  );
 
   const turnMessageIdsByTurnKey = yield* Cache.make<string, Set<MessageId>>({
     capacity: TURN_MESSAGE_IDS_BY_TURN_CACHE_CAPACITY,
@@ -1934,6 +2054,13 @@ const make = Effect.gen(function* () {
         }
       }
 
+      if (
+        shouldApplyThreadLifecycle &&
+        (event.type === "turn.completed" || event.type === "turn.aborted")
+      ) {
+        yield* recordTerminalWork(event, thread);
+      }
+
       const assistantDelta =
         event.type === "content.delta" && event.payload.streamKind === "assistant_text"
           ? event.payload.delta
@@ -2522,6 +2649,7 @@ const make = Effect.gen(function* () {
             event.payload.taskId,
           );
         }
+        yield* recordTerminalTaskWork(event, thread);
       }
 
       let activityEvent = event;
@@ -2717,4 +2845,5 @@ export const ProviderRuntimeIngestionLive = Layer.effect(
   Layer.provide(ProjectionThreadMessageRepositoryLive),
   Layer.provide(ProjectionThreadProposedPlanRepositoryLive),
   Layer.provide(ProjectionTurnRepositoryLive),
+  Layer.provideMerge(WorkTrackingService.layer),
 );
