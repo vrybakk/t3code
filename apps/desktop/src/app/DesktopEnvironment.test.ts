@@ -120,13 +120,14 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
-  it.effect("isolates packaged Nerd storage and app identity", () =>
+  it.effect("shares production state while preserving the packaged Nerd identity", () =>
     Effect.gen(function* () {
       const environment = yield* makeEnvironment({ appName: "T3 Code Nerd", isPackaged: true });
 
       assert.equal(environment.isNerdEdition, true);
       assert.equal(environment.displayName, "T3 Code Nerd");
-      assert.equal(environment.baseDir, "/Users/alice/.t3-nerd");
+      assert.equal(environment.baseDir, "/Users/alice/.t3");
+      assert.equal(environment.stateDir, "/Users/alice/.t3/userdata");
       assert.equal(environment.userDataDirName, "t3code-nerd");
       assert.equal(environment.appUserModelId, "com.vrybakk.t3code.nerd");
     }),
