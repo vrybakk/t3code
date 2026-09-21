@@ -2740,7 +2740,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       protocols: [
         {
           name: edition === "nerd" ? resolveDesktopProductName(version, edition) : "T3 Code",
-          schemes: edition === "nerd" ? ["t3code-nerd"] : ["t3code", "t3code-dev"],
+          schemes: edition === "nerd" ? ["t3code"] : ["t3code", "t3code-dev"],
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),

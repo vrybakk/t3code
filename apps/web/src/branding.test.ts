@@ -35,8 +35,28 @@ describe("branding", () => {
     const branding = await import("./branding");
 
     expect(branding.APP_BASE_NAME).toBe("T3 Code");
+    expect(branding.IS_NERD_EDITION).toBe(false);
     expect(branding.APP_STAGE_LABEL).toBe("Nightly");
     expect(branding.APP_DISPLAY_NAME).toBe("T3 Code (Nightly)");
+  });
+
+  it("identifies the Nerd desktop edition from injected branding", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        desktopBridge: {
+          getAppBranding: () => ({
+            baseName: "T3 Code Nerd",
+            stageLabel: null,
+            displayName: "T3 Code Nerd",
+          }),
+        },
+      },
+    });
+
+    const branding = await import("./branding");
+
+    expect(branding.IS_NERD_EDITION).toBe(true);
   });
 
   it("normalizes hosted app channel metadata", async () => {
