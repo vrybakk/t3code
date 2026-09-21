@@ -261,10 +261,11 @@ available.
 
 ### T3 Code Nerd fork builds
 
-`T3 Code Nerd` is an opt-in macOS-only fork edition. It installs beside the official app, keeps
-its own application data and `~/.t3-nerd` state by default, uses `t3code-nerd://`, and checks
-only `vrybakk/t3code` for updates. The official app remains installed separately and continues
-to update from upstream.
+`T3 Code Nerd` is a macOS-only replacement fork edition. It keeps its own application data and
+`~/.t3-nerd` state by default, uses the production `t3code://` renderer and OAuth callback so it
+can reuse T3 Connect, and checks only `vrybakk/t3code` for updates. Remove the official desktop
+app before relying on Nerd for OAuth callbacks because only one installed app should own the
+`t3code://` operating-system handler.
 
 The fork's scheduled Nerd workflow polls for the latest published upstream nightly, merges that
 exact release commit with the fork's `main`, aligns the bundled package versions, and publishes the
@@ -293,7 +294,7 @@ the `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_TEMPLATE`, `CLERK_CLI_OAUTH_CLIENT_ID`, 
 `APPLE_API_ISSUER`, the `APPLE_TEAM_ID` variable, and `MACOS_PROVISIONING_PROFILE` configured.
 Only that signed/notarized path publishes the macOS updater payload and release metadata. Select
 the Nightly track once in the Nerd app's About settings; after that it checks the fork's
-`nightly-mac.yml` feed while the official app remains on its independently selected upstream track.
+`nightly-mac.yml` feed.
 An existing unsigned Nerd build has no update feed, so install the first signed Nerd DMG manually;
 automatic updates begin with that signed installation.
 

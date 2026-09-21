@@ -1,12 +1,13 @@
 import type { DesktopUpdateActionResult, DesktopUpdateState } from "@t3tools/contracts";
+import { IS_NERD_EDITION } from "../branding";
 
 export type DesktopUpdateButtonAction = "download" | "install" | "none";
 
 const OFFICIAL_DESKTOP_RELEASE_HISTORY_URL = "https://github.com/pingdotgg/t3code/releases";
 const NERD_DESKTOP_RELEASE_HISTORY_URL = "https://github.com/vrybakk/t3code/releases";
 
-function resolveDesktopReleaseHistoryUrl(protocol = globalThis.location?.protocol): string {
-  return protocol === "t3code-nerd:"
+function resolveDesktopReleaseHistoryUrl(isNerdEdition = IS_NERD_EDITION): string {
+  return isNerdEdition
     ? NERD_DESKTOP_RELEASE_HISTORY_URL
     : OFFICIAL_DESKTOP_RELEASE_HISTORY_URL;
 }
@@ -21,14 +22,17 @@ export function getDesktopUpdateDownloadedVersion(state: DesktopUpdateState): st
 }
 
 /** Release notes for an exact downloaded build; nightly suffixes are part of the tag. */
-export function getDesktopUpdateReleaseUrl(version: string | null, protocol?: string): string | null {
+export function getDesktopUpdateReleaseUrl(
+  version: string | null,
+  isNerdEdition?: boolean,
+): string | null {
   const normalizedVersion = version?.trim();
   if (!normalizedVersion) return null;
-  return `${resolveDesktopReleaseHistoryUrl(protocol)}/tag/v${encodeURIComponent(normalizedVersion)}`;
+  return `${resolveDesktopReleaseHistoryUrl(isNerdEdition)}/tag/v${encodeURIComponent(normalizedVersion)}`;
 }
 
-export function getDesktopUpdateReleaseHistoryUrl(protocol?: string): string {
-  return resolveDesktopReleaseHistoryUrl(protocol);
+export function getDesktopUpdateReleaseHistoryUrl(isNerdEdition?: boolean): string {
+  return resolveDesktopReleaseHistoryUrl(isNerdEdition);
 }
 
 export function resolveDesktopUpdateButtonAction(

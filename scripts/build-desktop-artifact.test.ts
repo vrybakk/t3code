@@ -278,7 +278,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.equal(config.productName, "T3 Code Nerd");
       assert.equal(config.artifactName, "T3-Code-Nerd-${version}-${arch}.${ext}");
       assert.deepStrictEqual((config.mac as Record<string, unknown>).protocols, [
-        { name: "T3 Code Nerd", schemes: ["t3code-nerd"] },
+        { name: "T3 Code Nerd", schemes: ["t3code"] },
       ]);
       assert.notProperty(config, "publish");
     }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),

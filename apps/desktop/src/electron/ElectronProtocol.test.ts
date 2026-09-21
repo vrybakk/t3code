@@ -36,16 +36,19 @@ describe("ElectronProtocol", () => {
     unhandleMock.mockReset();
   });
 
-  it("registers Nerd with the same pre-ready privileges as the official schemes", () => {
+  it("uses the production renderer protocol for packaged builds", () => {
     ElectronProtocol.registerDesktopSchemePrivilegesSync();
 
     const schemes = registerSchemesAsPrivilegedMock.mock.calls[0]?.[0] as Array<{
       readonly scheme: string;
       readonly privileges: unknown;
     }>;
-    const official = schemes.find((scheme) => scheme.scheme === "t3code");
-    const nerd = schemes.find((scheme) => scheme.scheme === "t3code-nerd");
-    assert.deepEqual(nerd?.privileges, official?.privileges);
+    assert.equal(ElectronProtocol.getDesktopScheme(false), "t3code");
+    assert.equal(ElectronProtocol.getDesktopScheme(true), "t3code-dev");
+    assert.deepEqual(
+      schemes.map(({ scheme }) => scheme),
+      ["t3code", "t3code-dev"],
+    );
   });
 
   it.effect("serves the bundled client from disk without a backend", () =>

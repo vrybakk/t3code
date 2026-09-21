@@ -75,6 +75,11 @@ Development uses `t3code-dev://app`; production uses `t3code://app`. Update the 
 The Clerk Electron integration handles token
 persistence and system-browser callback delivery.
 
+Fork builds that replace the official desktop app should keep the production `t3code://app/`
+renderer and OAuth callback so they can use the same T3 Connect deployment. Do not run the official
+desktop app and a replacement fork build at the same time: only one installed application should
+own the `t3code://` operating-system handler.
+
 ## Android native sign-in redirects
 
 Clerk's native Android SDK uses `clerk://<applicationId>.callback`. In the Clerk instance selected by the app's publishable key, add each supported package to **Native applications > Allowlist for mobile SSO redirect**:
