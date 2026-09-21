@@ -116,6 +116,13 @@ export const animateSidebarLayoutChanges: AnimateLayoutChanges = (args) =>
 
 export type SidebarSection = "pinned" | "active" | "snoozed" | "settled";
 
+export function resolveSidebarThreadRowVariant(
+  section: SidebarSection,
+  groupedByProject: boolean,
+): "card" | "slim" {
+  return groupedByProject || section === "snoozed" || section === "settled" ? "slim" : "card";
+}
+
 /** Sortable ids: thread rows use their scoped key; structural items use a
     colon-free prefix: scoped thread keys always contain a colon. */
 const SIDEBAR_MARKER_PREFIX = "sidebar-marker-";
@@ -632,7 +639,12 @@ export function useThreadJumpHintVisibility(): {
   };
 }
 
-export function hasUnseenCompletion(thread: ThreadStatusInput): boolean {
+export function hasUnseenCompletion<
+  T extends {
+    readonly latestTurn: { readonly completedAt: string | null } | null;
+    readonly lastVisitedAt?: string | undefined;
+  },
+>(thread: T): boolean {
   if (!thread.latestTurn?.completedAt) return false;
   const completedAt = Date.parse(thread.latestTurn.completedAt);
   if (Number.isNaN(completedAt)) return false;
@@ -834,10 +846,16 @@ export function shouldRecedeSidebarThread(input: {
 
 type SidebarThreadStatusInput = Pick<
   SidebarThreadSummary,
-  "hasPendingApprovals" | "hasPendingUserInput" | "session" | "backgroundLiveness"
->;
+  "hasPendingApprovals" | "hasPendingUserInput" | "backgroundLiveness"
+> & {
+  readonly session: {
+    readonly status: NonNullable<SidebarThreadSummary["session"]>["status"];
+  } | null;
+};
 
-export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): SidebarThreadStatus {
+export function resolveSidebarThreadStatus<T extends SidebarThreadStatusInput>(
+  thread: T,
+): SidebarThreadStatus {
   if (thread.hasPendingApprovals) {
     return "approval";
   }

@@ -557,6 +557,7 @@ describe("ClientSettings environment identification", () => {
 describe("ClientSettings sidebar", () => {
   it("defaults to the current sidebar", () => {
     expect(decodeClientSettings({}).legacySidebarEnabled).toBe(false);
+    expect(decodeClientSettings({}).sidebarViewMode).toBe("threads");
   });
 
   it("drops the retired sidebar v2 beta keys, resetting everyone to the default", () => {
@@ -582,6 +583,14 @@ describe("ClientSettings sidebar", () => {
     expect(decodeClientSettingsPatch({ legacySidebarEnabled: true }).legacySidebarEnabled).toBe(
       true,
     );
+  });
+
+  it("preserves the project-grouped sidebar view", () => {
+    expect(decodeClientSettings({ sidebarViewMode: "projects" }).sidebarViewMode).toBe("projects");
+    expect(decodeClientSettingsPatch({ sidebarViewMode: "projects" }).sidebarViewMode).toBe(
+      "projects",
+    );
+    expect(() => decodeClientSettingsPatch({ sidebarViewMode: "folders" })).toThrow();
   });
 
   it("keeps unpin confirmation opt-in and patchable", () => {

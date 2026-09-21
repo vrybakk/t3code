@@ -34,6 +34,7 @@ import {
   sortLogicalProjectsForSidebar,
   sortSettledThreadsForSidebar,
   resolveSidebarDropTarget,
+  resolveSidebarThreadRowVariant,
   pinOrderKeyBetween,
   planPinnedReorder,
   planSidebarThreadDrop,
@@ -2534,6 +2535,22 @@ describe("resolveSidebarDropVerb", () => {
     expect(resolveSidebarDropVerb("pinned", "pinned")).toBeNull();
     expect(resolveSidebarDropVerb("active", null)).toBeNull();
     expect(resolveSidebarDropVerb("active", "snoozed")).toBeNull();
+  });
+});
+
+describe("resolveSidebarThreadRowVariant", () => {
+  it("keeps project-group children compact without changing their section semantics", () => {
+    expect(resolveSidebarThreadRowVariant("pinned", true)).toBe("slim");
+    expect(resolveSidebarThreadRowVariant("active", true)).toBe("slim");
+    expect(resolveSidebarThreadRowVariant("snoozed", true)).toBe("slim");
+    expect(resolveSidebarThreadRowVariant("settled", true)).toBe("slim");
+  });
+
+  it("preserves the existing flat-view densities", () => {
+    expect(resolveSidebarThreadRowVariant("pinned", false)).toBe("card");
+    expect(resolveSidebarThreadRowVariant("active", false)).toBe("card");
+    expect(resolveSidebarThreadRowVariant("snoozed", false)).toBe("slim");
+    expect(resolveSidebarThreadRowVariant("settled", false)).toBe("slim");
   });
 });
 
