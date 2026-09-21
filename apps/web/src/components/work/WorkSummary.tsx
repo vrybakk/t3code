@@ -33,6 +33,7 @@ export function WorkSummary({
         </div>
         <ToggleGroup
           aria-label="Work period"
+          className="w-full sm:w-fit"
           value={[selected?.label ?? ""]}
           onValueChange={(value) => {
             const label = value[0];
@@ -40,7 +41,7 @@ export function WorkSummary({
           }}
         >
           {summaries.map((summary) => (
-            <Toggle key={summary.label} value={summary.label}>
+            <Toggle key={summary.label} value={summary.label} className="flex-1 sm:flex-none">
               {summary.label}
             </Toggle>
           ))}
@@ -48,7 +49,7 @@ export function WorkSummary({
       </div>
       {overview ? (
         <>
-          <div className="mt-6 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
+          <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 text-sm md:grid-cols-5">
             <Metric label="Developer time" value={duration(overview.totals.manualMs)} />
             <Metric label="Agent elapsed" value={duration(overview.totals.agentElapsedMs)} />
             <Metric label="Agent task time" value={duration(overview.totals.agentTaskMs)} />
@@ -59,7 +60,7 @@ export function WorkSummary({
             <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Usage
             </h3>
-            <div className="mt-3 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 text-sm md:grid-cols-5">
               <Metric label="Input tokens" value={count(overview.totals.inputTokens)} />
               <Metric label="Cached input" value={count(overview.totals.cachedInputTokens)} />
               <Metric label="Output tokens" value={count(overview.totals.outputTokens)} />

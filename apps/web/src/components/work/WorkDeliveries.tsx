@@ -89,7 +89,7 @@ export function WorkDeliveries({
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">
-          Create a tracking project before recording a delivery.
+          Tracking projects appear automatically when local T3 projects are available.
         </p>
       )}
       <div className="mt-4 space-y-2 text-sm">
@@ -99,7 +99,7 @@ export function WorkDeliveries({
           deliveries.map((delivery) => (
             <div
               key={delivery.id}
-              className="flex items-center justify-between gap-3 rounded-md border p-3"
+              className="flex flex-col items-start justify-between gap-3 rounded-md border p-3 sm:flex-row sm:items-center"
             >
               <span>
                 {delivery.status} · {delivery.threadId ?? "Project delivery"} ·{" "}
