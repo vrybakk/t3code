@@ -1,6 +1,9 @@
 name: Release T3 Code Nerd
 
 on:
+  schedule:
+    # Poll after the upstream nightly window without running at the busy top of the hour.
+    - cron: "37 4 * * *"
   workflow_dispatch:
     inputs:
       version:
@@ -16,6 +19,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-t3-code-nerd
+  cancel-in-progress: false
+
 jobs:
   macos:
     runs-on: macos-14
@@ -27,28 +34,198 @@ jobs:
       T3CODE_RELAY_URL: ${{ vars.T3CODE_RELAY_URL }}
     steps:
       - uses: actions/checkout@v6
-      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
         with:
-          node-version-file: package.json
-          run-install: false
-      - id: release_version
-        name: Validate release version
+          fetch-depth: 0
+      - id: source
+        name: Resolve combined release source
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION_INPUT: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [[ ! "$RELEASE_VERSION_INPUT" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid release version." >&2
-            exit 1
+
+          validate_published_release() {
+            local tag="$1"
+            local version="$2"
+            local channel="$3"
+            local expected_prerelease="$4"
+            local asset classification metadata manifest_dir manifest_path
+
+            if [[ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]]; then
+              echo "Published Nerd release $tag has no matching tag." >&2
+              exit 1
+            fi
+            classification="$(
+              gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease \
+                --jq '[.isDraft, .isPrerelease] | @tsv'
+            )"
+            if [[ "$classification" != "false"$'\t'"$expected_prerelease" ]]; then
+              echo "Published Nerd release $tag has the wrong draft or prerelease classification." >&2
+              exit 1
+            fi
+            required_assets=(
+              "T3-Code-Nerd-$version-arm64.dmg"
+              "T3-Code-Nerd-$version-arm64.zip"
+              "T3-Code-Nerd-$version-arm64.zip.blockmap"
+              "$channel-mac.yml"
+            )
+            for asset in "${required_assets[@]}"; do
+              metadata="$(
+                gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+                  --jq ".assets[] | select(.name == \"$asset\") | [.state, .size] | @tsv"
+              )"
+              if [[ ! "$metadata" =~ ^uploaded[[:space:]][1-9][0-9]*$ ]]; then
+                echo "Published Nerd release $tag has an incomplete asset: $asset" >&2
+                exit 1
+              fi
+            done
+
+            manifest_dir="$(mktemp -d "$RUNNER_TEMP/nerd-release.XXXXXX")"
+            manifest_path="$manifest_dir/$channel-mac.yml"
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$channel-mac.yml" --dir "$manifest_dir"
+            RELEASE_VERSION="$version" \
+              ZIP_NAME="T3-Code-Nerd-$version-arm64.zip" \
+              DMG_NAME="T3-Code-Nerd-$version-arm64.dmg" \
+              MANIFEST_PATH="$manifest_path" \
+              ruby -ryaml -e '
+                manifest = YAML.safe_load_file(ENV.fetch("MANIFEST_PATH"))
+                abort "Updater manifest version mismatch." unless manifest["version"] == ENV.fetch("RELEASE_VERSION")
+                urls = Array(manifest["files"]).map { |file| file["url"] }
+                abort "Updater manifest is missing the Nerd ZIP." unless urls.include?(ENV.fetch("ZIP_NAME"))
+                abort "Updater manifest is missing the Nerd DMG." unless urls.include?(ENV.fetch("DMG_NAME"))
+              '
+          }
+
+          load_nightly_tag_source() {
+            local tag="$1"
+            local parent_count parents second_parent
+
+            git remote get-url upstream >/dev/null 2>&1 || \
+              git remote add upstream https://github.com/pingdotgg/t3code.git
+            git fetch --no-tags upstream "refs/tags/$tag"
+            upstream_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
+            git fetch --no-tags origin "refs/tags/$tag"
+            release_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
+            parents="$(git show -s --format=%P "$release_sha")"
+            parent_count="$(wc -w <<< "$parents")"
+            fork_sha="$(awk '{ print $1 }' <<< "$parents")"
+            second_parent="$(awk '{ print $2 }' <<< "$parents")"
+            if [[ -z "$fork_sha" || "$second_parent" != "$upstream_sha" || "$parent_count" -ne 2 ]]; then
+              echo "Existing tag $tag is not a workflow-created combined Nerd source." >&2
+              exit 1
+            fi
+          }
+
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+            release_tag="$(
+              gh api 'repos/pingdotgg/t3code/releases?per_page=100' \
+                --jq '[.[] | select(.prerelease and (.draft | not) and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-nightly\\.[0-9]{8}\\.[0-9]+$")))] | first | .tag_name'
+            )"
+            if [[ -z "$release_tag" || "$release_tag" == "null" ]]; then
+              echo "No published upstream nightly release was found." >&2
+              exit 1
+            fi
+            release_version="${release_tag#v}"
+            release_channel="nightly"
+            is_nightly="true"
+          else
+            if [[ ! "$RELEASE_VERSION_INPUT" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Invalid release version." >&2
+              exit 1
+            fi
+            release_version="$RELEASE_VERSION_INPUT"
+            release_tag="v$RELEASE_VERSION_INPUT"
+            if [[ "$release_version" =~ -nightly\.[0-9]{8}\.[0-9]+$ ]]; then
+              release_channel="nightly"
+              is_nightly="true"
+            else
+              release_channel="latest"
+              is_nightly="false"
+            fi
           fi
-          package_version="$(node -p 'require("./apps/desktop/package.json").version')"
-          if [[ "$RELEASE_VERSION_INPUT" != "$package_version" ]]; then
-            echo "Release version must match the checked-out desktop package version." >&2
-            exit 1
+
+          existing_release_state="$(
+            gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || true
+          )"
+          if [[ "$existing_release_state" == "false" ]]; then
+            if [[ "$is_nightly" == "true" ]]; then
+              load_nightly_tag_source "$release_tag"
+            fi
+            validate_published_release "$release_tag" "$release_version" "$release_channel" "$is_nightly"
+            echo "Published Nerd release $release_tag is complete; nothing to build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          echo "version=$RELEASE_VERSION_INPUT" >> "$GITHUB_OUTPUT"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          remote_tag_sha="$(git ls-remote --tags origin "refs/tags/$release_tag" | awk '{ print $1 }')"
+          if [[ -n "$remote_tag_sha" ]]; then
+            if [[ "$is_nightly" == "true" ]]; then
+              load_nightly_tag_source "$release_tag"
+            else
+              git fetch --no-tags origin "refs/tags/$release_tag"
+              release_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
+              fork_sha="$release_sha"
+              upstream_sha="not-applicable"
+            fi
+            git checkout --detach "$release_sha"
+            echo "Existing tag $release_tag will be rebuilt to resume publication."
+          else
+            if [[ "$existing_release_state" == "true" ]]; then
+              echo "Draft Nerd release $release_tag has no matching tag." >&2
+              exit 1
+            fi
+            fork_sha="$(git rev-parse HEAD)"
+            upstream_sha="not-applicable"
+            release_sha="$fork_sha"
+            if [[ "$is_nightly" == "true" ]]; then
+              git remote get-url upstream >/dev/null 2>&1 || \
+                git remote add upstream https://github.com/pingdotgg/t3code.git
+              git fetch --no-tags upstream "refs/tags/$release_tag"
+              upstream_sha="$(git rev-parse 'FETCH_HEAD^{commit}')"
+              merge_epoch="$(git show -s --format=%ct "$upstream_sha")"
+              if ! GIT_AUTHOR_DATE="@$merge_epoch +0000" GIT_COMMITTER_DATE="@$merge_epoch +0000" \
+                git merge --no-ff --no-edit "$upstream_sha"; then
+                echo "The fork no longer merges cleanly with $release_tag." >&2
+                git diff --name-only --diff-filter=U >&2
+                exit 1
+              fi
+              release_sha="$(git rev-parse HEAD)"
+              if [[ "$release_sha" == "$fork_sha" ]]; then
+                tree_sha="$(git rev-parse "$fork_sha^{tree}")"
+                release_sha="$(
+                  printf 'Merge upstream nightly %s into T3 Code Nerd\n' "$release_tag" | \
+                    GIT_AUTHOR_DATE="@$merge_epoch +0000" GIT_COMMITTER_DATE="@$merge_epoch +0000" \
+                    git commit-tree "$tree_sha" -p "$fork_sha" -p "$upstream_sha"
+                )"
+                git checkout --detach "$release_sha"
+              fi
+            else
+              package_version="$(node -p 'require("./apps/desktop/package.json").version')"
+              if [[ "$release_version" != "$package_version" ]]; then
+                echo "Release version must match the checked-out desktop package version." >&2
+                exit 1
+              fi
+            fi
+          fi
+
+          echo "version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "nightly=$is_nightly" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "fork_sha=$fork_sha" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+        if: steps.source.outputs.skip != 'true'
+        with:
+          node-version-file: package.json
+          run-install: false
       - name: Verify public desktop build configuration
+        if: steps.source.outputs.skip != 'true'
         shell: bash
         run: |
           required=(
@@ -67,11 +244,18 @@ jobs:
             printf 'Missing required public desktop build configuration: %s\n' "${missing[*]}" >&2
             exit 1
           fi
-      - run: vp install --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+      - if: steps.source.outputs.skip != 'true'
+        run: vp install --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+      - name: Align bundled package versions
+        if: steps.source.outputs.skip != 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
+        run: node scripts/update-release-package-versions.ts "$RELEASE_VERSION"
       - id: signing
+        if: steps.source.outputs.skip != 'true'
         shell: bash
         env:
-          SIGNED_INPUT: ${{ inputs.signed }}
+          SIGNED_INPUT: ${{ github.event_name == 'schedule' || inputs.signed }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -89,7 +273,7 @@ jobs:
             exit 1
           fi
       - name: Prepare Apple signing inputs
-        if: steps.signing.outputs.enabled == 'true'
+        if: steps.source.outputs.skip != 'true' && steps.signing.outputs.enabled == 'true'
         shell: bash
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -115,36 +299,127 @@ jobs:
           echo "T3CODE_APPLE_TEAM_ID=$APPLE_TEAM_ID" >> "$GITHUB_ENV"
           echo "T3CODE_MACOS_PROVISIONING_PROFILE=$profile_path" >> "$GITHUB_ENV"
       - run: vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --edition nerd --build-version "$RELEASE_VERSION"
+        if: steps.source.outputs.skip != 'true'
         env:
-          RELEASE_VERSION: ${{ steps.release_version.outputs.version }}
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
+          T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
           T3CODE_DESKTOP_SIGNED: ${{ steps.signing.outputs.enabled }}
           CSC_LINK: ${{ steps.signing.outputs.enabled == 'true' && secrets.CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ steps.signing.outputs.enabled == 'true' && secrets.CSC_KEY_PASSWORD || '' }}
-      - uses: actions/upload-artifact@v8
-        if: steps.signing.outputs.enabled != 'true'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.source.outputs.skip != 'true' && steps.signing.outputs.enabled != 'true'
         with:
-          name: t3-code-nerd-macos-${{ steps.release_version.outputs.version }}
+          name: t3-code-nerd-macos-${{ steps.source.outputs.version }}
           path: release/T3-Code-Nerd-*
-      - uses: actions/upload-artifact@v8
-        if: steps.signing.outputs.enabled == 'true'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.source.outputs.skip != 'true' && steps.signing.outputs.enabled == 'true'
         with:
-          name: t3-code-nerd-macos-${{ steps.release_version.outputs.version }}
+          name: t3-code-nerd-macos-${{ steps.source.outputs.version }}
           path: |
             release/T3-Code-Nerd-*
             release/*-mac.yml
-      - name: Publish signed updater release
-        if: steps.signing.outputs.enabled == 'true'
+      - name: Verify signed updater assets
+        if: steps.source.outputs.skip != 'true' && steps.signing.outputs.enabled == 'true'
+        shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ steps.release_version.outputs.version }}
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
+          RELEASE_CHANNEL: ${{ steps.source.outputs.nightly == 'true' && 'nightly' || 'latest' }}
         run: |
-          tag="nerd-v$RELEASE_VERSION"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            target="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$tag" --jq .target_commitish)"
-            if [[ "$target" != "$GITHUB_SHA" ]]; then
-              echo "Existing release tag does not target this workflow commit." >&2
+          set -euo pipefail
+          required=(
+            "release/T3-Code-Nerd-$RELEASE_VERSION-arm64.dmg"
+            "release/T3-Code-Nerd-$RELEASE_VERSION-arm64.zip"
+            "release/T3-Code-Nerd-$RELEASE_VERSION-arm64.zip.blockmap"
+            "release/$RELEASE_CHANNEL-mac.yml"
+          )
+          for path in "${required[@]}"; do
+            if [[ ! -s "$path" ]]; then
+              echo "Missing required updater asset: $path" >&2
               exit 1
             fi
-            exit 0
+          done
+          xcrun stapler validate "release/T3-Code-Nerd-$RELEASE_VERSION-arm64.dmg"
+      - name: Publish signed updater release
+        if: steps.source.outputs.skip != 'true' && steps.signing.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+          RELEASE_SHA: ${{ steps.source.outputs.release_sha }}
+          IS_NIGHTLY: ${{ steps.source.outputs.nightly }}
+          FORK_SHA: ${{ steps.source.outputs.fork_sha }}
+          UPSTREAM_SHA: ${{ steps.source.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          remote_tag_sha="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" | awk '{ print $1 }')"
+          if [[ -n "$remote_tag_sha" && "$remote_tag_sha" != "$RELEASE_SHA" ]]; then
+            echo "Existing tag $RELEASE_TAG points to a different commit." >&2
+            exit 1
           fi
-          gh release create "$tag" release/T3-Code-Nerd-* release/*-mac.yml --target "$GITHUB_SHA" --title "T3 Code Nerd $RELEASE_VERSION" --generate-notes
+          if [[ -z "$remote_tag_sha" ]]; then
+            git tag "$RELEASE_TAG" "$RELEASE_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+
+          notes="Fork source: $FORK_SHA
+          Upstream source: $UPSTREAM_SHA
+          Combined source: $RELEASE_SHA"
+          existing_release_state="$(
+            gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null || true
+          )"
+          if [[ "$existing_release_state" == "false" ]]; then
+            echo "Release $RELEASE_TAG was published while this job was running." >&2
+            exit 1
+          fi
+          if [[ "$existing_release_state" == "true" ]]; then
+            gh release upload "$RELEASE_TAG" \
+              release/T3-Code-Nerd-* release/*-mac.yml \
+              --clobber
+            if [[ "$IS_NIGHTLY" == "true" ]]; then
+              gh release edit "$RELEASE_TAG" \
+                --prerelease --latest=false \
+                --title "T3 Code Nerd $RELEASE_VERSION" \
+                --notes "$notes"
+            else
+              gh release edit "$RELEASE_TAG" \
+                --title "T3 Code Nerd $RELEASE_VERSION" \
+                --notes "$notes"
+            fi
+          else
+            if [[ "$IS_NIGHTLY" == "true" ]]; then
+              gh release create "$RELEASE_TAG" \
+                release/T3-Code-Nerd-* release/*-mac.yml \
+                --verify-tag --draft --prerelease --latest=false \
+                --title "T3 Code Nerd $RELEASE_VERSION" \
+                --notes "$notes"
+            else
+              gh release create "$RELEASE_TAG" \
+                release/T3-Code-Nerd-* release/*-mac.yml \
+                --verify-tag --draft \
+                --title "T3 Code Nerd $RELEASE_VERSION" \
+                --notes "$notes"
+            fi
+          fi
+
+          required_assets=(
+            "T3-Code-Nerd-$RELEASE_VERSION-arm64.dmg"
+            "T3-Code-Nerd-$RELEASE_VERSION-arm64.zip"
+            "T3-Code-Nerd-$RELEASE_VERSION-arm64.zip.blockmap"
+            "$([[ "$IS_NIGHTLY" == "true" ]] && echo nightly || echo latest)-mac.yml"
+          )
+          for asset in "${required_assets[@]}"; do
+            metadata="$(
+              gh release view "$RELEASE_TAG" --json assets \
+                --jq ".assets[] | select(.name == \"$asset\") | [.state, .size] | @tsv"
+            )"
+            if [[ ! "$metadata" =~ ^uploaded[[:space:]][1-9][0-9]*$ ]]; then
+              echo "Draft release has an incomplete required asset: $asset" >&2
+              exit 1
+            fi
+          done
+          if [[ "$IS_NIGHTLY" == "true" ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false
+          fi
