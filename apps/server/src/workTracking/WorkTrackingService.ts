@@ -253,6 +253,7 @@ export const layer = Layer.effect(
     const overview = Effect.fn("WorkTrackingService.overview")(function* (
       input: WorkOverviewInput,
     ) {
+      yield* mutations.reconcileUnboundProjects();
       const [
         profile,
         projects,

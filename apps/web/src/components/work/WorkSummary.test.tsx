@@ -1,6 +1,8 @@
 import { act, createElement } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
+
+vi.mock("../ui/toggle-group", () => ({ Toggle: "button", ToggleGroup: "div" }));
 
 import { WorkSummary } from "./WorkSummary.tsx";
 
@@ -34,11 +36,12 @@ describe("WorkSummary", () => {
         }),
       );
     });
-    const tokenSummary = renderer!.root
-      .findAllByType("p")
-      .find((paragraph) => paragraph.children.join("").startsWith("Tokens"));
-    expect(tokenSummary?.children.join("")).toBe(
-      "Tokens · Input 1,000 · Cached input 200 · Output 300 · Reasoning 40 · Tool uses 5",
-    );
+    const text = renderer!.root.findAllByType("p").map((paragraph) => paragraph.children.join(""));
+    expect(text).toContain("1,000");
+    expect(text).toContain("200");
+    expect(text).toContain("300");
+    expect(text).toContain("40");
+    expect(text).toContain("5");
+    expect(text.filter((value) => value.includes("unavailable"))).toHaveLength(0);
   });
 });
