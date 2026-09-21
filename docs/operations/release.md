@@ -261,11 +261,12 @@ available.
 
 ### T3 Code Nerd fork builds
 
-`T3 Code Nerd` is a macOS-only replacement fork edition. It keeps its own application data and
-`~/.t3-nerd` state by default, uses the production `t3code://` renderer and OAuth callback so it
-can reuse T3 Connect, and checks only `vrybakk/t3code` for updates. Remove the official desktop
-app before relying on Nerd for OAuth callbacks because only one installed app should own the
-`t3code://` operating-system handler.
+`T3 Code Nerd` is a macOS-only replacement fork edition. It uses the same `~/.t3` home as the
+official desktop app so existing projects, threads, and settings remain available, while keeping
+separate Electron application data under the Nerd identity. It uses the production `t3code://`
+renderer and OAuth callback so it can reuse T3 Connect, and checks only `vrybakk/t3code` for
+updates. Do not run Nerd and an official desktop build at the same time because they share the
+server database and only one installed app should own the `t3code://` operating-system handler.
 
 The fork's scheduled Nerd workflow polls for the latest published upstream nightly, merges that
 exact release commit with the fork's `main`, aligns the bundled package versions, and publishes the
