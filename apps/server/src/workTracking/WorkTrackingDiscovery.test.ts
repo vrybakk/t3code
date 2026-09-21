@@ -208,3 +208,102 @@ effectIt.effect("reviews discovered repositories and rejects roots outside bound
     assert.ok(saved.id);
   }).pipe(Effect.provide(testLayer)),
 );
+
+effectIt.effect("enabling Work provisions projects and nested repositories automatically", () =>
+  Effect.gen(function* () {
+    const workspace = yield* Effect.promise(() =>
+      NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-work-provision-")),
+    );
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(() => NodeFSP.rm(workspace, { recursive: true, force: true })),
+    );
+    yield* Effect.promise(() =>
+      Promise.all([
+        createRepository(NodePath.join(workspace, "api")),
+        createRepository(NodePath.join(workspace, "website")),
+        createRepository(NodePath.join(workspace, "mobile")),
+      ]),
+    );
+    yield* runMigrations({ toMigrationInclusive: 54 });
+    const sql = yield* SqlClient.SqlClient;
+    const work = yield* WorkTrackingService;
+    yield* sql`INSERT INTO projection_projects(project_id, title, workspace_root, scripts_json, created_at, updated_at) VALUES ('t3-project', 'Client workspace', ${workspace}, '[]', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`;
+
+    yield* work.upsertProfile({
+      displayName: "Developer",
+      timeZone: "UTC",
+      trackingEnabled: true,
+    });
+    yield* sql`DELETE FROM work_repositories`;
+    yield* work.upsertProfile({
+      displayName: "Developer",
+      timeZone: "UTC",
+      trackingEnabled: true,
+    });
+
+    const overview = yield* work.overview({
+      since: "2026-09-01T00:00:00.000Z",
+      until: "2026-10-01T00:00:00.000Z",
+    });
+    assert.equal(overview.projects.length, 1);
+    assert.equal(overview.projects[0]?.name, "Client workspace");
+    assert.deepEqual(overview.projects[0]?.t3ProjectIds, [ProjectId.make("t3-project")]);
+    const canonicalWorkspace = yield* Effect.promise(() => NodeFSP.realpath(workspace));
+    assert.deepEqual(
+      overview.projects[0]?.repositories.map((repository) => ({
+        root: repository.localRoot,
+        inclusion: repository.inclusion,
+        provenance: repository.provenance,
+      })),
+      ["api", "mobile", "website"].map((name) => ({
+        root: NodePath.join(canonicalWorkspace, name),
+        inclusion: "included",
+        provenance: "discovered",
+      })),
+    );
+  }).pipe(Effect.provide(testLayer)),
+);
+
+effectIt.effect("automatically provisions projects created after Work was enabled", () =>
+  Effect.gen(function* () {
+    yield* runMigrations({ toMigrationInclusive: 54 });
+    const sql = yield* SqlClient.SqlClient;
+    const work = yield* WorkTrackingService;
+    yield* work.upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true });
+    yield* sql`INSERT INTO projection_projects(project_id, title, workspace_root, scripts_json, created_at, updated_at) VALUES ('later-project', 'Later project', '/missing-workspace', '[]', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`;
+
+    const beforeRecord = yield* work.overview({
+      since: "2026-09-01T00:00:00.000Z",
+      until: "2026-09-02T00:00:00.000Z",
+    });
+    assert.equal(beforeRecord.projects[0]?.name, "Later project");
+
+    yield* work.recordAutomatic({
+      kind: "agent-turn",
+      projectId: "later-project",
+      threadId: "thread",
+      turnId: "turn",
+      sourceEventId: "event-later-project",
+      occurredAt: "2026-09-01T12:00:00.000Z",
+      provider: "codex",
+      outcome: "succeeded",
+      coverage: "complete",
+      inputTokens: 10,
+      cachedInputTokens: 0,
+      outputTokens: 5,
+      reasoningTokens: 2,
+      elapsedMs: 60,
+      taskMs: null,
+      model: null,
+      effort: null,
+      toolUses: 1,
+    });
+
+    const overview = yield* work.overview({
+      since: "2026-09-01T00:00:00.000Z",
+      until: "2026-09-02T00:00:00.000Z",
+    });
+    assert.equal(overview.projects[0]?.name, "Later project");
+    assert.equal(overview.records[0]?.sourceEventId, "event-later-project");
+  }).pipe(Effect.provide(testLayer)),
+);

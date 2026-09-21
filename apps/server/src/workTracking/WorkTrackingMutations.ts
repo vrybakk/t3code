@@ -20,7 +20,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
-import { isWithinWorkspaceRoot } from "./WorkTrackingDiscovery.ts";
+import { discoverRepositoryCandidates, isWithinWorkspaceRoot } from "./WorkTrackingDiscovery.ts";
 import type { AutomaticWorkRecordInput } from "./WorkTrackingService.ts";
 
 const nowIso = (milliseconds: number) => DateTime.formatIso(DateTime.makeUnsafe(milliseconds));
@@ -54,6 +54,78 @@ export const makeWorkTrackingMutations = ({
   readProfile,
   readRepositories,
 }: Dependencies) => {
+  const ensureTrackingProject = Effect.fn("WorkTrackingService.ensureTrackingProject")(function* (
+    projectId: string,
+    reconcileRepositories = false,
+  ) {
+    const existing = (yield* mapSqlError(
+      sql<{
+        readonly id: string;
+      }>`SELECT tracking_project_id AS id FROM work_tracking_project_bindings WHERE project_id = ${projectId} LIMIT 1`,
+    ))[0];
+    if (existing && !reconcileRepositories) return existing;
+    const source = (yield* mapSqlError(
+      sql<{
+        readonly title: string;
+        readonly workspaceRoot: string;
+      }>`SELECT title, workspace_root AS "workspaceRoot" FROM projection_projects WHERE project_id = ${projectId} AND deleted_at IS NULL LIMIT 1`,
+    ))[0];
+    if (!source) return null;
+    const discovered = yield* Effect.tryPromise({
+      try: () =>
+        discoverRepositoryCandidates([
+          { sourceProjectId: projectId, localRoot: source.workspaceRoot },
+        ]),
+      catch: () => failure("Could not scan local workspaces."),
+    });
+    const now = nowIso(yield* Clock.currentTimeMillis);
+    const id = existing?.id ?? (yield* crypto.randomUUIDv4);
+    const binding = yield* sql.withTransaction(
+      Effect.gen(function* () {
+        if (!existing) {
+          yield* mapSqlError(
+            sql`INSERT INTO work_tracking_projects(id, name, tracking_enabled, created_at, updated_at) VALUES (${id}, ${source.title}, 1, ${now}, ${now})`,
+          );
+          yield* mapSqlError(
+            sql`INSERT INTO work_tracking_project_bindings(tracking_project_id, project_id) VALUES (${id}, ${projectId}) ON CONFLICT(project_id) DO NOTHING`,
+          );
+        }
+        const saved = (yield* mapSqlError(
+          sql<{
+            readonly id: string;
+          }>`SELECT tracking_project_id AS id FROM work_tracking_project_bindings WHERE project_id = ${projectId} LIMIT 1`,
+        ))[0];
+        if (!existing && saved?.id !== id)
+          yield* mapSqlError(sql`DELETE FROM work_tracking_projects WHERE id = ${id}`);
+        if (saved?.id === id) {
+          yield* Effect.forEach(discovered.candidates, (repository) =>
+            Effect.gen(function* () {
+              const repositoryId = yield* crypto.randomUUIDv4;
+              yield* mapSqlError(
+                sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES (${repositoryId}, ${id}, ${repository.localRoot}, NULL, 'included', 'discovered', ${now}, ${now}) ON CONFLICT(tracking_project_id, local_root) DO NOTHING`,
+              );
+            }),
+          );
+        }
+        return saved ?? null;
+      }),
+    );
+    return binding;
+  });
+  const reconcileUnboundProjects = Effect.fn("WorkTrackingService.reconcileUnboundProjects")(
+    function* () {
+      const profile = yield* readProfile;
+      if (!profile?.trackingEnabled) return;
+      const projects = yield* mapSqlError(
+        sql<{
+          readonly projectId: string;
+        }>`SELECT projects.project_id AS "projectId" FROM projection_projects AS projects LEFT JOIN work_tracking_project_bindings AS bindings ON bindings.project_id = projects.project_id WHERE projects.deleted_at IS NULL AND bindings.project_id IS NULL ORDER BY projects.created_at, projects.project_id`,
+      );
+      yield* Effect.forEach(projects, (project) => ensureTrackingProject(project.projectId), {
+        concurrency: 1,
+      });
+    },
+  );
   const upsertProfile = Effect.fn("WorkTrackingService.upsertProfile")(function* (
     input: WorkProfileInput,
   ) {
@@ -65,6 +137,16 @@ export const makeWorkTrackingMutations = ({
     yield* mapSqlError(
       sql`INSERT INTO work_profiles(id, display_name, time_zone, tracking_enabled, created_at, updated_at) VALUES (${id}, ${input.displayName}, ${input.timeZone}, ${input.trackingEnabled ? 1 : 0}, ${existing?.createdAt ?? now}, ${now}) ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, time_zone = excluded.time_zone, tracking_enabled = excluded.tracking_enabled, updated_at = excluded.updated_at`,
     );
+    if (input.trackingEnabled) {
+      const projects = yield* mapSqlError(
+        sql<{
+          readonly projectId: string;
+        }>`SELECT project_id AS "projectId" FROM projection_projects WHERE deleted_at IS NULL ORDER BY created_at, project_id`,
+      );
+      yield* Effect.forEach(projects, (project) => ensureTrackingProject(project.projectId, true), {
+        concurrency: 1,
+      });
+    }
     return { id, ...input, createdAt: existing?.createdAt ?? now, updatedAt: now } as WorkProfile;
   });
   const upsertProject = Effect.fn("WorkTrackingService.upsertProject")(function* (
@@ -269,12 +351,14 @@ export const makeWorkTrackingMutations = ({
   ) {
     const profile = yield* readProfile;
     if (!profile?.trackingEnabled) return;
-    const project = yield* mapSqlError(
+    const project = yield* ensureTrackingProject(input.projectId);
+    if (!project) return;
+    const enabled = (yield* mapSqlError(
       sql<{
         readonly id: string;
-      }>`SELECT tracking_project_id AS id FROM work_tracking_project_bindings JOIN work_tracking_projects ON work_tracking_projects.id = tracking_project_id WHERE project_id = ${input.projectId} AND work_tracking_projects.tracking_enabled = 1 LIMIT 1`,
-    ).pipe(Effect.map((rows) => rows[0]));
-    if (!project) return;
+      }>`SELECT id FROM work_tracking_projects WHERE id = ${project.id} AND tracking_enabled = 1 LIMIT 1`,
+    ))[0];
+    if (!enabled) return;
     const repositoryCandidates = yield* mapSqlError(
       sql<{
         readonly id: string;
@@ -369,6 +453,7 @@ export const makeWorkTrackingMutations = ({
     upsertProject,
     upsertRepository,
     upsertManualEntry,
+    reconcileUnboundProjects,
     recordAutomatic,
     markDelivery,
     reopenDelivery,

@@ -137,7 +137,7 @@ export function WorkReports({
                 Generated {report.generatedAt.slice(0, 10)} · Status {report.statusAt.slice(0, 10)}
                 {report.reference ? ` · ${report.reference}` : ""}
               </p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="outline"

@@ -107,7 +107,7 @@ export function WorkManualEntries({
       </p>
       {projects.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          Create a tracking project before adding developer time.
+          Tracking projects appear automatically when local T3 projects are available.
         </p>
       ) : (
         <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={submit}>

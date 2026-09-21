@@ -1,12 +1,16 @@
 # Work
 
 Use **Work** in the sidebar to keep a personal, local record of time and agent activity for an
-environment. Start by setting your profile and timezone, then create a tracking project and bind
-the T3 Code projects and repositories that belong to it.
+environment. Set your profile and timezone, then enable local tracking. Work automatically creates
+a tracking project for each T3 project and includes Git repositories found beneath its workspace,
+including repositories nested in a shared folder.
 
 Agent turns and tasks are captured automatically. Add manual developer-time entries when you need
 to record work outside those events; manual entries can be corrected later from the month picker.
 Automatic agent metrics remain evidence and cannot be edited.
+
+Tracking projects are internal reporting records and do not need to be created or attached by hand.
+Use **Tracking settings** only when you need to correct which discovered repositories are included.
 
 Create a monthly report for a tracking project when you are ready to review it. Reports move from
 **Open** to **Submitted**, then **Invoiced**; invoiced reports are fixed snapshots. Export CSV for
