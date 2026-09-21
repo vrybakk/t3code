@@ -137,8 +137,13 @@ jobs:
             fi
             release_version="$RELEASE_VERSION_INPUT"
             release_tag="v$RELEASE_VERSION_INPUT"
-            release_channel="latest"
-            is_nightly="false"
+            if [[ "$release_version" =~ -nightly\.[0-9]{8}\.[0-9]+$ ]]; then
+              release_channel="nightly"
+              is_nightly="true"
+            else
+              release_channel="latest"
+              is_nightly="false"
+            fi
           fi
 
           existing_release_state="$(
@@ -338,6 +343,7 @@ jobs:
         if: steps.source.outputs.skip != 'true' && steps.signing.outputs.enabled == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_VERSION: ${{ steps.source.outputs.version }}
           RELEASE_TAG: ${{ steps.source.outputs.tag }}
           RELEASE_SHA: ${{ steps.source.outputs.release_sha }}

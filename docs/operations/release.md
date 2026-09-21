@@ -294,6 +294,8 @@ the `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_TEMPLATE`, `CLERK_CLI_OAUTH_CLIENT_ID`, 
 Only that signed/notarized path publishes the macOS updater payload and release metadata. Select
 the Nightly track once in the Nerd app's About settings; after that it checks the fork's
 `nightly-mac.yml` feed while the official app remains on its independently selected upstream track.
+An existing unsigned Nerd build has no update feed, so install the first signed Nerd DMG manually;
+automatic updates begin with that signed installation.
 
 - Updater runtime: `apps/desktop/src/updates/DesktopUpdates.ts`.
 - `electron-updater` adapter: `apps/desktop/src/electron/ElectronUpdater.ts`.
