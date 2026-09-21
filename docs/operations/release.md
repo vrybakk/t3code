@@ -266,6 +266,18 @@ its own application data and `~/.t3-nerd` state by default, uses `t3code-nerd://
 only `vrybakk/t3code` for updates. The official app remains installed separately and continues
 to update from upstream.
 
+The fork's scheduled Nerd workflow polls for the latest published upstream nightly, merges that
+exact release commit with the fork's `main`, aligns the bundled package versions, and publishes the
+signed combined build from the fork. A fork-only change therefore rides the next published upstream
+nightly instead of inventing a private client version. Merge conflicts fail the workflow without
+publishing; resolve them on the fork before the next run.
+
+Fork server features are supported when T3 Code Nerd hosts the environment because the desktop app
+bundles the merged server. Do not use the standard **Update server** action to install this version
+on an independently hosted environment: `t3@<version>` is the upstream runtime and does not contain
+fork-only server code. A separately hosted fork environment needs a dedicated fork runtime
+distribution before that update path can be supported.
+
 Before a fork release, sync upstream into the fork so the artifact includes the current official
 changes. For a local unsigned build, run:
 
@@ -273,12 +285,15 @@ changes. For a local unsigned build, run:
 vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --edition nerd
 ```
 
-Unsigned artifacts are manual-install only; they do not provide working macOS auto-updates. Run
-the `Release T3 Code Nerd` workflow to keep an unsigned artifact, or set `signed` only when the
-fork has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`,
+Unsigned artifacts are manual-install only; they do not provide working macOS auto-updates. Manual
+workflow runs may keep an unsigned artifact. Scheduled nightlies fail closed unless the fork has
+the `CLERK_PUBLISHABLE_KEY`, `CLERK_JWT_TEMPLATE`, `CLERK_CLI_OAUTH_CLIENT_ID`, and
+`T3CODE_RELAY_URL` repository variables, plus the signing secrets
+`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`,
 `APPLE_API_ISSUER`, the `APPLE_TEAM_ID` variable, and `MACOS_PROVISIONING_PROFILE` configured.
-Only that signed/notarized path publishes the macOS updater
-payload and release metadata.
+Only that signed/notarized path publishes the macOS updater payload and release metadata. Select
+the Nightly track once in the Nerd app's About settings; after that it checks the fork's
+`nightly-mac.yml` feed while the official app remains on its independently selected upstream track.
 
 - Updater runtime: `apps/desktop/src/updates/DesktopUpdates.ts`.
 - `electron-updater` adapter: `apps/desktop/src/electron/ElectronUpdater.ts`.
@@ -297,7 +312,7 @@ payload and release metadata.
   - `*.blockmap` files (used for differential downloads)
 - macOS metadata note:
   - `electron-updater` reads `latest-mac.yml` on stable and `nightly-mac.yml` on nightly, for both Intel and Apple Silicon.
-  - The workflow merges the per-arch mac manifests into one channel-specific mac manifest before publishing the GitHub Release.
+  - The main release workflow merges the per-arch mac manifests into one channel-specific mac manifest before publishing the GitHub Release. The Nerd workflow currently publishes Apple Silicon only.
 
 ### Windows payload topology and update validation
 
