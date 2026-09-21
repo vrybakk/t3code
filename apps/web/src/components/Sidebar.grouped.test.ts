@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import {
   countSidebarProjectThreadStatuses,
+  getVisibleSidebarProjectThreads,
   groupSidebarThreadsByProject,
   planSidebarProjectGroupReorder,
   resolveSidebarProjectGroupExpanded,
@@ -146,5 +147,55 @@ describe("project group preferences", () => {
       draggedProjectIds: ["environment-a:project-a", "environment-b:project-b"],
       targetProjectIds: ["environment-a:project-c"],
     });
+  });
+});
+
+describe("getVisibleSidebarProjectThreads", () => {
+  const project = null;
+  const group = (key: string, threads: readonly string[]) => ({
+    key,
+    project,
+    threads: [...threads],
+  });
+
+  it("follows rendered section and project order while omitting collapsed groups", () => {
+    expect(
+      getVisibleSidebarProjectThreads(
+        [
+          {
+            section: "active",
+            groups: [
+              group("project:first", ["older-active"]),
+              group("project:collapsed", ["newer-hidden"]),
+              group("project:last", ["newest-active"]),
+            ],
+          },
+          {
+            section: "snoozed",
+            groups: [group("project:first", ["snoozed-first"])],
+          },
+          {
+            section: "settled",
+            groups: [group("project:last", ["settled-last"])],
+          },
+        ],
+        {
+          "grouped:active:project:first": true,
+          "grouped:active:project:collapsed": false,
+          "grouped:active:project:last": true,
+          "grouped:snoozed:project:first": true,
+          "grouped:settled:project:last": true,
+        },
+      ),
+    ).toEqual(["older-active", "newest-active", "snoozed-first", "settled-last"]);
+  });
+
+  it("treats groups without a saved preference as closed", () => {
+    expect(
+      getVisibleSidebarProjectThreads(
+        [{ section: "active", groups: [group("project:first", ["hidden"])] }],
+        {},
+      ),
+    ).toEqual([]);
   });
 });

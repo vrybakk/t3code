@@ -247,6 +247,7 @@ import {
 } from "./sidebar/SidebarProjectThreadGroup";
 import {
   countSidebarProjectThreadStatuses,
+  getVisibleSidebarProjectThreads,
   groupSidebarThreadsByProject,
   planSidebarProjectGroupReorder,
 } from "./Sidebar.grouped";
@@ -2164,6 +2165,7 @@ const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props: {
 
 export default function Sidebar() {
   const projects = useProjects();
+  const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const projectOrder = useUiStateStore((store) => store.projectOrder);
   const reorderProjects = useUiStateStore((store) => store.reorderProjects);
   const threads = useThreadShells();
@@ -2834,12 +2836,33 @@ export default function Sidebar() {
     () => [...pinnedThreads, ...activeThreads, ...visibleSnoozedThreads, ...renderedSettledThreads],
     [pinnedThreads, activeThreads, visibleSnoozedThreads, renderedSettledThreads],
   );
+  const visibleOrderedThreads = useMemo(
+    () =>
+      sidebarViewMode === "projects"
+        ? getVisibleSidebarProjectThreads(
+            [
+              { section: "active", groups: activeProjectThreadGroups },
+              { section: "snoozed", groups: snoozedProjectThreadGroups },
+              { section: "settled", groups: settledProjectThreadGroups },
+            ],
+            projectExpandedById,
+          )
+        : orderedThreads,
+    [
+      activeProjectThreadGroups,
+      orderedThreads,
+      projectExpandedById,
+      settledProjectThreadGroups,
+      sidebarViewMode,
+      snoozedProjectThreadGroups,
+    ],
+  );
   const orderedThreadKeys = useMemo(
     () =>
-      orderedThreads.map((thread) =>
+      visibleOrderedThreads.map((thread) =>
         scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
       ),
-    [orderedThreads],
+    [visibleOrderedThreads],
   );
   // Rows call back into the click handler without carrying the ordered list as
   // a prop — a fresh array identity per shell update would defeat every row's
@@ -4888,14 +4911,13 @@ export default function Sidebar() {
                           group: (typeof activeProjectThreadGroups)[number],
                           section: "active" | "snoozed" | "settled",
                           statusThreads = group.threads,
-                          sortable = true,
                         ) => (
                           <SidebarProjectThreadGroupRow
                             key={`${section}:${group.key}`}
                             group={group}
                             section={section}
                             statusCounts={countSidebarProjectThreadStatuses(statusThreads)}
-                            sortable={sortable && group.project !== null}
+                            sortable={group.project !== null}
                             renderThread={(thread) => {
                               const threadKey = scopedThreadKey(
                                 scopeThreadRef(thread.environmentId, thread.id),

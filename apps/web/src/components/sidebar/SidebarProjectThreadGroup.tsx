@@ -35,16 +35,17 @@ import { ProjectFavicon } from "../ProjectFavicon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   resolveSidebarProjectGroupExpanded,
+  sidebarProjectThreadGroupExpansionKey,
   type SidebarProjectThreadGroup,
+  type SidebarProjectThreadSection,
   type SidebarProjectThreadStatusCounts,
 } from "../Sidebar.grouped";
-import type { SidebarSection } from "../Sidebar.logic";
 
 type ProjectThreadGroup = SidebarProjectThreadGroup<SidebarProjectSnapshot, EnvironmentThreadShell>;
 
 interface SidebarProjectThreadGroupProps {
   group: ProjectThreadGroup;
-  section: SidebarSection;
+  section: SidebarProjectThreadSection;
   statusCounts: SidebarProjectThreadStatusCounts;
   sortable?: boolean;
   renderThread: (thread: EnvironmentThreadShell) => ReactNode;
@@ -118,7 +119,7 @@ function StatusCount(props: {
 }
 
 export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupProps) {
-  const expansionKey = `grouped:${props.section}:${props.group.key}`;
+  const expansionKey = sidebarProjectThreadGroupExpansionKey(props.section, props.group.key);
   const expanded = useUiStateStore((state) =>
     resolveSidebarProjectGroupExpanded(state.projectExpandedById, expansionKey),
   );

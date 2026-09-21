@@ -20,6 +20,15 @@ export interface SidebarProjectThreadGroup<TProject, TThread> {
   readonly threads: TThread[];
 }
 
+export type SidebarProjectThreadSection = "active" | "snoozed" | "settled";
+
+export function sidebarProjectThreadGroupExpansionKey(
+  section: SidebarProjectThreadSection,
+  groupKey: string,
+): string {
+  return `grouped:${section}:${groupKey}`;
+}
+
 function physicalProjectKey(thread: ProjectThreadLike): string {
   return `${thread.environmentId}:${thread.projectId}`;
 }
@@ -98,6 +107,25 @@ export function resolveSidebarProjectGroupExpanded(
   expansionKey: string,
 ): boolean {
   return projectExpandedById[expansionKey] ?? false;
+}
+
+export function getVisibleSidebarProjectThreads<TProject, TThread>(
+  sections: ReadonlyArray<{
+    readonly section: SidebarProjectThreadSection;
+    readonly groups: ReadonlyArray<SidebarProjectThreadGroup<TProject, TThread>>;
+  }>,
+  projectExpandedById: Readonly<Record<string, boolean>>,
+): TThread[] {
+  return sections.flatMap(({ groups, section }) =>
+    groups.flatMap((group) =>
+      resolveSidebarProjectGroupExpanded(
+        projectExpandedById,
+        sidebarProjectThreadGroupExpansionKey(section, group.key),
+      )
+        ? group.threads
+        : [],
+    ),
+  );
 }
 
 interface ReorderableSidebarProject {
