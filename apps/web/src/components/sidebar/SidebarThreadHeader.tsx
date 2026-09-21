@@ -10,7 +10,15 @@
  * of the sidebar's scope logic. `searchFieldRef` lands on the search field so
  * the picker's popup can anchor to that width rather than to its 28px trigger.
  */
-import { FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import {
+  FolderPlusIcon,
+  ListIcon,
+  ListTreeIcon,
+  SearchIcon,
+  SquarePenIcon,
+  XIcon,
+} from "lucide-react";
+import type { SidebarViewMode } from "@t3tools/contracts/settings";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -32,6 +40,8 @@ export interface SidebarThreadHeaderProps {
   hasProjects: boolean;
   /** The project scope combobox, rendered as the first icon of the group. */
   projectScope: ReactNode;
+  viewMode: SidebarViewMode;
+  onViewModeChange: (viewMode: SidebarViewMode) => void;
   onNewProject: () => void;
   /** Receives the click so Shift+click can skip the project picker. */
   onNewThread: (event: ReactMouseEvent) => void;
@@ -54,6 +64,8 @@ export function SidebarThreadHeader({
   searchFieldRef,
   hasProjects,
   projectScope,
+  viewMode,
+  onViewModeChange,
   onNewProject,
   onNewThread,
   newThreadDisabled,
@@ -129,6 +141,12 @@ export function SidebarThreadHeader({
         {hasProjects ? (
           <>
             {projectScope}
+            <SidebarHeaderIconButton
+              label={viewMode === "threads" ? "Group threads by project" : "Show flat thread list"}
+              onClick={() => onViewModeChange(viewMode === "threads" ? "projects" : "threads")}
+            >
+              {viewMode === "threads" ? <ListTreeIcon /> : <ListIcon />}
+            </SidebarHeaderIconButton>
             <SidebarHeaderIconButton label="New project" onClick={onNewProject}>
               <FolderPlusIcon />
             </SidebarHeaderIconButton>

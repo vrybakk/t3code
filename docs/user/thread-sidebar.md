@@ -29,6 +29,13 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 
 Pin a thread from its menu to keep it above your active work.
 
+On web and desktop, use the project-tree button beside search to switch between the flat thread
+list and project groups. Project groups start collapsed and show counts for all, running, and
+pending threads. Open a project to choose a thread, or drag its handle to set a manual project
+order. Snoozed and settled threads remain in their own shelves and use the same project order when
+those shelves are open. Switch back to the flat list when you want to drag threads between
+lifecycle sections or reorder pinned and active work.
+
 On web and desktop, you can also drag files from your computer onto any thread row:
 the thread opens and the files are attached in its composer, ready for
 your next message. The same per-message file limits apply as when attaching
