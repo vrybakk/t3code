@@ -11,6 +11,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
+import { WorkSelect } from "./WorkSelect";
 
 export function isValidWorkMonth(value: string): boolean {
   return /^\d{4}-(?:0[1-9]|1[0-2])$/u.test(value);
@@ -110,27 +111,21 @@ export function WorkManualEntries({
           Tracking projects appear automatically when local T3 projects are available.
         </p>
       ) : (
-        <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={submit}>
-          <label className="grid gap-1.5">
+        <form className="mt-4 grid min-w-0 gap-3 md:grid-cols-2" onSubmit={submit}>
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-manual-project">Tracking project</Label>
-            <select
+            <WorkSelect
               id="work-manual-project"
-              className="h-9 rounded-lg border bg-background px-3 text-sm"
               value={projectId}
-              onChange={(event) => {
-                setProjectId(event.target.value);
+              onValueChange={(value) => {
+                setProjectId(value);
                 setRepositoryId("");
                 setThreadId("");
               }}
-            >
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5">
+              options={projects.map((project) => ({ value: project.id, label: project.name }))}
+            />
+          </div>
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-manual-occurred-at">Date and time</Label>
             <Input
               id="work-manual-occurred-at"
@@ -138,8 +133,8 @@ export function WorkManualEntries({
               value={occurredAt}
               onChange={(event) => setOccurredAt(event.target.value)}
             />
-          </label>
-          <label className="grid gap-1.5">
+          </div>
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-manual-duration">Duration (minutes)</Label>
             <Input
               id="work-manual-duration"
@@ -148,50 +143,51 @@ export function WorkManualEntries({
               onChange={(event) => setDuration(event.target.value)}
               placeholder="60"
             />
-          </label>
-          <label className="grid gap-1.5">
+          </div>
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-manual-thread">Thread (optional)</Label>
-            <select
+            <WorkSelect
               id="work-manual-thread"
-              className="h-9 rounded-lg border bg-background px-3 text-sm"
               value={threadId}
-              onChange={(event) => setThreadId(event.target.value)}
-            >
-              <option value="">No thread</option>
-              {visibleThreads.map((thread) => (
-                <option key={thread.id} value={thread.id}>
-                  {thread.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5">
+              onValueChange={setThreadId}
+              options={[
+                { value: "", label: "No thread" },
+                ...visibleThreads.map((thread) => ({ value: thread.id, label: thread.title })),
+              ]}
+            />
+          </div>
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-manual-repository-select">Repository (optional)</Label>
-            <select
+            <WorkSelect
               id="work-manual-repository-select"
-              className="h-9 rounded-lg border bg-background px-3 text-sm"
               value={repositoryId}
-              onChange={(event) => setRepositoryId(event.target.value)}
+              onValueChange={setRepositoryId}
               disabled={crossRepository}
-            >
-              <option value="">No repository</option>
-              {selectedProject?.repositories
-                .filter((repository) => repository.inclusion === "included")
-                .map((repository) => (
-                  <option key={repository.id} value={repository.id}>
-                    {repository.localRoot}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5">
+              options={[
+                { value: "", label: "No repository" },
+                ...(selectedProject?.repositories ?? [])
+                  .filter(
+                    (repository) =>
+                      repository.inclusion === "included" || repository.id === repositoryId,
+                  )
+                  .map((repository) => ({
+                    value: repository.id,
+                    label:
+                      repository.localRoot.split(/[\\/]/u).findLast(Boolean) ??
+                      repository.localRoot,
+                    title: repository.localRoot,
+                  })),
+              ]}
+            />
+          </div>
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-manual-category">Category (optional)</Label>
             <Input
               id="work-manual-category"
               value={category}
               onChange={(event) => setCategory(event.target.value)}
             />
-          </label>
+          </div>
           <label className="flex items-center gap-2 text-sm md:col-span-2">
             <input
               type="checkbox"
@@ -203,14 +199,14 @@ export function WorkManualEntries({
             />
             Cross-repository work
           </label>
-          <label className="grid gap-1.5 md:col-span-2">
+          <div className="grid min-w-0 gap-1.5 md:col-span-2">
             <Label htmlFor="work-manual-note">Note (optional)</Label>
             <Textarea
               id="work-manual-note"
               value={note}
               onChange={(event) => setNote(event.target.value)}
             />
-          </label>
+          </div>
           {error ? (
             <p role="alert" className="text-sm text-destructive md:col-span-2">
               {error}
@@ -235,7 +231,7 @@ export function WorkManualEntries({
             Month
             <Input
               aria-label="Manual entry month"
-              className="h-8 w-auto"
+              className="w-auto"
               type="month"
               value={month}
               onChange={(event) => {
@@ -244,7 +240,9 @@ export function WorkManualEntries({
             />
           </label>
         </div>
-        {monthLoading ? <p className="text-sm text-muted-foreground">Loading month…</p> : null}
+        {monthLoading && manual.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Loading month…</p>
+        ) : null}
         {manual.length === 0 ? (
           <p className="text-sm text-muted-foreground">No manual entries in this month.</p>
         ) : (

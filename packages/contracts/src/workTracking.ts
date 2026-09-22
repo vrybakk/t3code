@@ -207,6 +207,14 @@ export const WorkProjectTotals = Schema.Struct({
   totals: WorkTotals,
 });
 export type WorkProjectTotals = typeof WorkProjectTotals.Type;
+export const WorkDailyTotals = Schema.Struct({
+  date: TrimmedNonEmptyString,
+  trackingProjectId: WorkTrackingProjectId,
+  developerMs: NonNegativeInt,
+  agentElapsedMs: NonNegativeInt,
+  taskMs: NonNegativeInt,
+});
+export type WorkDailyTotals = typeof WorkDailyTotals.Type;
 export const WorkTimeCoverage = Schema.Struct({
   active: WorkCoverage,
   waiting: WorkCoverage,
@@ -226,6 +234,7 @@ export const WorkOverview = Schema.Struct({
   records: Schema.Array(WorkRecord),
   adjustments: Schema.Array(WorkRecord),
   projectTotals: Schema.Array(WorkProjectTotals),
+  dailyTotals: Schema.optional(Schema.Array(WorkDailyTotals)),
   repositoryInvolvement: Schema.Array(WorkRepositoryInvolvement),
   deliveries: Schema.Array(WorkDelivery),
   reports: Schema.Array(WorkReport),

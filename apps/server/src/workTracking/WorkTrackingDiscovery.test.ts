@@ -17,13 +17,16 @@ import { WorkTrackingService, layer } from "./WorkTrackingService.ts";
 
 const createRepository = async (directory: string, worktree = false) => {
   await NodeFSP.mkdir(directory, { recursive: true });
-  if (worktree)
+  if (worktree) {
+    const metadata = NodePath.join(directory, "..", ".git", "worktrees", "x");
+    await NodeFSP.mkdir(metadata, { recursive: true });
+    await NodeFSP.writeFile(NodePath.join(metadata, "commondir"), "../..\n");
     await NodeFSP.writeFile(NodePath.join(directory, ".git"), "gitdir: ../.git/worktrees/x\n");
-  else await NodeFSP.mkdir(NodePath.join(directory, ".git"));
+  } else await NodeFSP.mkdir(NodePath.join(directory, ".git"));
 };
 
 describe("work repository discovery", () => {
-  it("finds nested repositories, worktrees, and the bound root without leaving it", async () => {
+  it("finds nested repositories without duplicating linked worktrees or leaving the bound root", async () => {
     const temporary = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-work-discovery-"));
     try {
       await createRepository(temporary);
@@ -61,7 +64,6 @@ describe("work repository discovery", () => {
           NodePath.join(resolvedTemporary, "api"),
           NodePath.join(resolvedTemporary, "mobile"),
           NodePath.join(resolvedTemporary, "website"),
-          NodePath.join(resolvedTemporary, "worktree"),
         ]);
         expect(new Set(roots).size).toBe(roots.length);
         expect(roots.some((root) => root.includes("node_modules") || root.includes("vendor"))).toBe(
@@ -69,6 +71,15 @@ describe("work repository discovery", () => {
         );
         expect(roots.includes(tooDeep)).toBe(false);
         expect(roots.includes(outside)).toBe(false);
+        const worktreeOnly = await discoverRepositoryCandidates([
+          { localRoot: NodePath.join(temporary, "worktree"), sourceProjectId: "worktree-project" },
+        ]);
+        expect(worktreeOnly.candidates).toMatchObject([
+          {
+            localRoot: NodePath.join(resolvedTemporary, "worktree"),
+            canonicalIdentity: NodePath.join(resolvedTemporary, ".git"),
+          },
+        ]);
       } finally {
         await NodeFSP.rm(outside, { recursive: true, force: true });
       }
@@ -306,4 +317,134 @@ effectIt.effect("automatically provisions projects created after Work was enable
     assert.equal(overview.projects[0]?.name, "Later project");
     assert.equal(overview.records[0]?.sourceEventId, "event-later-project");
   }).pipe(Effect.provide(testLayer)),
+);
+
+effectIt.effect(
+  "groups historical worktree aliases, preserves exclusions, and attributes new work once",
+  () =>
+    Effect.gen(function* () {
+      const workspace = yield* Effect.promise(() =>
+        NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-work-aliases-")),
+      );
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(() => NodeFSP.rm(workspace, { recursive: true, force: true })),
+      );
+      yield* Effect.promise(async () => {
+        await createRepository(workspace);
+        await createRepository(NodePath.join(workspace, "worktree"), true);
+      });
+      yield* runMigrations({ toMigrationInclusive: 54 });
+      const sql = yield* SqlClient.SqlClient;
+      const work = yield* WorkTrackingService;
+      const root = yield* Effect.promise(() => NodeFSP.realpath(workspace));
+      const worktree = NodePath.join(root, "worktree");
+      yield* sql`INSERT INTO projection_projects(project_id, title, workspace_root, scripts_json, created_at, updated_at) VALUES ('project', 'Project', ${root}, '[]', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`;
+      yield* work.upsertProfile({
+        displayName: "Developer",
+        timeZone: "UTC",
+        trackingEnabled: true,
+      });
+      const range = { since: "2026-09-01T00:00:00.000Z", until: "2026-10-01T00:00:00.000Z" };
+      const initial = yield* work.overview(range);
+      const project = initial.projects[0]!;
+      const repository = project.repositories[0]!;
+      yield* sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES ('old-worktree', ${project.id}, ${worktree}, NULL, 'excluded', 'discovered', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`;
+      const excluded = yield* work.overview(range);
+      assert.equal(excluded.projects[0]?.repositories.length, 1);
+      assert.equal(excluded.projects[0]?.repositories[0]?.inclusion, "excluded");
+      yield* work.upsertRepository({
+        id: repository.id,
+        trackingProjectId: project.id,
+        localRoot: root,
+        inclusion: "included",
+        provenance: "discovered",
+      });
+      const automatic = {
+        kind: "agent-turn" as const,
+        projectId: "project",
+        threadId: "thread",
+        turnId: "turn",
+        sourceEventId: "single",
+        occurredAt: "2026-09-01T12:00:00.000Z",
+        provider: "codex",
+        outcome: "succeeded" as const,
+        coverage: "complete" as const,
+        inputTokens: 10,
+        cachedInputTokens: 0,
+        outputTokens: 5,
+        reasoningTokens: 2,
+        elapsedMs: 60,
+        taskMs: null,
+        model: null,
+        effort: null,
+        toolUses: 1,
+      };
+      yield* work.recordAutomatic(automatic);
+      let overview = yield* work.overview(range);
+      assert.equal(overview.records[0]?.repositoryId, repository.id);
+      assert.equal(overview.records[0]?.crossRepository, false);
+      yield* sql`UPDATE work_records SET repository_id = 'old-worktree' WHERE source_event_id = 'single'`;
+      overview = yield* work.overview(range);
+      assert.deepEqual(overview.repositoryInvolvement, [
+        { trackingProjectId: project.id, repositoryId: repository.id, records: 1 },
+      ]);
+      assert.equal(overview.records[0]?.repositoryId, "old-worktree");
+      yield* work.upsertRepository({
+        id: repository.id,
+        trackingProjectId: project.id,
+        localRoot: root,
+        inclusion: "excluded",
+        provenance: "discovered",
+      });
+      yield* work.recordAutomatic({ ...automatic, sourceEventId: "excluded" });
+      overview = yield* work.overview(range);
+      assert.equal(
+        overview.records.find((record) => record.sourceEventId === "excluded")?.repositoryId,
+        null,
+      );
+      assert.equal(overview.records.length, 2);
+      yield* Effect.promise(() => createRepository(NodePath.join(root, "api")));
+      const discovered = yield* work.discoverRepositories({ trackingProjectId: project.id });
+      assert.equal(
+        discovered.candidates.find((candidate) => candidate.localRoot === root)?.inclusion,
+        "excluded",
+      );
+      overview = yield* work.overview(range);
+      assert.equal(overview.projects[0]?.repositories.length, 2);
+      assert.equal(
+        overview.projects[0]?.repositories.find((candidate) => candidate.localRoot.endsWith("/api"))
+          ?.inclusion,
+        "included",
+      );
+      yield* work.upsertRepository({
+        id: repository.id,
+        trackingProjectId: project.id,
+        localRoot: root,
+        inclusion: "included",
+        provenance: "discovered",
+      });
+      const original = yield* work.upsertManualEntry({
+        trackingProjectId: project.id,
+        repositoryId: "old-worktree" as never,
+        occurredAt: automatic.occurredAt,
+        durationMs: 60_000,
+      });
+      const editable = (yield* work.manualRecords(range))[0]!;
+      assert.equal(editable.repositoryId, repository.id);
+      const correction = yield* work.upsertManualEntry({
+        id: editable.id,
+        trackingProjectId: editable.trackingProjectId,
+        repositoryId: editable.repositoryId!,
+        occurredAt: editable.occurredAt,
+        durationMs: 120_000,
+      });
+      assert.equal(correction.repositoryId, repository.id);
+      assert.equal(correction.revision, 1);
+      const history = yield* sql<{
+        readonly repositoryId: string;
+        readonly supersedesId: string;
+      }>`SELECT repository_id AS "repositoryId", supersedes_id AS "supersedesId" FROM work_records WHERE id = ${original.id}`;
+      assert.equal(history[0]?.repositoryId, "old-worktree");
+      assert.equal(history[0]?.supersedesId, correction.id);
+    }).pipe(Effect.provide(testLayer)),
 );

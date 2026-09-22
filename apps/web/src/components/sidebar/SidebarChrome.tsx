@@ -1,9 +1,4 @@
-import {
-  ArrowLeftIcon,
-  BriefcaseBusinessIcon,
-  ChartNoAxesColumnIcon,
-  SettingsIcon,
-} from "lucide-react";
+import { ArrowLeftIcon, TimerIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
 import { Link, useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
@@ -229,11 +224,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label="Usage"
             onClick={handleUsageClick}
           />
-          <SidebarUtilityItem
-            icon={<BriefcaseBusinessIcon />}
-            label="Work"
-            onClick={handleWorkClick}
-          />
+          <SidebarUtilityItem icon={<TimerIcon />} label="Work" onClick={handleWorkClick} />
         </>
       )}
       <SidebarUpdatePill />

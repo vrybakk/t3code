@@ -189,9 +189,95 @@ it.effect(
       assert.equal(overview.totals.outputTokens, 1_503);
       assert.equal(overview.totals.reasoningTokens, 2_004);
       assert.equal(overview.totals.toolUses, 2_505);
+      assert.deepEqual(overview.dailyTotals, [
+        {
+          date: "2026-09-01",
+          trackingProjectId: project.id,
+          developerMs: 0,
+          agentElapsedMs: 501,
+          taskMs: 0,
+        },
+      ]);
+      const csv = yield* work.exportCsv(undefined, "2026-09");
+      assert.equal(csv.content.split("\n").length, 502);
+      assert.include(csv.content, '"Ledger"');
       assert.equal(overview.timeCoverage.active, "partial");
       assert.equal(overview.timeCoverage.waiting, "unavailable");
       assert.ok(yield* encodeWorkOverview(overview));
+    }).pipe(Effect.provide(makeTestLayer())),
+);
+
+it.effect(
+  "groups daily project totals in the profile timezone and exports all current project records",
+  () =>
+    Effect.gen(function* () {
+      yield* runMigrations({ toMigrationInclusive: 54 });
+      const sql = yield* SqlClient.SqlClient;
+      const work = yield* WorkTrackingService;
+      yield* work.upsertProfile({
+        displayName: "Developer",
+        timeZone: "Europe/Madrid",
+        trackingEnabled: true,
+      });
+      const first = yield* work.upsertProject({
+        name: "First project",
+        t3ProjectIds: [],
+        trackingEnabled: true,
+      });
+      const second = yield* work.upsertProject({
+        name: "Second project",
+        t3ProjectIds: [],
+        trackingEnabled: true,
+      });
+      const original = yield* work.upsertManualEntry({
+        trackingProjectId: first.id,
+        occurredAt: "2026-09-01T22:30:00.000Z",
+        durationMs: 60_000,
+        note: "superseded record",
+      });
+      yield* work.upsertManualEntry({
+        id: original.id,
+        trackingProjectId: first.id,
+        occurredAt: original.occurredAt,
+        durationMs: 120_000,
+        note: "current record",
+      });
+      yield* work.upsertManualEntry({
+        trackingProjectId: second.id,
+        occurredAt: "2026-09-01T21:30:00.000Z",
+        durationMs: 180_000,
+      });
+      yield* sql`INSERT INTO work_records(id, kind, tracking_project_id, cross_repository, occurred_at, elapsed_ms, task_ms, outcome, coverage, revision, created_at, updated_at) VALUES ('turn', 'agent-turn', ${first.id}, 0, '2026-09-01T22:40:00.000Z', 240000, NULL, 'succeeded', 'complete', 0, '2026-09-01T22:40:00.000Z', '2026-09-01T22:40:00.000Z'), ('task', 'agent-task', ${first.id}, 0, '2026-09-01T22:45:00.000Z', NULL, 360000, 'succeeded', 'complete', 0, '2026-09-01T22:45:00.000Z', '2026-09-01T22:45:00.000Z')`;
+      const range = { since: "2026-09-01T00:00:00.000Z", until: "2026-09-03T00:00:00.000Z" };
+      const overview = yield* work.overview(range);
+      assert.deepEqual(overview.dailyTotals, [
+        {
+          date: "2026-09-01",
+          trackingProjectId: second.id,
+          developerMs: 180_000,
+          agentElapsedMs: 0,
+          taskMs: 0,
+        },
+        {
+          date: "2026-09-02",
+          trackingProjectId: first.id,
+          developerMs: 120_000,
+          agentElapsedMs: 240_000,
+          taskMs: 360_000,
+        },
+      ]);
+      const filtered = yield* work.overview({ ...range, trackingProjectId: first.id });
+    assert.deepEqual(filtered.dailyTotals, overview.dailyTotals?.slice(1));
+      const csv = yield* work.exportCsv(undefined, "2026-09");
+      assert.equal(csv.content.split("\n").length, 5);
+      assert.ok(csv.content.startsWith("project_name,record_id,"));
+      assert.include(csv.content, '"First project"');
+      assert.include(csv.content, '"Second project"');
+      assert.include(csv.content, '"current record"');
+      assert.notInclude(csv.content, "superseded record");
+      const projectCsv = yield* work.exportCsv(first.id, "2026-09");
+      assert.equal(projectCsv.content.split("\n").length, 4);
+      assert.notInclude(projectCsv.content, '"Second project"');
     }).pipe(Effect.provide(makeTestLayer())),
 );
 

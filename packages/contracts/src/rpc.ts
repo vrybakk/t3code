@@ -769,7 +769,7 @@ const WsWorkImportJsonRpc = Rpc.make(WS_METHODS.workImportJson, {
 });
 const WsWorkExportCsvRpc = Rpc.make(WS_METHODS.workExportCsv, {
   payload: Schema.Struct({
-    trackingProjectId: WorkTrackingProjectId,
+    trackingProjectId: Schema.optional(WorkTrackingProjectId),
     month: TrimmedNonEmptyString,
   }),
   success: WorkCsvExport,

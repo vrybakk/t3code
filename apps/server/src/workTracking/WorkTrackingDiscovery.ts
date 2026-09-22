@@ -9,6 +9,8 @@ import {
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as Effect from "effect/Effect";
+import * as DateTime from "effect/DateTime";
+import * as Crypto from "effect/Crypto";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 const MAX_DEPTH = 6;
@@ -48,13 +50,67 @@ interface ScanRoot {
   readonly sourceProjectId: string;
 }
 
-const isGitRepository = async (directory: string) => {
+export const readRepositoryIdentity = async (directory: string) => {
   try {
-    const git = await NodeFSP.lstat(NodePath.join(directory, ".git"));
-    return git.isDirectory() || git.isFile();
+    const metadataPath = NodePath.join(directory, ".git");
+    const git = await NodeFSP.lstat(metadataPath);
+    if (git.isSymbolicLink()) return null;
+    let gitDirectory = metadataPath;
+    if (git.isFile()) {
+      const content = await NodeFSP.readFile(metadataPath, "utf8");
+      const target = /^gitdir:\s*(.+)\s*$/m.exec(content)?.[1]?.trim();
+      if (!target) return null;
+      gitDirectory = NodePath.resolve(directory, target);
+    } else if (!git.isDirectory()) return null;
+    let commonDirectory = gitDirectory;
+    try {
+      commonDirectory = NodePath.resolve(
+        gitDirectory,
+        (await NodeFSP.readFile(NodePath.join(gitDirectory, "commondir"), "utf8")).trim(),
+      );
+    } catch {
+      // Ordinary repositories and submodules have no commondir file.
+    }
+    return {
+      canonicalIdentity: await NodeFSP.realpath(commonDirectory),
+      linkedWorktree: commonDirectory !== gitDirectory,
+    };
   } catch {
-    return false;
+    return null;
   }
+};
+
+export const groupWorkRepositories = async (repositories: ReadonlyArray<WorkRepository>) => {
+  const resolved = await Promise.all(
+    repositories.map(async (repository) => ({
+      ...repository,
+      canonicalIdentity:
+        repository.canonicalIdentity ??
+        (await readRepositoryIdentity(repository.localRoot))?.canonicalIdentity ??
+        null,
+    })),
+  );
+  const groups = new Map<
+    string,
+    { repository: WorkRepository; ids: Array<WorkRepository["id"]> }
+  >();
+  for (const repository of resolved.sort(
+    (left, right) =>
+      Number(right.canonicalIdentity === NodePath.join(right.localRoot, ".git")) -
+        Number(left.canonicalIdentity === NodePath.join(left.localRoot, ".git")) ||
+      left.localRoot.length - right.localRoot.length ||
+      left.localRoot.localeCompare(right.localRoot),
+  )) {
+    const key = `${repository.trackingProjectId}:${repository.canonicalIdentity ?? repository.localRoot}`;
+    const group = groups.get(key);
+    if (!group) groups.set(key, { repository, ids: [repository.id] });
+    else {
+      group.ids.push(repository.id);
+      if (repository.inclusion === "excluded")
+        group.repository = { ...group.repository, inclusion: "excluded" };
+    }
+  }
+  return [...groups.values()];
 };
 
 export const discoverRepositoryCandidates = async (
@@ -100,17 +156,19 @@ export const discoverRepositoryCandidates = async (
     }
     if (!metadata.isDirectory() || metadata.isSymbolicLink()) continue;
     visited += 1;
-    if (await isGitRepository(current.localRoot))
-      candidates.set(
-        current.localRoot,
-        candidates.get(current.localRoot) ?? {
+    const identity = await readRepositoryIdentity(current.localRoot);
+    if (identity) {
+      const existing = candidates.get(identity.canonicalIdentity);
+      if (!existing || identity.canonicalIdentity === NodePath.join(current.localRoot, ".git"))
+        candidates.set(identity.canonicalIdentity, {
           localRoot: current.localRoot,
-          canonicalIdentity: null,
+          canonicalIdentity: identity.canonicalIdentity,
           inclusion: null,
           provenance: null,
           sourceProjectId: current.sourceProjectId as never,
-        },
-      );
+        });
+    }
+    if (identity?.linkedWorktree && current.depth > 0) continue;
     if (current.depth >= MAX_DEPTH) continue;
     try {
       const entries = await NodeFSP.readdir(current.localRoot, {
@@ -138,7 +196,7 @@ export const discoverRepositoryCandidates = async (
   };
 };
 
-export const makeWorkTrackingDiscovery = (sql: SqlClient.SqlClient) => {
+export const makeWorkTrackingDiscovery = (sql: SqlClient.SqlClient, crypto: Crypto.Crypto) => {
   const discoverRepositories = Effect.fn("WorkTrackingService.discoverRepositories")(function* (
     input: WorkRepositoryDiscoveryInput,
   ) {
@@ -155,17 +213,34 @@ export const makeWorkTrackingDiscovery = (sql: SqlClient.SqlClient) => {
     const existing = yield* mapSqlError(
       sql<WorkRepository>`SELECT id, tracking_project_id AS "trackingProjectId", local_root AS "localRoot", canonical_identity AS "canonicalIdentity", inclusion, provenance, created_at AS "createdAt", updated_at AS "updatedAt" FROM work_repositories WHERE tracking_project_id = ${input.trackingProjectId}`,
     );
-    const existingByRoot = new Map(
-      existing.map((repository) => [NodePath.resolve(repository.localRoot), repository]),
-    );
+    const groups = yield* Effect.promise(() => groupWorkRepositories(existing));
+    const now = DateTime.formatIso(yield* DateTime.now);
+    for (const candidate of discovered.candidates) {
+      if (
+        groups.some(
+          ({ repository }) =>
+            repository.canonicalIdentity === candidate.canonicalIdentity ||
+            repository.localRoot === candidate.localRoot,
+        )
+      )
+        continue;
+      const id = yield* crypto.randomUUIDv4;
+      yield* mapSqlError(
+        sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES (${id}, ${input.trackingProjectId}, ${candidate.localRoot}, ${candidate.canonicalIdentity}, 'included', 'discovered', ${now}, ${now}) ON CONFLICT(tracking_project_id, local_root) DO NOTHING`,
+      );
+    }
     return {
       candidates: discovered.candidates.map((candidate) => {
-        const repository = existingByRoot.get(candidate.localRoot);
+        const repository = groups.find(
+          ({ repository }) =>
+            repository.canonicalIdentity === candidate.canonicalIdentity ||
+            NodePath.resolve(repository.localRoot) === candidate.localRoot,
+        )?.repository;
         return {
           ...candidate,
-          canonicalIdentity: repository?.canonicalIdentity ?? null,
-          inclusion: repository?.inclusion ?? null,
-          provenance: repository?.provenance ?? null,
+          canonicalIdentity: repository?.canonicalIdentity ?? candidate.canonicalIdentity,
+          inclusion: repository?.inclusion ?? "included",
+          provenance: repository?.provenance ?? "discovered",
         };
       }),
       truncated: discovered.truncated,

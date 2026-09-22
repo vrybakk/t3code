@@ -1,4 +1,5 @@
 import type { WorkOverview } from "@t3tools/contracts";
+import { WorkPath } from "./WorkPath";
 
 const duration = (value: number) => `${Math.round(value / 60_000)}m`;
 
@@ -23,17 +24,28 @@ export function WorkBreakdown({ overview }: { readonly overview: WorkOverview })
                   {duration(summary.totals.agentTaskMs)}
                 </p>
                 {project?.repositories.length ? (
-                  <p className="mt-1 text-muted-foreground">
-                    Repositories are involvement only:{" "}
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                     {project.repositories
+                      .filter((repository) => repository.inclusion === "included")
                       .map((repository) => {
                         const involvement = overview.repositoryInvolvement.find(
                           (item) => item.repositoryId === repository.id,
                         );
-                        return `${repository.localRoot} (${involvement?.records ?? 0} records)`;
-                      })
-                      .join(", ")}
-                  </p>
+                        return (
+                          <div
+                            key={repository.id}
+                            className="flex min-w-0 max-w-full items-center gap-2 rounded-md bg-muted/50 px-2 py-1"
+                          >
+                            <WorkPath path={repository.localRoot} />
+                            {involvement?.records ? (
+                              <span className="shrink-0 tabular-nums">
+                                {involvement.records} records
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                  </div>
                 ) : null}
               </div>
             );

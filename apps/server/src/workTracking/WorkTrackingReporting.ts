@@ -176,7 +176,7 @@ export const makeWorkTrackingReporting = ({
     );
   });
   const exportCsv = Effect.fn("WorkTrackingService.exportCsv")(function* (
-    trackingProjectId: string,
+    trackingProjectId: string | undefined,
     month: string,
   ) {
     if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month))
@@ -188,13 +188,25 @@ export const makeWorkTrackingReporting = ({
     const records = yield* readRecords({
       since: window.since,
       until: window.until,
-      trackingProjectId: trackingProjectId as never,
+      ...(trackingProjectId === undefined ? {} : { trackingProjectId: trackingProjectId as never }),
     });
+    const projects = yield* mapSqlError(
+      sql<{
+        readonly id: string;
+        readonly name: string;
+      }>`SELECT id, name FROM work_tracking_projects`,
+    );
+    const projectNames = new Map(projects.map((project) => [project.id, project.name]));
     return {
       filename: `work-${month}.csv`,
       content: [
-        WORK_RECORD_CSV_HEADER.join(","),
-        ...records.map((record) => encodeCsvRow(workRecordCsvValues(record))),
+        ["project_name", ...WORK_RECORD_CSV_HEADER].join(","),
+        ...records.map((record) =>
+          encodeCsvRow([
+            projectNames.get(record.trackingProjectId) ?? null,
+            ...workRecordCsvValues(record),
+          ]),
+        ),
       ].join("\n"),
     };
   });

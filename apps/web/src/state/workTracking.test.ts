@@ -9,6 +9,8 @@ import {
 
 describe("parseDurationMinutes", () => {
   it("rejects negative and non-finite manual duration", () => {
+    expect(parseDurationMinutes("")).toBeNull();
+    expect(parseDurationMinutes("   ")).toBeNull();
     expect(parseDurationMinutes("-1")).toBeNull();
     expect(parseDurationMinutes("NaN")).toBeNull();
     expect(parseDurationMinutes("Infinity")).toBeNull();

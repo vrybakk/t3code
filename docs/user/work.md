@@ -11,10 +11,17 @@ Automatic agent metrics remain evidence and cannot be edited.
 
 Tracking projects are internal reporting records and do not need to be created or attached by hand.
 Use **Tracking settings** only when you need to correct which discovered repositories are included.
+Linked Git worktrees belong to the same repository. Excluding a repository changes repository
+attribution, not project time or token capture; disable local tracking to stop capturing activity.
+Work shows running agent sessions with live elapsed time. Their metrics enter the ledger when the
+turn ends; these timers do not measure developer time.
 
-Create a monthly report for a tracking project when you are ready to review it. Reports move from
-**Open** to **Submitted**, then **Invoiced**; invoiced reports are fixed snapshots. Export CSV for
-a month or a report snapshot when you need to share it.
+Reports show all projects for the selected month, with daily time and project totals. Switch between
+developer time, agent elapsed time, and task time without combining them. Filter to one project when
+needed, or export the entire month as one CSV.
+
+For a fixed per-project handoff, create a monthly snapshot under **Project snapshots and delivery**.
+Snapshots move from **Open** to **Submitted**, then **Invoiced**; invoiced snapshots cannot change.
 
 The ledger stays in the environment's local storage. Use the backup controls in Work to export a
 backup before moving or restoring local data. Agent elapsed time is available when captured, but

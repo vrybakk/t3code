@@ -20,7 +20,12 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
-import { discoverRepositoryCandidates, isWithinWorkspaceRoot } from "./WorkTrackingDiscovery.ts";
+import {
+  discoverRepositoryCandidates,
+  groupWorkRepositories,
+  isWithinWorkspaceRoot,
+  readRepositoryIdentity,
+} from "./WorkTrackingDiscovery.ts";
 import type { AutomaticWorkRecordInput } from "./WorkTrackingService.ts";
 
 const nowIso = (milliseconds: number) => DateTime.formatIso(DateTime.makeUnsafe(milliseconds));
@@ -102,7 +107,7 @@ export const makeWorkTrackingMutations = ({
             Effect.gen(function* () {
               const repositoryId = yield* crypto.randomUUIDv4;
               yield* mapSqlError(
-                sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES (${repositoryId}, ${id}, ${repository.localRoot}, NULL, 'included', 'discovered', ${now}, ${now}) ON CONFLICT(tracking_project_id, local_root) DO NOTHING`,
+                sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES (${repositoryId}, ${id}, ${repository.localRoot}, ${repository.canonicalIdentity}, 'included', 'discovered', ${now}, ${now}) ON CONFLICT(tracking_project_id, local_root) DO UPDATE SET canonical_identity = excluded.canonical_identity`,
               );
             }),
           );
@@ -243,14 +248,25 @@ export const makeWorkTrackingMutations = ({
         ))[0];
     const now = nowIso(yield* Clock.currentTimeMillis);
     const id = input.id ?? repositoryByRoot?.id ?? (yield* crypto.randomUUIDv4);
+    const identity = yield* Effect.promise(() => readRepositoryIdentity(normalized.candidate));
+    const canonicalIdentity = identity?.canonicalIdentity ?? input.canonicalIdentity ?? null;
     yield* mapSqlError(
-      sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES (${id}, ${input.trackingProjectId}, ${normalized.candidate}, ${input.canonicalIdentity ?? null}, ${input.inclusion}, ${input.provenance}, ${now}, ${now}) ON CONFLICT(id) DO UPDATE SET local_root = excluded.local_root, canonical_identity = excluded.canonical_identity, inclusion = excluded.inclusion, provenance = excluded.provenance, updated_at = excluded.updated_at`,
+      sql`INSERT INTO work_repositories(id, tracking_project_id, local_root, canonical_identity, inclusion, provenance, created_at, updated_at) VALUES (${id}, ${input.trackingProjectId}, ${normalized.candidate}, ${canonicalIdentity}, ${input.inclusion}, ${input.provenance}, ${now}, ${now}) ON CONFLICT(id) DO UPDATE SET local_root = excluded.local_root, canonical_identity = excluded.canonical_identity, inclusion = excluded.inclusion, provenance = excluded.provenance, updated_at = excluded.updated_at`,
     );
+    const aliases = yield* mapSqlError(
+      sql<WorkRepository>`SELECT id, tracking_project_id AS "trackingProjectId", local_root AS "localRoot", canonical_identity AS "canonicalIdentity", inclusion, provenance, created_at AS "createdAt", updated_at AS "updatedAt" FROM work_repositories WHERE tracking_project_id = ${input.trackingProjectId}`,
+    );
+    const groups = yield* Effect.promise(() => groupWorkRepositories(aliases));
+    const group = groups.find((group) => group.ids.some((alias) => alias === id));
+    if (group)
+      yield* mapSqlError(
+        sql`UPDATE work_repositories SET inclusion = ${input.inclusion}, canonical_identity = ${canonicalIdentity}, updated_at = ${now} WHERE ${sql.in("id", group.ids)}`,
+      );
     return {
       id,
       ...input,
       localRoot: normalized.candidate,
-      canonicalIdentity: input.canonicalIdentity ?? null,
+      canonicalIdentity,
       createdAt: repositoryByRoot?.createdAt ?? now,
       updatedAt: now,
     } as unknown as WorkRepository;
@@ -360,21 +376,24 @@ export const makeWorkTrackingMutations = ({
     ))[0];
     if (!enabled) return;
     const repositoryCandidates = yield* mapSqlError(
-      sql<{
-        readonly id: string;
-        readonly localRoot: string;
-        readonly workspaceRoot: string;
-      }>`SELECT repositories.id, repositories.local_root AS "localRoot", projects.workspace_root AS "workspaceRoot" FROM work_repositories AS repositories JOIN work_tracking_project_bindings AS bindings ON bindings.tracking_project_id = repositories.tracking_project_id JOIN projection_projects AS projects ON projects.project_id = bindings.project_id WHERE repositories.tracking_project_id = ${project.id} AND bindings.project_id = ${input.projectId} AND repositories.inclusion = 'included' AND projects.deleted_at IS NULL`,
+      sql<WorkRepository>`SELECT repositories.id, repositories.tracking_project_id AS "trackingProjectId", repositories.local_root AS "localRoot", repositories.canonical_identity AS "canonicalIdentity", repositories.inclusion, repositories.provenance, repositories.created_at AS "createdAt", repositories.updated_at AS "updatedAt" FROM work_repositories AS repositories WHERE repositories.tracking_project_id = ${project.id}`,
     );
-    const repositoryIds = [
-      ...new Set(
-        repositoryCandidates
-          .filter((repository) =>
-            isWithinWorkspaceRoot(repository.workspaceRoot, repository.localRoot),
-          )
-          .map((repository) => repository.id),
-      ),
-    ];
+    const roots = yield* mapSqlError(
+      sql<{
+        readonly workspaceRoot: string;
+      }>`SELECT workspace_root AS "workspaceRoot" FROM projection_projects WHERE project_id = ${input.projectId} AND deleted_at IS NULL`,
+    );
+    const scoped = repositoryCandidates.filter((repository) =>
+      roots.some((root) => isWithinWorkspaceRoot(root.workspaceRoot, repository.localRoot)),
+    );
+    const groups = yield* Effect.promise(() => groupWorkRepositories(repositoryCandidates));
+    const scopedIds = new Set(scoped.map((repository) => repository.id));
+    const repositoryIds = groups
+      .filter(
+        (group) =>
+          group.repository.inclusion === "included" && group.ids.some((id) => scopedIds.has(id)),
+      )
+      .map((group) => group.repository.id);
     const repositoryId = repositoryIds.length === 1 ? repositoryIds[0] : null;
     const crossRepository = repositoryIds.length > 1;
     const id = yield* crypto.randomUUIDv4;

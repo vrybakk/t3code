@@ -13,7 +13,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { isElectron } from "../../env";
 import { usePrimaryEnvironmentId } from "../../state/environments";
-import { useThreadShells } from "../../state/entities";
+import { useProjects, useThreadShells } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { browserTimeZone, useWorkMutations, workWindow } from "../../state/workTracking";
 import { ScrollArea } from "../ui/scroll-area";
@@ -28,9 +28,13 @@ import { WorkDeliveries } from "./WorkDeliveries";
 import { WorkManualEntries } from "./WorkManualEntries";
 import { WorkProfileForm } from "./WorkProfileForm";
 import { WorkReports } from "./WorkReports";
+import { WorkMonthlyReport } from "./WorkMonthlyReport";
 import { WorkReportSnapshotPrint } from "./WorkReportSnapshotPrint";
 import { WorkRepositoryReview } from "./WorkRepositoryReview";
 import { WorkSummary } from "./WorkSummary";
+import { WorkSelect } from "./WorkSelect";
+import { WorkRunningSessions } from "./WorkRunningSessions";
+import { workProjectLabels } from "./workPresentation";
 
 const monthInTimeZone = (timeZone: string) => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -82,7 +86,21 @@ export function WorkPage() {
   const monthResult = useAtomValue(
     serverEnvironment.workOverview({ environmentId, input: windows.month }),
   );
-  const overview = Option.getOrNull(AsyncResult.value(monthResult));
+  const rawOverview = Option.getOrNull(AsyncResult.value(monthResult));
+  const sourceProjects = useProjects();
+  const overview = useMemo(
+    () =>
+      rawOverview
+        ? {
+            ...rawOverview,
+            projects: workProjectLabels(
+              rawOverview.projects,
+              sourceProjects.filter((project) => project.environmentId === environmentId),
+            ),
+          }
+        : null,
+    [rawOverview, sourceProjects, environmentId],
+  );
   const threads = useThreadShells().filter((thread) => thread.environmentId === environmentId);
   const mutations = useWorkMutations(environmentId);
   const [manualMonth, setManualMonth] = useState(() => monthInTimeZone(browserZone));
@@ -181,7 +199,7 @@ export function WorkPage() {
         </WorkspacePageHeader>
         <ScrollArea viewportRef={scrollViewportRef} className="min-h-0 flex-1">
           <WorkspacePageContainer width="wide" className="py-6">
-            {bootstrap.waiting ? (
+            {bootstrap.waiting && overview === null ? (
               <p className="text-sm text-muted-foreground">Loading local work ledger…</p>
             ) : null}
             {overview === null && !bootstrap.waiting ? (
@@ -208,6 +226,11 @@ export function WorkPage() {
                     Complete your local Work profile in Settings to start recording time.
                   </button>
                 ) : null}
+                <WorkRunningSessions
+                  threads={threads}
+                  projects={overview.projects}
+                  enabled={overview.profile?.trackingEnabled ?? false}
+                />
                 <Tabs.Panel value="overview" keepMounted className="space-y-6">
                   <WorkSummary
                     summaries={[
@@ -240,49 +263,71 @@ export function WorkPage() {
                   />
                 </Tabs.Panel>
                 <Tabs.Panel value="reports" keepMounted className="space-y-6">
-                  <WorkDeliveries
+                  <WorkMonthlyReport
+                    environmentId={environmentId}
                     projects={overview.projects}
-                    threads={threads}
-                    deliveries={overview.deliveries}
-                    pending={pending}
-                    onMark={async (trackingProjectId, threadId) =>
-                      (await perform(() =>
-                        mutations.markDelivery({ trackingProjectId, threadId }),
-                      )) !== null
-                    }
-                    onReopen={async (id) =>
-                      (await perform(() => mutations.reopenDelivery({ id }))) !== null
-                    }
-                  />
-                  <WorkReports
-                    key={timeZone}
-                    projects={overview.projects}
-                    reports={overview.reports}
+                    timeZone={timeZone}
                     defaultMonth={monthInTimeZone(timeZone)}
-                    pending={pending}
-                    onCreate={async (input) =>
-                      (await perform(() => mutations.createReport(input))) !== null
-                    }
-                    onTransition={async (input) =>
-                      (await perform(() => mutations.transitionReport(input))) !== null
-                    }
                     onCsv={async (trackingProjectId, month) => {
                       const result = await mutations.exportCsv({
-                        trackingProjectId,
+                        ...(trackingProjectId ? { trackingProjectId } : {}),
                         month,
                       });
                       if (result._tag === "Success")
                         download(result.value.filename, result.value.content);
                       else setError("Could not export the CSV report.");
                     }}
-                    onSnapshotCsv={async (id) => {
-                      const result = await mutations.exportReportCsv({ id });
-                      if (result._tag === "Success")
-                        download(result.value.filename, result.value.content);
-                      else setError("Could not export the immutable report snapshot.");
-                    }}
-                    onPrintSnapshot={setPrintReportId}
                   />
+                  <details className="rounded-lg border p-5">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      Project snapshots and delivery
+                    </summary>
+                    <div className="mt-5 space-y-5">
+                      <WorkDeliveries
+                        projects={overview.projects}
+                        threads={threads}
+                        deliveries={overview.deliveries}
+                        pending={pending}
+                        onMark={async (trackingProjectId, threadId) =>
+                          (await perform(() =>
+                            mutations.markDelivery({ trackingProjectId, threadId }),
+                          )) !== null
+                        }
+                        onReopen={async (id) =>
+                          (await perform(() => mutations.reopenDelivery({ id }))) !== null
+                        }
+                      />
+                      <WorkReports
+                        key={timeZone}
+                        projects={overview.projects}
+                        reports={overview.reports}
+                        defaultMonth={monthInTimeZone(timeZone)}
+                        pending={pending}
+                        onCreate={async (input) =>
+                          (await perform(() => mutations.createReport(input))) !== null
+                        }
+                        onTransition={async (input) =>
+                          (await perform(() => mutations.transitionReport(input))) !== null
+                        }
+                        onCsv={async (trackingProjectId, month) => {
+                          const result = await mutations.exportCsv({
+                            trackingProjectId,
+                            month,
+                          });
+                          if (result._tag === "Success")
+                            download(result.value.filename, result.value.content);
+                          else setError("Could not export the CSV report.");
+                        }}
+                        onSnapshotCsv={async (id) => {
+                          const result = await mutations.exportReportCsv({ id });
+                          if (result._tag === "Success")
+                            download(result.value.filename, result.value.content);
+                          else setError("Could not export the immutable report snapshot.");
+                        }}
+                        onPrintSnapshot={setPrintReportId}
+                      />
+                    </div>
+                  </details>
                 </Tabs.Panel>
                 <Tabs.Panel value="settings" keepMounted className="space-y-6">
                   <WorkProfileForm
@@ -302,27 +347,26 @@ export function WorkPage() {
                         Tracking settings
                       </h2>
                       <p className="text-sm text-muted-foreground">
-                        T3 projects and nested Git repositories are included automatically.
+                        Projects are added automatically when tracking is enabled. Repositories
+                        include their worktrees.
                       </p>
                     </div>
                     <div className="mt-4 space-y-4">
                       {overview.projects.length > 1 ? (
-                        <label className="grid max-w-md gap-1.5 text-sm font-medium">
-                          Tracking project
-                          <select
-                            className="h-9 rounded-md border bg-background px-3 font-normal"
+                        <div className="grid min-w-0 max-w-md gap-1.5 text-sm font-medium">
+                          <label htmlFor="work-settings-project">Tracking project</label>
+                          <WorkSelect
+                            id="work-settings-project"
                             value={selected?.id ?? ""}
-                            onChange={(event) =>
-                              setSelectedId(event.target.value as WorkTrackingProject["id"])
+                            onValueChange={(value) =>
+                              setSelectedId(value as WorkTrackingProject["id"])
                             }
-                          >
-                            {overview.projects.map((project) => (
-                              <option key={project.id} value={project.id}>
-                                {project.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                            options={overview.projects.map((project) => ({
+                              value: project.id,
+                              label: project.name,
+                            }))}
+                          />
+                        </div>
                       ) : null}
                       {selected ? (
                         <WorkRepositoryReview

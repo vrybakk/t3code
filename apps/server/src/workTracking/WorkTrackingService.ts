@@ -6,6 +6,7 @@ import {
   type WorkOverview,
   type WorkOverviewInput,
   type WorkProjectTotals,
+  type WorkDailyTotals,
   type WorkRepositoryInvolvement,
   type WorkProfile,
   type WorkProfileInput,
@@ -27,13 +28,14 @@ import {
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { makeWorkTrackingMutations } from "./WorkTrackingMutations.ts";
-import { makeWorkTrackingDiscovery } from "./WorkTrackingDiscovery.ts";
+import { groupWorkRepositories, makeWorkTrackingDiscovery } from "./WorkTrackingDiscovery.ts";
 import { makeWorkTrackingBackup } from "./WorkTrackingBackup.ts";
 import { makeWorkTrackingReporting } from "./WorkTrackingReporting.ts";
 
@@ -90,7 +92,7 @@ export interface WorkTrackingServiceShape {
   readonly exportJson: Effect.Effect<WorkExport, WorkError>;
   readonly importJson: (input: WorkImportInput) => Effect.Effect<WorkExport, WorkError>;
   readonly exportCsv: (
-    trackingProjectId: string,
+    trackingProjectId: string | undefined,
     month: string,
   ) => Effect.Effect<{ filename: string; content: string }, WorkError>;
   readonly exportReportCsv: (
@@ -130,9 +132,13 @@ export const layer = Layer.effect(
           : null;
       }),
     );
-    const readRepositories = (trackingProjectId?: string) =>
+    const readRepositoryGroups = (trackingProjectId?: string) =>
       mapSqlError(
         sql<WorkRepository>`SELECT id, tracking_project_id AS "trackingProjectId", local_root AS "localRoot", canonical_identity AS "canonicalIdentity", inclusion, provenance, created_at AS "createdAt", updated_at AS "updatedAt" FROM work_repositories ${trackingProjectId === undefined ? sql`` : sql`WHERE tracking_project_id = ${trackingProjectId}`}`,
+      ).pipe(Effect.flatMap((rows) => Effect.promise(() => groupWorkRepositories(rows))));
+    const readRepositories = (trackingProjectId?: string) =>
+      readRepositoryGroups(trackingProjectId).pipe(
+        Effect.map((groups) => groups.map((group) => group.repository)),
       );
     const readProjects = Effect.fn("WorkTrackingService.readProjects")(function* () {
       const rows = yield* mapSqlError(
@@ -180,7 +186,24 @@ export const layer = Layer.effect(
         sql<
           Record<string, unknown>
         >`SELECT id, kind, tracking_project_id AS "trackingProjectId", project_id AS "projectId", thread_id AS "threadId", turn_id AS "turnId", repository_id AS "repositoryId", cross_repository = 1 AS "crossRepository", occurred_at AS "occurredAt", duration_ms AS "durationMs", elapsed_ms AS "elapsedMs", active_ms AS "activeMs", waiting_ms AS "waitingMs", task_ms AS "taskMs", provider, model, effort, surface, json_object('inputTokens', input_tokens, 'cachedInputTokens', cached_input_tokens, 'outputTokens', output_tokens, 'reasoningTokens', reasoning_tokens) AS tokens, tool_usage_json AS "toolUsage", outcome, coverage, category, note, source_event_id AS "sourceEventId", revision, supersedes_id AS "supersedesId", created_at AS "createdAt", updated_at AS "updatedAt" FROM work_records WHERE kind = 'manual' AND occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} ORDER BY occurred_at DESC`,
-      ).pipe(Effect.flatMap(decodeRecords));
+      ).pipe(
+        Effect.flatMap(decodeRecords),
+        Effect.flatMap((records) =>
+          Effect.gen(function* () {
+            const groups = yield* readRepositoryGroups(input.trackingProjectId);
+            const aliases = new Map(
+              groups.flatMap((group) => group.ids.map((id) => [id, group.repository.id] as const)),
+            );
+            return records.map((record) => ({
+              ...record,
+              repositoryId:
+                record.repositoryId === null
+                  ? null
+                  : (aliases.get(record.repositoryId) ?? record.repositoryId),
+            }));
+          }),
+        ),
+      );
     const readAdjustments = (input: WorkOverviewInput) =>
       mapSqlError(
         sql<
@@ -197,9 +220,64 @@ export const layer = Layer.effect(
           ),
         ),
       );
+    const readDailyTotals = Effect.fn("WorkTrackingService.readDailyTotals")(function* (
+      input: WorkOverviewInput,
+    ) {
+      const profile = yield* readProfile;
+      const timeZone = DateTime.zoneMakeNamedUnsafe(profile?.timeZone ?? "UTC");
+      const rows = yield* mapSqlError(
+        sql<{
+          readonly trackingProjectId: WorkDailyTotals["trackingProjectId"];
+          readonly occurredAt: string;
+          readonly developerMs: number;
+          readonly agentElapsedMs: number;
+          readonly taskMs: number;
+        }>`SELECT tracking_project_id AS "trackingProjectId", occurred_at AS "occurredAt", COALESCE(SUM(CASE WHEN kind = 'manual' THEN duration_ms ELSE 0 END), 0) AS "developerMs", COALESCE(SUM(CASE WHEN kind = 'agent-turn' THEN elapsed_ms ELSE 0 END), 0) AS "agentElapsedMs", COALESCE(SUM(CASE WHEN kind = 'agent-task' THEN task_ms ELSE 0 END), 0) AS "taskMs" FROM work_records WHERE occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} GROUP BY tracking_project_id, occurred_at`,
+      );
+      const totals = new Map<string, WorkDailyTotals>();
+      for (const row of rows) {
+        const date = DateTime.formatIsoDate(
+          DateTime.setZone(DateTime.makeUnsafe(row.occurredAt), timeZone),
+        );
+        const key = `${date}:${row.trackingProjectId}`;
+        const prior = totals.get(key);
+        totals.set(key, {
+          date,
+          trackingProjectId: row.trackingProjectId,
+          developerMs: row.developerMs + (prior?.developerMs ?? 0),
+          agentElapsedMs: row.agentElapsedMs + (prior?.agentElapsedMs ?? 0),
+          taskMs: row.taskMs + (prior?.taskMs ?? 0),
+        });
+      }
+      return [...totals.values()].sort(
+        (left, right) =>
+          left.date.localeCompare(right.date) ||
+          left.trackingProjectId.localeCompare(right.trackingProjectId),
+      );
+    });
     const readRepositoryInvolvement = (input: WorkOverviewInput) =>
       mapSqlError(
         sql<WorkRepositoryInvolvement>`SELECT tracking_project_id AS "trackingProjectId", repository_id AS "repositoryId", COUNT(*) AS records FROM work_records WHERE occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL AND repository_id IS NOT NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} GROUP BY tracking_project_id, repository_id`,
+      ).pipe(
+        Effect.flatMap((rows) =>
+          Effect.gen(function* () {
+            const groups = yield* readRepositoryGroups(input.trackingProjectId);
+            const aliases = new Map(
+              groups.flatMap((group) => group.ids.map((id) => [id, group.repository.id] as const)),
+            );
+            const totals = new Map<string, WorkRepositoryInvolvement>();
+            for (const row of rows) {
+              const repositoryId = aliases.get(row.repositoryId) ?? row.repositoryId;
+              const prior = totals.get(repositoryId);
+              totals.set(repositoryId, {
+                ...row,
+                repositoryId,
+                records: row.records + (prior?.records ?? 0),
+              });
+            }
+            return [...totals.values()];
+          }),
+        ),
       );
     const readTimeCoverage = (input: WorkOverviewInput) =>
       mapSqlError(
@@ -249,7 +327,7 @@ export const layer = Layer.effect(
       );
     });
     const mutations = makeWorkTrackingMutations({ sql, crypto, readProfile, readRepositories });
-    const discovery = makeWorkTrackingDiscovery(sql);
+    const discovery = makeWorkTrackingDiscovery(sql, crypto);
     const overview = Effect.fn("WorkTrackingService.overview")(function* (
       input: WorkOverviewInput,
     ) {
@@ -260,6 +338,7 @@ export const layer = Layer.effect(
         records,
         adjustments,
         projectTotals,
+        dailyTotals,
         repositoryInvolvement,
         deliveries,
         reports,
@@ -270,6 +349,7 @@ export const layer = Layer.effect(
         readRecords(input),
         readAdjustments(input),
         readProjectTotals(input),
+        readDailyTotals(input),
         readRepositoryInvolvement(input),
         readDeliveries,
         readReports(),
@@ -311,6 +391,7 @@ export const layer = Layer.effect(
         records,
         adjustments,
         projectTotals,
+        dailyTotals,
         repositoryInvolvement,
         deliveries,
         reports,

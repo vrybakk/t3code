@@ -25,6 +25,7 @@ export const workWindow = (
 ) => workTimeWindow(kind, timeZone, referenceDate);
 
 export const parseDurationMinutes = (value: string): number | null => {
+  if (!value.trim()) return null;
   const minutes = Number(value);
   return Number.isFinite(minutes) && minutes >= 0 ? Math.round(minutes * 60_000) : null;
 };
@@ -119,7 +120,7 @@ export function useWorkMutations(environmentId: EnvironmentId) {
     }) => run(transitionReport, input),
     exportJson: () => exportJson({ environmentId, input: {} }),
     importJson: (input: WorkImportInput) => run(importJson, input),
-    exportCsv: (input: { trackingProjectId: WorkTrackingProjectId; month: string }) =>
+    exportCsv: (input: { trackingProjectId?: WorkTrackingProjectId; month: string }) =>
       exportCsv({ environmentId, input }),
     exportReportCsv: (input: { id: WorkReportId }) => exportReportCsv({ environmentId, input }),
   };

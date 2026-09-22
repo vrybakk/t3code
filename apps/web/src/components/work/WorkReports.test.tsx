@@ -60,7 +60,7 @@ describe("WorkReports", () => {
     expect(projectSelect(renderer!).props.value).toBe("project-a");
 
     act(() => {
-      projectSelect(renderer!).props.onChange({ target: { value: "project-b" } });
+      projectSelect(renderer!).props.onValueChange("project-b");
       renderer!.update(render("", projects));
     });
     expect(projectSelect(renderer!).props.value).toBe("project-b");

@@ -43,15 +43,15 @@ export function WorkProfileForm({
         timezone.
       </p>
       <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={submit}>
-        <label className="grid gap-1.5">
+        <div className="grid min-w-0 gap-1.5">
           <Label htmlFor="work-display-name">Display name</Label>
           <Input
             id="work-display-name"
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
           />
-        </label>
-        <label className="grid gap-1.5">
+        </div>
+        <div className="grid min-w-0 gap-1.5">
           <Label htmlFor="work-timezone">Reporting timezone</Label>
           <Input
             id="work-timezone"
@@ -59,7 +59,7 @@ export function WorkProfileForm({
             onChange={(event) => setTimeZone(event.target.value)}
             placeholder="Europe/Madrid"
           />
-        </label>
+        </div>
         <div className="flex items-center justify-between gap-3 sm:col-span-2">
           <Label htmlFor="work-tracking-enabled">Enable local Work tracking</Label>
           <Switch

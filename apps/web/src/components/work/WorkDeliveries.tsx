@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
+import { WorkSelect } from "./WorkSelect";
 
 export function WorkDeliveries({
   projects,
@@ -43,49 +44,41 @@ export function WorkDeliveries({
         Reopening preserves the delivered cycle and starts a new open cycle.
       </p>
       {projects.length ? (
-        <div className="mt-3 flex flex-wrap items-end gap-2">
-          <label className="grid gap-1.5">
+        <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-delivery-project">Tracking project</Label>
-            <select
+            <WorkSelect
               id="work-delivery-project"
-              className="h-9 rounded-lg border bg-background px-3 text-sm"
               value={projectId}
-              onChange={(event) => {
-                setProjectId(event.target.value);
+              onValueChange={(value) => {
+                setProjectId(value);
                 setThreadId("");
               }}
-            >
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5">
+              options={projects.map((project) => ({ value: project.id, label: project.name }))}
+            />
+          </div>
+          <div className="grid min-w-0 gap-1.5">
             <Label htmlFor="work-delivery-thread">Thread (optional)</Label>
-            <select
+            <WorkSelect
               id="work-delivery-thread"
-              className="h-9 rounded-lg border bg-background px-3 text-sm"
               value={threadId}
-              onChange={(event) => setThreadId(event.target.value)}
+              onValueChange={setThreadId}
+              options={[
+                { value: "", label: "Project delivery" },
+                ...visibleThreads.map((thread) => ({ value: thread.id, label: thread.title })),
+              ]}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Button
+              disabled={pending || !projectId}
+              onClick={() =>
+                void onMark(projectId as WorkTrackingProject["id"], (threadId as ThreadId) || null)
+              }
             >
-              <option value="">Project delivery</option>
-              {visibleThreads.map((thread) => (
-                <option key={thread.id} value={thread.id}>
-                  {thread.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button
-            disabled={pending || !projectId}
-            onClick={() =>
-              void onMark(projectId as WorkTrackingProject["id"], (threadId as ThreadId) || null)
-            }
-          >
-            Mark delivered
-          </Button>
+              Mark delivered
+            </Button>
+          </div>
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">

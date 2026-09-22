@@ -8,6 +8,8 @@ import { serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
+import { WorkPath } from "./WorkPath";
 
 export function WorkRepositoryReview({
   environmentId,
@@ -49,12 +51,13 @@ export function WorkRepositoryReview({
   return (
     <section className="rounded-lg border p-5" aria-labelledby="work-repositories-heading">
       <h2 id="work-repositories-heading" className="font-medium">
-        Repository review
+        Repositories
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Repositories show involvement only; Work never splits tokens or time across them.
+        Included automatically. Excluding a repository removes its attribution, but keeps project
+        time and tokens. Worktrees follow their repository.
       </p>
-      {result.waiting ? (
+      {result.waiting && discovery === null ? (
         <p className="mt-3 text-sm text-muted-foreground">Scanning bound workspaces…</p>
       ) : null}
       {discovery?.candidates.length === 0 ? (
@@ -66,45 +69,30 @@ export function WorkRepositoryReview({
         {discovery?.candidates.map((candidate) => (
           <div
             key={candidate.localRoot}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+            className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-3 text-sm"
           >
-            <div>
-              <p className="font-medium break-all">{candidate.localRoot}</p>
-              <p className="text-muted-foreground">
-                Source T3 project: {candidate.sourceProjectId} ·{" "}
-                {candidate.inclusion ?? "Not reviewed"}
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">
+                <WorkPath path={candidate.localRoot} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {candidate.inclusion === "excluded"
+                  ? "Excluded from repository attribution"
+                  : "Included"}
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={candidate.inclusion === "included" ? "default" : "outline"}
-                disabled={pending}
-                onClick={() =>
-                  void onSave({
-                    localRoot: candidate.localRoot,
-                    inclusion: "included",
-                    provenance: candidate.provenance ?? "discovered",
-                  })
-                }
-              >
-                Include
-              </Button>
-              <Button
-                size="sm"
-                variant={candidate.inclusion === "excluded" ? "default" : "outline"}
-                disabled={pending}
-                onClick={() =>
-                  void onSave({
-                    localRoot: candidate.localRoot,
-                    inclusion: "excluded",
-                    provenance: candidate.provenance ?? "discovered",
-                  })
-                }
-              >
-                Exclude
-              </Button>
-            </div>
+            <Switch
+              aria-label={`Include ${candidate.localRoot}`}
+              checked={candidate.inclusion !== "excluded"}
+              disabled={pending}
+              onCheckedChange={(checked) =>
+                void onSave({
+                  localRoot: candidate.localRoot,
+                  inclusion: checked ? "included" : "excluded",
+                  provenance: candidate.provenance ?? "discovered",
+                })
+              }
+            />
           </div>
         ))}
       </div>
@@ -113,20 +101,23 @@ export function WorkRepositoryReview({
           Discovery reached its safe scan limit. Review the listed repositories or add one manually.
         </p>
       ) : null}
-      <form className="mt-4 flex flex-wrap items-end gap-2" onSubmit={addManual}>
-        <label className="grid min-w-64 flex-1 gap-1.5">
-          <Label htmlFor="work-manual-repository">Manual local root</Label>
-          <Input
-            id="work-manual-repository"
-            value={manualRoot}
-            onChange={(event) => setManualRoot(event.target.value)}
-            placeholder="/path/to/repository"
-          />
-        </label>
-        <Button type="submit" disabled={pending}>
-          Add repository
-        </Button>
-      </form>
+      <details className="mt-4 text-sm">
+        <summary className="cursor-pointer text-muted-foreground">Add a missing repository</summary>
+        <form className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={addManual}>
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            <Label htmlFor="work-manual-repository">Manual local root</Label>
+            <Input
+              id="work-manual-repository"
+              value={manualRoot}
+              onChange={(event) => setManualRoot(event.target.value)}
+              placeholder="/path/to/repository"
+            />
+          </div>
+          <Button type="submit" disabled={pending}>
+            Add repository
+          </Button>
+        </form>
+      </details>
       {error ? (
         <p role="alert" className="mt-2 text-sm text-destructive">
           {error}

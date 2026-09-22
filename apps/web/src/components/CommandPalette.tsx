@@ -42,7 +42,7 @@ import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import {
   ArrowLeftIcon,
-  BriefcaseBusinessIcon,
+  TimerIcon,
   ChartNoAxesColumnIcon,
   CornerLeftUpIcon,
   FileSearchIcon,
@@ -1839,7 +1839,7 @@ function OpenCommandPaletteDialog(props: {
     value: "action:work",
     searchTerms: ["work", "time", "reports", "delivery", "ledger"],
     title: "Open work",
-    icon: <BriefcaseBusinessIcon className={ITEM_ICON_CLASS} />,
+    icon: <TimerIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/work" });
     },

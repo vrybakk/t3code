@@ -5,6 +5,7 @@ import { workReportActions } from "../../state/workTracking";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { WorkSelect } from "./WorkSelect";
 
 const validMonth = (value: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 
@@ -75,39 +76,36 @@ export function WorkReports({
       <h2 id="work-reports-heading" className="font-medium">
         Reports
       </h2>
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="grid gap-1.5">
+      <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-1.5">
           <Label htmlFor="work-report-project">Tracking project</Label>
-          <select
+          <WorkSelect
             id="work-report-project"
-            className="h-9 rounded-lg border bg-background px-3 text-sm"
             value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1.5">
+            onValueChange={setProjectId}
+            options={projects.map((project) => ({ value: project.id, label: project.name }))}
+          />
+        </div>
+        <div className="grid min-w-0 gap-1.5">
           <Label htmlFor="work-report-month">Month</Label>
           <Input
             id="work-report-month"
+            type="month"
             value={month}
             onChange={(event) => setMonth(event.target.value)}
             placeholder="2026-09"
           />
-        </label>
-        <label className="grid gap-1.5">
+        </div>
+        <div className="grid min-w-0 gap-1.5 sm:col-span-2 lg:col-span-1">
           <Label htmlFor="work-report-reference">Reference (optional)</Label>
           <Input
             id="work-report-reference"
             value={reference}
             onChange={(event) => setReference(event.target.value)}
           />
-        </label>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
         <Button disabled={pending || !projects.length} onClick={() => void create()}>
           Create snapshot
         </Button>
