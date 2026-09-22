@@ -128,7 +128,7 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.displayName, "T3 Code Nerd");
       assert.equal(environment.baseDir, "/Users/alice/.t3");
       assert.equal(environment.stateDir, "/Users/alice/.t3/userdata");
-      assert.equal(environment.userDataDirName, "t3code-nerd");
+      assert.equal(environment.userDataDirName, "t3code");
       assert.equal(environment.appUserModelId, "com.vrybakk.t3code.nerd");
     }),
   );
