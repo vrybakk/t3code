@@ -96,15 +96,37 @@ describe("countSidebarProjectThreadStatuses", () => {
         makeThread({ id: "failed", sessionStatus: "error" }),
         makeThread({ id: "idle", sessionStatus: "ready" }),
       ]),
-    ).toEqual({ total: 6, running: 2, pending: 2 });
+    ).toEqual({ total: 6, idle: 2, running: 2, pending: 2 });
   });
 
-  it("keeps zero-value counters explicit", () => {
+  it("counts an ordinary chat without overlapping active categories", () => {
     expect(countSidebarProjectThreadStatuses([makeThread({ id: "idle" })])).toEqual({
       total: 1,
+      idle: 1,
       running: 0,
       pending: 0,
     });
+  });
+
+  it("counts a running chat only as running", () => {
+    expect(
+      countSidebarProjectThreadStatuses([makeThread({ id: "running", sessionStatus: "running" })]),
+    ).toEqual({ total: 1, idle: 0, running: 1, pending: 0 });
+  });
+
+  it("counts a pending chat only as pending", () => {
+    expect(
+      countSidebarProjectThreadStatuses([makeThread({ id: "pending", pendingInput: true })]),
+    ).toEqual({ total: 1, idle: 0, running: 0, pending: 1 });
+  });
+
+  it("separates pending chats from ordinary chats", () => {
+    expect(
+      countSidebarProjectThreadStatuses([
+        makeThread({ id: "idle" }),
+        makeThread({ id: "pending", pendingApproval: true }),
+      ]),
+    ).toEqual({ total: 2, idle: 1, running: 0, pending: 1 });
   });
 });
 

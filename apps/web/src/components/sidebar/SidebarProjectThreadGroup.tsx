@@ -22,7 +22,6 @@ import {
   ChevronRightIcon,
   CircleDashedIcon,
   FolderIcon,
-  GripVerticalIcon,
   MessageCircleQuestionIcon,
   MessagesSquareIcon,
 } from "lucide-react";
@@ -154,26 +153,21 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
       data-testid={`sidebar-project-group-${props.section}`}
     >
       <div className="group/project-row flex h-9 w-full items-center rounded-md text-xs text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
-        {props.sortable ? (
-          <button
-            ref={setActivatorNodeRef}
-            type="button"
-            aria-label={`Reorder ${label}`}
-            className="flex size-6 shrink-0 cursor-grab items-center justify-center rounded-sm text-icon-muted/55 outline-none hover:text-icon-muted focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVerticalIcon aria-hidden className="size-3" />
-          </button>
-        ) : (
-          <span aria-hidden className="size-6 shrink-0" />
-        )}
         <button
+          ref={props.sortable ? setActivatorNodeRef : undefined}
           type="button"
+          {...(props.sortable ? attributes : {})}
+          {...(props.sortable ? listeners : {})}
           aria-expanded={expanded}
           aria-label={`${label}, ${props.statusCounts.total} chats, ${props.statusCounts.running} running, ${props.statusCounts.pending} pending`}
           onClick={() => setProjectExpanded(expansionKey, !expanded)}
-          className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 pr-2 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring active:translate-y-px"
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") listeners?.onKeyDown?.(event);
+          }}
+          className={cn(
+            "flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring active:translate-y-px",
+            props.sortable && "cursor-grab active:cursor-grabbing",
+          )}
         >
           <ChevronRightIcon
             aria-hidden
@@ -191,32 +185,38 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
             {label}
           </span>
           <span className="flex shrink-0 items-center gap-1.5 text-[10px] leading-none">
-            <StatusCount
-              count={props.statusCounts.total}
-              label={props.statusCounts.total === 1 ? "chat" : "chats"}
-              className="text-sidebar-muted-foreground/60"
-            >
-              <MessagesSquareIcon aria-hidden className="size-3" />
-            </StatusCount>
-            <StatusCount
-              count={props.statusCounts.running}
-              label="running"
-              className="text-sky-600 dark:text-sky-400"
-            >
-              <CircleDashedIcon aria-hidden className="size-3" />
-            </StatusCount>
-            <StatusCount
-              count={props.statusCounts.pending}
-              label="pending"
-              className="text-amber-700 dark:text-amber-300"
-            >
-              <MessageCircleQuestionIcon aria-hidden className="size-3" />
-            </StatusCount>
+            {props.statusCounts.idle > 0 ? (
+              <StatusCount
+                count={props.statusCounts.idle}
+                label={props.statusCounts.idle === 1 ? "chat" : "chats"}
+                className="text-sidebar-muted-foreground/60"
+              >
+                <MessagesSquareIcon aria-hidden className="size-3" />
+              </StatusCount>
+            ) : null}
+            {props.statusCounts.running > 0 ? (
+              <StatusCount
+                count={props.statusCounts.running}
+                label="running"
+                className="text-sky-600 dark:text-sky-400"
+              >
+                <CircleDashedIcon aria-hidden className="size-3" />
+              </StatusCount>
+            ) : null}
+            {props.statusCounts.pending > 0 ? (
+              <StatusCount
+                count={props.statusCounts.pending}
+                label="pending"
+                className="text-amber-700 dark:text-amber-300"
+              >
+                <MessageCircleQuestionIcon aria-hidden className="size-3" />
+              </StatusCount>
+            ) : null}
           </span>
         </button>
       </div>
       {expanded ? (
-        <ul className="ml-8 border-l border-sidebar-border/50 pl-1">
+        <ul className="border-l border-sidebar-border/50">
           {props.group.threads.map((thread) => props.renderThread(thread))}
         </ul>
       ) : null}

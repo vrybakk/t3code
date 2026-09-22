@@ -80,6 +80,7 @@ type StatusThread = Pick<
 
 export interface SidebarProjectThreadStatusCounts {
   readonly total: number;
+  readonly idle: number;
   readonly running: number;
   readonly pending: number;
 }
@@ -87,6 +88,7 @@ export interface SidebarProjectThreadStatusCounts {
 export function countSidebarProjectThreadStatuses(
   threads: readonly StatusThread[],
 ): SidebarProjectThreadStatusCounts {
+  let idle = 0;
   let running = 0;
   let pending = 0;
 
@@ -96,10 +98,12 @@ export function countSidebarProjectThreadStatuses(
       running += 1;
     } else if (status === "approval" || status === "input") {
       pending += 1;
+    } else {
+      idle += 1;
     }
   }
 
-  return { total: threads.length, running, pending };
+  return { total: threads.length, idle, running, pending };
 }
 
 export function resolveSidebarProjectGroupExpanded(
