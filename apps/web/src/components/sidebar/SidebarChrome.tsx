@@ -9,6 +9,7 @@ import { memo, useCallback } from "react";
 import { Link, useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
 
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
+import { IS_NERD_EDITION } from "../../branding";
 import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
 import { T3Wordmark } from "../T3Wordmark";
@@ -44,7 +45,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
   const backdropVariant = resolveSidebarStageBackdropVariant(
     stageLabel,
-    environmentIdentificationMode === "artwork",
+    environmentIdentificationMode === "artwork" && !IS_NERD_EDITION,
   );
   const pillLabel =
     environmentIdentificationMode === "pill"
@@ -92,18 +93,25 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
       )}
       to="/"
     >
-      {/* Center the visible capitals, without the font's ascender/descender space. */}
-      <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
-        <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
-        <span
-          className={cn(
-            "truncate [text-box:trim-both_cap_alphabetic]",
-            onBackdrop ? "text-white/70" : "text-muted-foreground",
-          )}
-        >
-          Code
+      {IS_NERD_EDITION ? (
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium tracking-tight">
+          <img alt="" className="size-5 shrink-0 rounded-[5px]" src="/apple-touch-icon.png" />
+          <span className="truncate [text-box:trim-both_cap_alphabetic]">T3 Code Nerd</span>
         </span>
-      </span>
+      ) : (
+        // Center the visible capitals, without the font's ascender/descender space.
+        <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
+          <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
+          <span
+            className={cn(
+              "truncate [text-box:trim-both_cap_alphabetic]",
+              onBackdrop ? "text-white/70" : "text-muted-foreground",
+            )}
+          >
+            Code
+          </span>
+        </span>
+      )}
     </Link>
   );
 }

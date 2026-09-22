@@ -73,6 +73,27 @@ describe("brand-assets", () => {
     });
   });
 
+  it("maps Nerd desktop web assets to the Nerd icon family", () => {
+    expect(resolveWebIconOverrides("nerd", "apps/server/dist/client")).toEqual([
+      {
+        sourceRelativePath: BRAND_ASSET_PATHS.nerdWebFaviconIco,
+        targetRelativePath: "apps/server/dist/client/favicon.ico",
+      },
+      {
+        sourceRelativePath: BRAND_ASSET_PATHS.nerdWebFavicon16Png,
+        targetRelativePath: "apps/server/dist/client/favicon-16x16.png",
+      },
+      {
+        sourceRelativePath: BRAND_ASSET_PATHS.nerdWebFavicon32Png,
+        targetRelativePath: "apps/server/dist/client/favicon-32x32.png",
+      },
+      {
+        sourceRelativePath: BRAND_ASSET_PATHS.nerdWebAppleTouchIconPng,
+        targetRelativePath: "apps/server/dist/client/apple-touch-icon.png",
+      },
+    ]);
+  });
+
   it("maps hosted release channels to web asset brands", () => {
     expect(resolveWebAssetBrandForChannel("latest")).toBe("production");
     expect(resolveWebAssetBrandForChannel("nightly")).toBe("nightly");

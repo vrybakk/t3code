@@ -157,18 +157,30 @@ describe("DesktopAppIdentity", () => {
     ),
   );
 
-  it.effect("never adopts Electron's product-name userdata directory for Nerd", () =>
+  it.effect("reuses the official legacy Electron profile for a seamless Nerd replacement", () =>
     withIdentity(
       Effect.gen(function* () {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         const userDataPath = yield* identity.resolveUserDataPath;
 
-        assert.equal(userDataPath, "/Users/alice/Library/Application Support/t3code-nerd");
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/T3 Code (Alpha)");
       }),
       {
         environment: { appName: "T3 Code Nerd" },
         legacyPathExists: true,
       },
+    ),
+  );
+
+  it.effect("reuses the official stable Electron profile when no legacy profile exists", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        const userDataPath = yield* identity.resolveUserDataPath;
+
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/t3code");
+      }),
+      { environment: { appName: "T3 Code Nerd" } },
     ),
   );
 
@@ -227,6 +239,31 @@ describe("DesktopAppIdentity", () => {
           },
         },
         pngIconPath: Option.some("/icon.png"),
+      },
+    );
+  });
+
+  it.effect("uses the official channel name for Nerd Keychain compatibility", () => {
+    const calls: ElectronAppCalls = {
+      setAboutPanelOptions: [],
+      setDockIcon: [],
+      setName: [],
+    };
+
+    return withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        yield* identity.configure;
+
+        assert.deepEqual(calls.setName, ["T3 Code (Nightly)"]);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "T3 Code Nerd");
+      }),
+      {
+        calls,
+        environment: {
+          appName: "T3 Code Nerd",
+          appVersion: "0.0.43-nightly.20260922.2096",
+        },
       },
     );
   });

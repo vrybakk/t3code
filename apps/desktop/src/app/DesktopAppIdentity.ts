@@ -48,9 +48,6 @@ const normalizeCommitHash = (value: string): Option.Option<string> => {
 export const resolveUserDataPath = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
-  if (environment.isNerdEdition) {
-    return environment.path.join(environment.appDataDirectory, environment.userDataDirName);
-  }
   const legacyPath = environment.path.join(
     environment.appDataDirectory,
     environment.legacyUserDataDirName,
@@ -123,7 +120,17 @@ export const make = Effect.gen(function* () {
 
   const configure = Effect.gen(function* () {
     const commitHash = yield* resolveAboutCommitHash;
-    yield* electronApp.setName(environment.displayName);
+    const electronAppName = environment.isNerdEdition
+      ? DesktopEnvironment.resolveDesktopAppBranding({
+          isDevelopment: environment.isDevelopment,
+          appVersion: environment.appVersion,
+        }).displayName
+      : environment.displayName;
+
+    // Electron derives the macOS safeStorage Keychain service from this internal
+    // name. Keep Nerd on the matching official channel so existing encrypted
+    // account and connection records remain readable.
+    yield* electronApp.setName(electronAppName);
     yield* electronApp.setAboutPanelOptions({
       applicationName: environment.displayName,
       applicationVersion: environment.appVersion,
