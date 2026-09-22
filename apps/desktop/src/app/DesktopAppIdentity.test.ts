@@ -243,7 +243,7 @@ describe("DesktopAppIdentity", () => {
     );
   });
 
-  it.effect("uses the official channel name for Nerd Keychain compatibility", () => {
+  it.effect("keeps the shared internal package name for Nerd", () => {
     const calls: ElectronAppCalls = {
       setAboutPanelOptions: [],
       setDockIcon: [],
@@ -255,7 +255,7 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         yield* identity.configure;
 
-        assert.deepEqual(calls.setName, ["T3 Code (Nightly)"]);
+        assert.deepEqual(calls.setName, ["t3code"]);
         assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "T3 Code Nerd");
       }),
       {

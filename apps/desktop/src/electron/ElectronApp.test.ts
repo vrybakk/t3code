@@ -12,6 +12,7 @@ const {
   getVersionMock,
   onMock,
   quitMock,
+  readFileSyncMock,
   relaunchMock,
   removeListenerMock,
   removeSwitchMock,
@@ -33,6 +34,7 @@ const {
   getVersionMock: vi.fn(() => "1.2.3"),
   onMock: vi.fn(),
   quitMock: vi.fn(),
+  readFileSyncMock: vi.fn(() => '{"t3codeDesktopEdition":"nerd"}'),
   relaunchMock: vi.fn(),
   removeListenerMock: vi.fn(),
   removeSwitchMock: vi.fn(),
@@ -44,6 +46,10 @@ const {
   setNameMock: vi.fn(),
   setPathMock: vi.fn(),
   whenReadyMock: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("node:fs", () => ({
+  readFileSync: readFileSyncMock,
 }));
 
 vi.mock("electron", () => ({
@@ -102,6 +108,7 @@ describe("ElectronApp", () => {
       const metadata = yield* electronApp.metadata;
 
       assert.deepEqual(metadata, {
+        appEdition: "nerd",
         appVersion: "1.2.3",
         appPath: "/app",
         isPackaged: true,

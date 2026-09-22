@@ -120,16 +120,10 @@ export const make = Effect.gen(function* () {
 
   const configure = Effect.gen(function* () {
     const commitHash = yield* resolveAboutCommitHash;
-    const electronAppName = environment.isNerdEdition
-      ? DesktopEnvironment.resolveDesktopAppBranding({
-          isDevelopment: environment.isDevelopment,
-          appVersion: environment.appVersion,
-        }).displayName
-      : environment.displayName;
+    const electronAppName = environment.isNerdEdition ? "t3code" : environment.displayName;
 
-    // Electron derives the macOS safeStorage Keychain service from this internal
-    // name. Keep Nerd on the matching official channel so existing encrypted
-    // account and connection records remain readable.
+    // Keep Nerd's internal identity aligned with its package name. Its visible
+    // product name remains independent in the bundle and About panel metadata.
     yield* electronApp.setName(electronAppName);
     yield* electronApp.setAboutPanelOptions({
       applicationName: environment.displayName,

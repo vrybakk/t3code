@@ -52,6 +52,7 @@ import {
   resolveFffNativeDependencies,
   resolveBuildOptions,
   resolveDesktopBuildIconAssets,
+  resolveDesktopPackageName,
   resolveDesktopProductName,
   resolveDesktopUpdateChannel,
   resolveDesktopWebAssetBrand,
@@ -257,6 +258,11 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it("switches desktop packaging product names to nightly for nightly builds", () => {
     assert.equal(resolveDesktopProductName("0.0.17"), "T3 Code (Alpha)");
     assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "T3 Code (Nightly)");
+  });
+
+  it("keeps Nerd on the official package name for macOS Safe Storage compatibility", () => {
+    assert.equal(resolveDesktopPackageName("official"), "t3code");
+    assert.equal(resolveDesktopPackageName("nerd"), "t3code");
   });
 
   it.effect("builds an isolated unsigned Nerd macOS identity without an updater feed", () =>

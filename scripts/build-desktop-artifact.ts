@@ -2662,6 +2662,13 @@ export function resolveDesktopProductName(
     : (desktopPackageJson.productName ?? "T3 Code");
 }
 
+export function resolveDesktopPackageName(
+  _edition: typeof DesktopEdition.Type = "official",
+): string {
+  // macOS derives Electron safeStorage from the package name before main-process code runs.
+  return "t3code";
+}
+
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   platform: typeof BuildPlatform.Type,
   target: string,
@@ -3684,7 +3691,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: options.edition === "nerd" ? "t3code-nerd" : "t3code",
+    name: resolveDesktopPackageName(options.edition),
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,

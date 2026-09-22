@@ -122,7 +122,11 @@ describe("DesktopEnvironment", () => {
 
   it.effect("shares production state while preserving the packaged Nerd identity", () =>
     Effect.gen(function* () {
-      const environment = yield* makeEnvironment({ appName: "T3 Code Nerd", isPackaged: true });
+      const environment = yield* makeEnvironment({
+        appName: "t3code",
+        appEdition: "nerd",
+        isPackaged: true,
+      });
 
       assert.equal(environment.isNerdEdition, true);
       assert.equal(environment.displayName, "T3 Code Nerd");

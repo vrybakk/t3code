@@ -25,6 +25,7 @@ export interface MakeDesktopEnvironmentInput {
   readonly processArch: string;
   readonly appVersion: string;
   readonly appName?: string;
+  readonly appEdition?: "nerd";
   readonly appPath: string;
   readonly isPackaged: boolean;
   readonly resourcesPath: string;
@@ -162,7 +163,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
   const devServerUrl = config.devServerUrl;
   const isDevelopment = Option.isSome(devServerUrl);
   const isNerdEdition =
-    !isDevelopment && (input.appName === "T3 Code Nerd" || input.appName === "t3code-nerd");
+    !isDevelopment &&
+    (input.appEdition === "nerd" ||
+      input.appName === "T3 Code Nerd" ||
+      input.appName === "t3code-nerd");
   const appDataDirectory =
     input.platform === "win32"
       ? Option.getOrElse(config.appDataDirectory, () =>

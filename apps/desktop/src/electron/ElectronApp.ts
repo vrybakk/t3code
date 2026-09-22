@@ -1,3 +1,6 @@
+// @effect-diagnostics nodeBuiltinImport:off - Electron's ASAR-aware fs resolves its packaged manifest before Effect services initialize.
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -6,7 +9,15 @@ import * as Scope from "effect/Scope";
 
 import * as Electron from "electron";
 
+const DesktopAppPackageMetadata = Schema.Struct({
+  t3codeDesktopEdition: Schema.optional(Schema.Literal("nerd")),
+});
+const decodeDesktopAppPackageMetadata = Schema.decodeUnknownSync(
+  Schema.fromJsonString(DesktopAppPackageMetadata),
+);
+
 export interface ElectronAppMetadata {
+  readonly appEdition?: "nerd";
   readonly appVersion: string;
   readonly appPath: string;
   readonly isPackaged: boolean;
@@ -17,7 +28,7 @@ export interface ElectronAppMetadata {
 export class ElectronAppMetadataReadError extends Schema.TaggedError<ElectronAppMetadataReadError>()(
   "ElectronAppMetadataReadError",
   {
-    property: Schema.Literals(["app-version", "app-path"]),
+    property: Schema.Literals(["app-version", "app-path", "app-package-metadata"]),
     cause: Schema.Defect(),
   },
 ) {
@@ -116,8 +127,22 @@ export const make = ElectronApp.of({
           cause,
         }),
     });
+    const appEdition = yield* Effect.try({
+      try: () => {
+        const packageMetadata = decodeDesktopAppPackageMetadata(
+          NodeFS.readFileSync(NodePath.join(appPath, "package.json"), "utf8"),
+        );
+        return packageMetadata.t3codeDesktopEdition;
+      },
+      catch: (cause) =>
+        new ElectronAppMetadataReadError({
+          property: "app-package-metadata",
+          cause,
+        }),
+    });
 
     return {
+      ...(appEdition === undefined ? {} : { appEdition }),
       appVersion,
       appPath,
       isPackaged: Electron.app.isPackaged,
