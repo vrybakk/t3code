@@ -1663,7 +1663,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                     <span className="text-xs text-blue-600 tabular-nums dark:text-blue-400">
                       {props.snoozeWakeLabelText}
                     </span>
-                  ) : isWoke ? (
+                  ) : isWoke && topStatus?.icon !== "working" ? (
                     // A wake can land straight in the settled tail (e.g. PR
                     // merged while snoozed); the signal must survive the trip.
                     <Tooltip>
@@ -1682,14 +1682,18 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                       />
                       <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
                     </Tooltip>
-                  ) : topStatus?.icon === "done" ? (
+                  ) : topStatus?.icon === "done" || topStatus?.icon === "working" ? (
                     <span
                       className={cn(
                         "inline-flex items-center gap-1 text-xs font-medium",
                         topStatus.className,
                       )}
                     >
-                      <CircleCheckIcon aria-hidden className="size-3 shrink-0" />
+                      {topStatus.icon === "working" ? (
+                        <CircleDashedIcon aria-hidden className="size-3 shrink-0" />
+                      ) : (
+                        <CircleCheckIcon aria-hidden className="size-3 shrink-0" />
+                      )}
                       <span role="status">{topStatus.label}</span>
                     </span>
                   ) : (
