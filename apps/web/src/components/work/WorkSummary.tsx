@@ -1,32 +1,26 @@
 import type { WorkOverview } from "@t3tools/contracts";
 import { formatTokens } from "@t3tools/shared/usageFormat";
-import { useState } from "react";
-
-import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { WorkOverviewChart } from "./WorkOverviewChart";
-import { formatWorkDuration, type WorkMonthlyMetric } from "./workMonthlySeries";
+import { formatWorkDuration } from "./workMonthlySeries";
 
 const METRICS = [
   {
     value: "developerMs",
     field: "manualMs",
-    label: "Developer time",
-    short: "Developer",
+    label: "Manual time",
     note: "Manually recorded work",
   },
   {
     value: "agentElapsedMs",
     field: "agentElapsedMs",
     label: "Agent elapsed",
-    short: "Agent",
     note: "Recorded agent turns",
   },
   {
     value: "taskMs",
     field: "agentTaskMs",
     label: "Agent task time",
-    short: "Tasks",
-    note: "Recorded agent tasks",
+    note: "Task and subagent durations; excluded from total to avoid double-counting",
   },
 ] as const;
 
@@ -37,8 +31,6 @@ export function WorkSummary({
   readonly overview: WorkOverview | null;
   readonly days: ReadonlyArray<string>;
 }) {
-  const [metric, setMetric] = useState<WorkMonthlyMetric>("developerMs");
-  const selected = METRICS.find((entry) => entry.value === metric) ?? METRICS[0];
   if (!overview) {
     return (
       <p className="py-6 text-sm text-muted-foreground" role="status">
@@ -56,10 +48,10 @@ export function WorkSummary({
         <div className="flex min-w-0 flex-col gap-5">
           <div className="flex flex-col gap-1">
             <span className="text-4xl font-semibold text-foreground tabular-nums">
-              {formatWorkDuration(totals[selected.field])}
+              {formatWorkDuration(totals.manualMs + totals.agentElapsedMs)}
             </span>
             <span className="text-xs text-muted-foreground">
-              {selected.label} · {totals.records.toLocaleString()}{" "}
+              Total recorded work · {totals.records.toLocaleString()}{" "}
               {totals.records === 1 ? "record" : "records"}
             </span>
           </div>
@@ -78,36 +70,15 @@ export function WorkSummary({
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-foreground">
-              Daily {selected.label.toLowerCase()}
+              {days.length === 1 ? "Today's" : "Daily"} total
             </h2>
-            <ToggleGroup
-              aria-label="Work chart metric"
-              variant="segmented"
-              value={[metric]}
-              onValueChange={(values) => {
-                const next = values[0];
-                if (next === "developerMs" || next === "agentElapsedMs" || next === "taskMs")
-                  setMetric(next);
-              }}
-            >
-              {METRICS.map((entry) => (
-                <Toggle key={entry.value} value={entry.value}>
-                  {entry.short}
-                </Toggle>
-              ))}
-            </ToggleGroup>
           </div>
           {overview.dailyTotals === undefined ? (
             <p className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">
               Daily history is unavailable on this server. Totals are shown separately.
             </p>
           ) : (
-            <WorkOverviewChart
-              days={days}
-              dailyTotals={overview.dailyTotals}
-              metric={metric}
-              label={selected.label}
-            />
+            <WorkOverviewChart days={days} dailyTotals={overview.dailyTotals} />
           )}
         </div>
       </section>
@@ -128,7 +99,9 @@ export function WorkSummary({
           {overview.timeCoverage.waiting === "unavailable"
             ? "Waiting time unavailable"
             : `Waiting ${formatWorkDuration(totals.agentWaitingMs)}${overview.timeCoverage.waiting === "partial" ? " (partial coverage)" : ""}`}
-          {". Developer, turn, and task time are separate measures, not additive."}
+          {
+            ". Total includes manual and agent elapsed time; overlaps are not deduplicated. Task time is shown separately."
+          }
         </p>
       </section>
     </div>

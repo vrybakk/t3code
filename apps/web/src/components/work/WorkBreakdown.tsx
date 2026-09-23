@@ -58,11 +58,11 @@ export function WorkBreakdown({
               <caption className="sr-only">Project totals for the selected period</caption>
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="w-2/5 py-2 pr-3 font-normal" scope="col">
+                  <th className="w-2/5 px-3 py-2 font-normal" scope="col">
                     Project
                   </th>
-                  {["Developer", "Agent", "Tasks", "Tokens"].map((label) => (
-                    <th key={label} className="px-2 py-2 text-right font-normal" scope="col">
+                  {["Manual", "Agent", "Tasks", "Tokens"].map((label) => (
+                    <th key={label} className="px-3 py-2 text-right font-normal" scope="col">
                       {label}
                     </th>
                   ))}
@@ -83,7 +83,7 @@ export function WorkBreakdown({
                         key={summary.trackingProjectId}
                         className="border-b border-border/50 hover:bg-muted/50"
                       >
-                        <th scope="row" className="py-3 pr-3 text-left font-normal">
+                        <th scope="row" className="px-3 py-3 text-left font-normal">
                           <span className="block truncate">
                             {overview.projects.find(
                               (project) => project.id === summary.trackingProjectId,
@@ -94,16 +94,16 @@ export function WorkBreakdown({
                             {summary.totals.records === 1 ? "record" : "records"}
                           </span>
                         </th>
-                        <td className="px-2 py-3 text-right tabular-nums">
+                        <td className="px-3 py-3 text-right tabular-nums">
                           {formatWorkDuration(summary.totals.manualMs)}
                         </td>
-                        <td className="px-2 py-3 text-right tabular-nums">
+                        <td className="px-3 py-3 text-right tabular-nums">
                           {formatWorkDuration(summary.totals.agentElapsedMs)}
                         </td>
-                        <td className="px-2 py-3 text-right tabular-nums">
+                        <td className="px-3 py-3 text-right tabular-nums">
                           {formatWorkDuration(summary.totals.agentTaskMs)}
                         </td>
-                        <td className="px-2 py-3 text-right text-muted-foreground tabular-nums">
+                        <td className="px-3 py-3 text-right text-muted-foreground tabular-nums">
                           {formatTokens(summary.totals.inputTokens + summary.totals.outputTokens)}
                         </td>
                       </tr>

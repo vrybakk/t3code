@@ -22,7 +22,7 @@ import {
 } from "./workMonthlySeries";
 
 const METRICS = [
-  { value: "developerMs", label: "Developer" },
+  { value: "developerMs", label: "Manual" },
   { value: "agentElapsedMs", label: "Agent elapsed" },
   { value: "taskMs", label: "Task time" },
 ] as const;
@@ -31,21 +31,25 @@ export function WorkMonthlyReport({
   environmentId,
   projects,
   timeZone,
-  defaultMonth,
+  month,
+  onMonthChange: setMonth,
+  projectId,
+  onProjectChange: setProjectId,
   onCsv,
 }: {
   readonly environmentId: EnvironmentId;
   readonly projects: ReadonlyArray<WorkTrackingProject>;
   readonly timeZone: string;
-  readonly defaultMonth: string;
+  readonly month: string;
+  readonly onMonthChange: (month: string) => void;
+  readonly projectId: string;
+  readonly onProjectChange: (projectId: string) => void;
   readonly onCsv: (
     trackingProjectId: WorkTrackingProjectId | undefined,
     month: string,
   ) => Promise<void>;
 }) {
-  const [month, setMonth] = useState(defaultMonth);
-  const [projectId, setProjectId] = useState("");
-  const [metric, setMetric] = useState<WorkMonthlyMetric>("developerMs");
+  const [metric, setMetric] = useState<WorkMonthlyMetric>("agentElapsedMs");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
   const selectedProject = projects.find((project) => project.id === projectId);
@@ -99,7 +103,7 @@ export function WorkMonthlyReport({
             Monthly report
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            All projects in one report. Developer and agent time stay separate.
+            All projects in one report. Manual and agent time stay separate.
           </p>
         </div>
         <Button
@@ -173,7 +177,7 @@ export function WorkMonthlyReport({
         <>
           <div className="mt-6 grid grid-cols-2 gap-4 border-y py-4 text-sm sm:grid-cols-3">
             {[
-              { label: "Developer time", value: overview.totals.manualMs },
+              { label: "Manual time", value: overview.totals.manualMs },
               { label: "Agent elapsed", value: overview.totals.agentElapsedMs },
               { label: "Task time", value: overview.totals.agentTaskMs },
             ].map((item) => (
@@ -225,7 +229,7 @@ export function WorkMonthlyReport({
                     Project
                   </th>
                   <th scope="col" className="px-2 py-2 text-right font-medium">
-                    Developer
+                    Manual
                   </th>
                   <th scope="col" className="px-2 py-2 text-right font-medium">
                     Agent

@@ -21,6 +21,15 @@ describe("Work overview presentation", () => {
     expect(
       workRecordPresentation({
         kind: "manual",
+        category: null,
+        note: null,
+        revision: 0,
+        durationMs: 60000,
+      } as never),
+    ).toEqual({ title: "Manual time", detail: "Manual entry", duration: 60000 });
+    expect(
+      workRecordPresentation({
+        kind: "manual",
         category: "Review",
         note: "Checked release",
         durationMs: 60000,

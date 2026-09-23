@@ -35,7 +35,7 @@ export function WorkRunningSessions({
         Running agent sessions <span className="text-muted-foreground">{running.length}</span>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Live elapsed time. Recorded when the turn ends; developer time is entered manually.
+        Live elapsed time. Recorded when the turn ends; manual time is entered separately.
       </p>
       <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
         {running.map((thread) => {

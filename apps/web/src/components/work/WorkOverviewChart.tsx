@@ -2,7 +2,7 @@ import type { WorkOverview } from "@t3tools/contracts";
 import { useState } from "react";
 
 import { niceScale } from "../usage/UsageProviderChart";
-import { formatWorkDuration, type WorkMonthlyMetric } from "./workMonthlySeries";
+import { formatWorkDuration } from "./workMonthlySeries";
 
 const WIDTH = 960;
 const HEIGHT = 260;
@@ -11,11 +11,19 @@ const TOP = 8;
 export function buildWorkOverviewSeries(
   days: ReadonlyArray<string>,
   totals: NonNullable<WorkOverview["dailyTotals"]>,
-  metric: WorkMonthlyMetric,
 ) {
-  const values = new Map<string, number>();
-  for (const entry of totals) values.set(entry.date, (values.get(entry.date) ?? 0) + entry[metric]);
-  return days.map((date) => ({ date, value: values.get(date) ?? 0 }));
+  const values = new Map<string, { manualMs: number; agentElapsedMs: number; taskMs: number }>();
+  for (const entry of totals) {
+    const day = values.get(entry.date) ?? { manualMs: 0, agentElapsedMs: 0, taskMs: 0 };
+    day.manualMs += entry.developerMs;
+    day.agentElapsedMs += entry.agentElapsedMs;
+    day.taskMs += entry.taskMs;
+    values.set(entry.date, day);
+  }
+  return days.map((date) => {
+    const day = values.get(date) ?? { manualMs: 0, agentElapsedMs: 0, taskMs: 0 };
+    return { date, ...day, value: day.manualMs + day.agentElapsedMs };
+  });
 }
 
 const dateLabel = (date: string) =>
@@ -28,16 +36,12 @@ const dateLabel = (date: string) =>
 export function WorkOverviewChart({
   days,
   dailyTotals,
-  metric,
-  label,
 }: {
   readonly days: ReadonlyArray<string>;
   readonly dailyTotals: NonNullable<WorkOverview["dailyTotals"]>;
-  readonly metric: WorkMonthlyMetric;
-  readonly label: string;
 }) {
   const [activeDate, setActiveDate] = useState<string | null>(null);
-  const series = buildWorkOverviewSeries(days, dailyTotals, metric);
+  const series = buildWorkOverviewSeries(days, dailyTotals);
   const peak = Math.max(0, ...series.map((entry) => entry.value));
   const unit = peak >= 3_600_000 ? 3_600_000 : 60_000;
   const durationScale = niceScale(peak / unit, 4);
@@ -51,7 +55,9 @@ export function WorkOverviewChart({
   const line = series
     .map((entry, index) => `${index === 0 ? "M" : "L"}${toX(index)},${toY(entry.value)}`)
     .join(" ");
-  const active = series.find((entry) => entry.date === activeDate);
+  const active =
+    series.find((entry) => entry.date === activeDate) ??
+    (days.length === 1 ? series[0] : undefined);
   const axisIndices = [...new Set([0, Math.floor((days.length - 1) / 2), days.length - 1])].filter(
     (index) => index >= 0 && index < days.length,
   );
@@ -74,7 +80,7 @@ export function WorkOverviewChart({
           preserveAspectRatio="none"
           className="h-64 min-w-0 flex-1 overflow-visible"
           role="group"
-          aria-label={`Daily ${label.toLowerCase()}`}
+          aria-label="Daily total recorded work"
           onPointerLeave={() => setActiveDate(null)}
         >
           {scale.ticks.map((tick) => (
@@ -96,14 +102,16 @@ export function WorkOverviewChart({
               className="text-foreground/10"
             />
           )}
-          <path
-            d={line}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            vectorEffect="non-scaling-stroke"
-            className="text-foreground"
-          />
+          {series.length > 1 && (
+            <path
+              d={line}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+              className="text-foreground"
+            />
+          )}
           {series.map((entry, index) => {
             const step = days.length > 1 ? WIDTH / (days.length - 1) : WIDTH;
             return (
@@ -111,12 +119,23 @@ export function WorkOverviewChart({
                 key={entry.date}
                 tabIndex={0}
                 role="img"
-                aria-label={`${entry.date}: ${formatWorkDuration(entry.value)} ${label.toLowerCase()}`}
+                aria-label={`${entry.date}: ${formatWorkDuration(entry.value)} total recorded work`}
                 className="outline-none focus-visible:[&>rect]:stroke-ring"
                 onFocus={() => setActiveDate(entry.date)}
                 onBlur={() => setActiveDate(null)}
                 onPointerEnter={() => setActiveDate(entry.date)}
               >
+                {days.length === 1 && entry.value > 0 && (
+                  <rect
+                    x={WIDTH / 2 - 60}
+                    y={toY(entry.value)}
+                    width={120}
+                    height={HEIGHT - toY(entry.value)}
+                    rx={4}
+                    fill="currentColor"
+                    className="text-foreground"
+                  />
+                )}
                 <rect
                   x={Math.max(0, toX(index) - step / 2)}
                   width={
@@ -131,7 +150,7 @@ export function WorkOverviewChart({
                   strokeWidth={2}
                   vectorEffect="non-scaling-stroke"
                 />
-                {(days.length === 1 || activeDate === entry.date) && (
+                {days.length > 1 && activeDate === entry.date && (
                   <circle
                     cx={toX(index)}
                     cy={toY(entry.value)}
@@ -163,10 +182,10 @@ export function WorkOverviewChart({
       </div>
       <p className="mt-3 min-h-4 text-xs text-muted-foreground" aria-live="polite">
         {active
-          ? `${dateLabel(active.date)} · ${formatWorkDuration(active.value)} ${label.toLowerCase()}`
+          ? `${dateLabel(active.date)} · Total ${formatWorkDuration(active.value)} · Manual ${formatWorkDuration(active.manualMs)} · Agent ${formatWorkDuration(active.agentElapsedMs)} · Tasks ${formatWorkDuration(active.taskMs)} (not added to total)`
           : peak > 0
             ? "Hover or focus a day to see its total."
-            : `No ${label.toLowerCase()} recorded in this period.`}
+            : "No work recorded in this period."}
       </p>
     </div>
   );

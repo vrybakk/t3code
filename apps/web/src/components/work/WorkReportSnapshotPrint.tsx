@@ -43,7 +43,7 @@ export function WorkReportSnapshotPrint({
       </p>
       {snapshot.profileDisplayName ? <p>Prepared for {snapshot.profileDisplayName}</p> : null}
       <p>
-        Developer {minutes(snapshot.totals.manualMs)} · Agent elapsed{" "}
+        Manual {minutes(snapshot.totals.manualMs)} · Agent elapsed{" "}
         {minutes(snapshot.totals.agentElapsedMs)} · Task time {minutes(snapshot.totals.agentTaskMs)}
       </p>
       <p>
@@ -57,7 +57,7 @@ export function WorkReportSnapshotPrint({
           <tr className="border-b">
             <th>Date</th>
             <th>Kind</th>
-            <th>Developer</th>
+            <th>Manual</th>
             <th>Agent elapsed</th>
             <th>Task time</th>
             <th>Outcome</th>

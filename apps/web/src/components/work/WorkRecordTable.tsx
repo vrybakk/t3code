@@ -1,10 +1,16 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId, WorkOverviewInput, WorkTrackingProject } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  WorkOverviewInput,
+  WorkRecord,
+  WorkTrackingProject,
+} from "@t3tools/contracts";
 import { formatTokens } from "@t3tools/shared/usageFormat";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useState } from "react";
 import { serverEnvironment } from "../../state/server";
+import { Button } from "../ui/button";
 import { WorkPagination, WORK_PAGE_SIZE } from "./WorkPagination";
 import { formatWorkDuration } from "./workMonthlySeries";
 import { workRecordPresentation } from "./workOverviewPresentation";
@@ -14,11 +20,13 @@ export function WorkRecordTable({
   window,
   projects,
   timeZone,
+  onEdit,
 }: {
   readonly environmentId: EnvironmentId;
   readonly window: WorkOverviewInput;
   readonly projects: ReadonlyArray<WorkTrackingProject>;
   readonly timeZone: string;
+  readonly onEdit?: (record: WorkRecord) => void;
 }) {
   const [page, setPage] = useState(0);
   const result = useAtomValue(
@@ -49,33 +57,38 @@ export function WorkRecordTable({
   return (
     <div aria-busy={result.waiting}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-140 table-fixed text-sm">
+        <table className="w-full min-w-160 table-fixed text-sm [&_th]:px-3 [&_td]:px-3">
           <caption className="sr-only">
             Current work records, newest first. Corrections replace previous values.
           </caption>
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
-              <th scope="col" className="w-1/5 py-2 pr-3 font-normal">
+              <th scope="col" className="w-36 py-2 font-normal">
                 When
               </th>
-              <th scope="col" className="w-2/5 py-2 pr-3 font-normal">
+              <th scope="col" className="py-2 font-normal">
                 Activity
               </th>
-              <th scope="col" className="w-1/5 py-2 pr-3 font-normal">
+              <th scope="col" className="w-32 py-2 font-normal">
                 Project
               </th>
-              <th scope="col" className="py-2 pr-3 text-right font-normal">
+              <th scope="col" className="w-24 py-2 text-right font-normal">
                 Time
               </th>
-              <th scope="col" className="py-2 text-right font-normal">
+              <th scope="col" className="w-24 py-2 text-right font-normal">
                 Tokens
               </th>
+              {onEdit ? (
+                <th scope="col" className="w-20 py-2 text-right font-normal">
+                  <span className="sr-only">Actions</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
             {overview === null ? (
               <tr>
-                <td colSpan={5} className="h-48 text-center text-muted-foreground">
+                <td colSpan={onEdit ? 6 : 5} className="h-48 text-center text-muted-foreground">
                   {result.waiting
                     ? "Loading activity…"
                     : "Activity is unavailable. Check the environment connection."}
@@ -83,7 +96,7 @@ export function WorkRecordTable({
               </tr>
             ) : records.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                <td colSpan={onEdit ? 6 : 5} className="py-8 text-center text-muted-foreground">
                   No records on this page.
                 </td>
               </tr>
@@ -107,7 +120,7 @@ export function WorkRecordTable({
                           ?.name ?? "Archived project"}
                       </span>
                     </td>
-                    <td className="py-3 pr-3 text-right tabular-nums">
+                    <td className="py-3 text-right whitespace-nowrap tabular-nums">
                       {item.duration === null ? "—" : formatWorkDuration(item.duration)}
                     </td>
                     <td className="py-3 text-right text-muted-foreground tabular-nums">
@@ -117,6 +130,15 @@ export function WorkRecordTable({
                             (record.tokens.inputTokens ?? 0) + (record.tokens.outputTokens ?? 0),
                           )}
                     </td>
+                    {onEdit ? (
+                      <td className="py-3 text-right">
+                        {record.kind === "manual" ? (
+                          <Button variant="ghost" size="sm" onClick={() => onEdit(record)}>
+                            Edit
+                          </Button>
+                        ) : null}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })

@@ -23,7 +23,7 @@ export function workOverviewDays(since: string, until: string, timeZone: string)
 export function workRecordPresentation(record: WorkRecord) {
   if (record.kind === "manual")
     return {
-      title: record.category ?? "Developer time",
+      title: record.category ?? "Manual time",
       detail: record.note ?? (record.revision > 0 ? "Corrected entry" : "Manual entry"),
       duration: record.durationMs,
     };

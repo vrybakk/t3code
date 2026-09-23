@@ -1,9 +1,7 @@
 import type { WorkOverview } from "@t3tools/contracts";
 import { act, createElement } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { describe, expect, it, vi } from "vite-plus/test";
-
-vi.mock("../ui/toggle-group", () => ({ Toggle: "button", ToggleGroup: "div" }));
+import { describe, expect, it } from "vite-plus/test";
 
 import { WorkSummary } from "./WorkSummary";
 
@@ -34,7 +32,7 @@ const overview: WorkOverview = {
 };
 
 describe("WorkSummary", () => {
-  it("switches the headline and chart without adding independent time measures", () => {
+  it("shows total recorded work without a metric selector or double-counting tasks", () => {
     let renderer: ReactTestRenderer;
     act(() => {
       renderer = create(createElement(WorkSummary, { overview, days: ["2026-09-23"] }));
@@ -44,15 +42,13 @@ describe("WorkSummary", () => {
         .findAllByType("span")
         .filter((node) => node.props.className?.includes("text-4xl"))
         .map((node) => node.children.join(""));
-    expect(headline()).toEqual(["1h"]);
-    act(() =>
-      renderer!.root
-        .findByProps({ "aria-label": "Work chart metric" })
-        .props.onValueChange(["agentElapsedMs"]),
-    );
-    expect(headline()).toEqual(["2h"]);
+    expect(headline()).toEqual(["3h"]);
     expect(renderer!.root.findAllByType("h2").map((node) => node.children.join(""))).toContain(
-      "Daily agent elapsed",
+      "Today's total",
+    );
+    expect(renderer!.root.findAllByProps({ "aria-label": "Work chart metric" })).toHaveLength(0);
+    expect(renderer!.root.findAllByType("span").map((node) => node.children.join(""))).toContain(
+      "Task and subagent durations; excluded from total to avoid double-counting",
     );
   });
 

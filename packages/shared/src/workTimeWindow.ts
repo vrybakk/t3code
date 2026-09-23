@@ -74,6 +74,24 @@ export const isIanaTimeZone = (timeZone: string) => {
   }
 };
 
+/** Inclusive civil dates, converted to the same exclusive bounds used by Work queries. */
+export function workDateRange(from: string, through: string, timeZone: string) {
+  const parse = (value: string): CivilDate | null => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const [year = 0, month = 0, day = 0] = value.split("-").map(Number);
+    const date = new Date(`${value}T00:00:00Z`);
+    if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0, 10) !== value) return null;
+    return { year, month, day };
+  };
+  const start = parse(from);
+  const end = parse(through);
+  if (!start || !end || compareDate(start, end) > 0) return null;
+  return {
+    since: firstInstantOfCivilDate(start, timeZone),
+    until: firstInstantOfCivilDate(addDays(end, 1), timeZone),
+  };
+}
+
 export const workTimeWindow = (kind: WorkWindowKind, timeZone: string, now: Date = new Date()) => {
   const today = partsAt(now, timeZone);
   const date = { year: today.year, month: today.month, day: today.day };

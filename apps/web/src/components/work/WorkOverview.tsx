@@ -8,6 +8,7 @@ import { serverEnvironment } from "../../state/server";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { workWindow } from "../../state/workTracking";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
+import { Button } from "../ui/button";
 import { WorkSummary } from "./WorkSummary";
 import { WorkSelect } from "./WorkSelect";
 import { WorkBreakdown } from "./WorkBreakdown";
@@ -23,10 +24,14 @@ export function WorkOverview({
   environmentId,
   timeZone,
   projects,
+  onAddEntry,
+  canAddEntry,
 }: {
   readonly environmentId: EnvironmentId;
   readonly timeZone: string;
   readonly projects: ReadonlyArray<WorkTrackingProject>;
+  readonly onAddEntry: () => void;
+  readonly canAddEntry: boolean;
 }) {
   const [period, setPeriod] = useState<"today" | "week" | "month">("month");
   const [projectId, setProjectId] = useState("");
@@ -65,21 +70,27 @@ export function WorkOverview({
             ]}
           />
         </div>
-        <ToggleGroup
-          aria-label="Overview period"
-          variant="segmented"
-          value={[period]}
-          onValueChange={(values) => {
-            const selected = PERIODS.find((item) => item.value === values[0]);
-            if (selected) setPeriod(selected.value);
-          }}
-        >
-          {PERIODS.map((item) => (
-            <Toggle key={item.value} value={item.value}>
-              {item.label}
-            </Toggle>
-          ))}
-        </ToggleGroup>
+        <div className="flex flex-wrap items-center gap-3">
+          <ToggleGroup
+            aria-label="Overview period"
+            variant="segmented"
+            className="h-9 sm:h-8"
+            value={[period]}
+            onValueChange={(values) => {
+              const selected = PERIODS.find((item) => item.value === values[0]);
+              if (selected) setPeriod(selected.value);
+            }}
+          >
+            {PERIODS.map((item) => (
+              <Toggle key={item.value} value={item.value} className="h-full">
+                {item.label}
+              </Toggle>
+            ))}
+          </ToggleGroup>
+          <Button onClick={onAddEntry} disabled={!canAddEntry}>
+            Add entry
+          </Button>
+        </div>
       </div>
       {overview ? (
         <>
@@ -91,10 +102,7 @@ export function WorkOverview({
             window={input}
             timeZone={timeZone}
           />
-          <p className="text-xs text-muted-foreground">
-            Reporting timezone: {timeZone}. Developer, agent elapsed, and task time are separate
-            measures.
-          </p>
+          <p className="text-xs text-muted-foreground">Reporting timezone: {timeZone}.</p>
         </>
       ) : result.waiting ? (
         <div role="status" aria-label="Loading work overview" className="space-y-8">

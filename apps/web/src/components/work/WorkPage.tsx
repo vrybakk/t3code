@@ -1,214 +1,91 @@
-import { useAtomValue } from "@effect/atom-react";
+import { Tabs } from "@base-ui/react/tabs";
+import { Link } from "@tanstack/react-router";
 import {
   type EnvironmentId,
   PRIMARY_LOCAL_ENVIRONMENT_ID,
-  type WorkExport,
-  type WorkReportId,
-  type WorkTrackingProject,
+  type WorkRecord,
 } from "@t3tools/contracts";
-import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
-import { Tabs } from "@base-ui/react/tabs";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { isElectron } from "../../env";
 import { usePrimaryEnvironmentId } from "../../state/environments";
-import { useProjects, useThreadShells } from "../../state/entities";
-import { serverEnvironment } from "../../state/server";
-import { browserTimeZone, useWorkMutations, workWindow } from "../../state/workTracking";
+import { useWorkMutations } from "../../state/workTracking";
 import { ScrollArea } from "../ui/scroll-area";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SidebarInset } from "../ui/sidebar";
 import { toggleVariants } from "../ui/toggle";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
-import { WorkBackupActions } from "./WorkBackupActions";
+import { WorkEntryDialog } from "./WorkEntryDialog";
 import { WorkOverview } from "./WorkOverview";
-import { WorkDeliveries } from "./WorkDeliveries";
-import { WorkTimePanel } from "./WorkTimePanel";
-import { WorkProfileForm } from "./WorkProfileForm";
-import { WorkReports } from "./WorkReports";
-import { WorkMonthlyReport } from "./WorkMonthlyReport";
-import { WorkReportSnapshotPrint } from "./WorkReportSnapshotPrint";
-import { WorkRepositoryReview } from "./WorkRepositoryReview";
-import { WorkSelect } from "./WorkSelect";
+import { WorkReportsPanel } from "./WorkReportsPanel";
 import { WorkRunningSessions } from "./WorkRunningSessions";
-import { workProjectLabels } from "./workPresentation";
-
-const monthInTimeZone = (timeZone: string) => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(new Date());
-  return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}`;
-};
-
-const WORK_SECTIONS = [
-  { value: "overview", label: "Overview" },
-  { value: "time", label: "Time" },
-  { value: "reports", label: "Reports" },
-  { value: "settings", label: "Settings" },
-] as const;
-
-type WorkSection = (typeof WORK_SECTIONS)[number]["value"];
-
-const isWorkSection = (value: string): value is WorkSection =>
-  WORK_SECTIONS.some((section) => section.value === value);
+import { useWorkData } from "./useWorkData";
 
 export function WorkPage() {
-  const [section, setSection] = useState<WorkSection>("overview");
-  const scrollViewportRef = useRef<HTMLDivElement>(null);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const environmentId = primaryEnvironmentId ?? (PRIMARY_LOCAL_ENVIRONMENT_ID as EnvironmentId);
-  const browserZone = useMemo(() => browserTimeZone(), []);
-  const bootstrapWindow = useMemo(() => workWindow("month", browserZone), [browserZone]);
-  const bootstrap = useAtomValue(
-    serverEnvironment.workOverview({
-      environmentId,
-      input: { ...bootstrapWindow, includeRecords: false },
-    }),
-  );
-  const bootstrapOverview = Option.getOrNull(AsyncResult.value(bootstrap));
-  const timeZone = bootstrapOverview?.profile?.timeZone ?? browserZone;
-  const monthWindow = useMemo(() => workWindow("month", timeZone), [timeZone]);
-  const monthResult = useAtomValue(
-    serverEnvironment.workOverview({
-      environmentId,
-      input: { ...monthWindow, includeRecords: false },
-    }),
-  );
-  const rawOverview = Option.getOrNull(AsyncResult.value(monthResult));
-  const sourceProjects = useProjects();
-  const overview = useMemo(
-    () =>
-      rawOverview
-        ? {
-            ...rawOverview,
-            projects: workProjectLabels(
-              rawOverview.projects,
-              sourceProjects.filter((project) => project.environmentId === environmentId),
-            ),
-          }
-        : null,
-    [rawOverview, sourceProjects, environmentId],
-  );
-  const threads = useThreadShells().filter((thread) => thread.environmentId === environmentId);
+  return <WorkEnvironmentPage key={environmentId} environmentId={environmentId} />;
+}
+
+function WorkEnvironmentPage({ environmentId }: { environmentId: EnvironmentId }) {
+  const [section, setSection] = useState("overview");
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const { overview, timeZone, threads, loading } = useWorkData(environmentId);
   const mutations = useWorkMutations(environmentId);
-  const [manualMonth, setManualMonth] = useState(() => monthInTimeZone(browserZone));
-  const [selectedId, setSelectedId] = useState<WorkTrackingProject["id"] | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [printReportId, setPrintReportId] = useState<WorkReportId | null>(null);
-  const selectSection = (nextSection: WorkSection) => {
-    scrollViewportRef.current?.scrollTo({ top: 0 });
-    setSection(nextSection);
-  };
-  const selected =
-    overview?.projects.find((project) => project.id === selectedId) ??
-    overview?.projects[0] ??
-    null;
-  const perform = async <T extends { readonly _tag: string }>(operation: () => Promise<T>) => {
-    setPending(true);
-    setError("");
-    const response = await operation();
-    setPending(false);
-    if (response._tag === "Success") return response;
-    setError("Could not save this Work change. Check the local server connection and try again.");
-    return null;
-  };
-  const download = (filename: string, content: string) => {
-    const url = URL.createObjectURL(new Blob([content], { type: "text/csv" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [editing, setEditing] = useState<WorkRecord | null>(null);
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground isolate">
       <Tabs.Root
         value={section}
         onValueChange={(value) => {
-          if (value && isWorkSection(value)) selectSection(value);
+          if (value !== "overview" && value !== "reports") return;
+          scrollViewportRef.current?.scrollTo({ top: 0 });
+          setSection(value);
         }}
         className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground"
       >
         <WorkspacePageHeader electron={isElectron} className="h-auto">
-          <div className="flex w-full min-w-0 items-center justify-between gap-3 py-2">
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3 py-2">
             <h1>Work</h1>
             <Tabs.List
               aria-label="Work section"
-              className="hidden gap-0.5 rounded-lg bg-input/40 p-0.5 sm:flex"
+              className="flex gap-0.5 rounded-lg bg-input/40 p-0.5"
             >
-              {WORK_SECTIONS.map((item) => (
+              {[
+                ["overview", "Overview"],
+                ["reports", "Reports"],
+              ].map(([value, label]) => (
                 <Tabs.Tab
-                  key={item.value}
-                  value={item.value}
-                  data-pressed={section === item.value ? "" : undefined}
-                  className={toggleVariants({
-                    variant: "segmented",
-                    size: "segmented",
-                  })}
+                  key={value}
+                  value={value}
+                  data-pressed={section === value ? "" : undefined}
+                  className={toggleVariants({ variant: "segmented", size: "segmented" })}
                 >
-                  {item.label}
+                  {label}
                 </Tabs.Tab>
               ))}
             </Tabs.List>
-            <Select
-              value={section}
-              onValueChange={(value) => {
-                if (value && isWorkSection(value)) selectSection(value);
-              }}
-            >
-              <SelectTrigger
-                aria-label="Work section"
-                size="compact"
-                variant="ghost"
-                className="w-auto min-w-0 sm:hidden"
-              >
-                <SelectValue>
-                  {WORK_SECTIONS.find((item) => item.value === section)?.label}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                {WORK_SECTIONS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
           </div>
         </WorkspacePageHeader>
         <ScrollArea viewportRef={scrollViewportRef} className="min-h-0 flex-1">
           <WorkspacePageContainer width="wide" className="py-6">
-            {bootstrap.waiting && overview === null ? (
-              <p className="text-sm text-muted-foreground">Loading local work ledger…</p>
-            ) : null}
-            {overview === null && !bootstrap.waiting ? (
-              <p className="text-sm text-muted-foreground">
-                Work is unavailable for this environment.
+            {overview === null ? (
+              <p role={loading ? "status" : "alert"} className="text-sm text-muted-foreground">
+                {loading
+                  ? "Loading local work ledger…"
+                  : "Work is unavailable for this environment."}
               </p>
-            ) : null}
-            {overview ? (
+            ) : (
               <>
-                {error ? (
-                  <p
-                    role="alert"
-                    className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+                {overview.profile === null ? (
+                  <Link
+                    to="/settings/work"
+                    search={{ machine: environmentId }}
+                    className="rounded-lg border border-dashed p-4 text-left text-sm text-muted-foreground hover:text-foreground"
                   >
-                    {error}
-                  </p>
-                ) : null}
-                {overview.profile === null && section !== "settings" ? (
-                  <button
-                    type="button"
-                    className="rounded-lg border border-dashed p-4 text-left text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
-                    onClick={() => selectSection("settings")}
-                  >
-                    Complete your local Work profile in Settings to start recording time.
-                  </button>
+                    Complete your Work profile in Settings to start recording time.
+                  </Link>
                 ) : null}
                 <WorkRunningSessions
                   threads={threads}
@@ -217,182 +94,39 @@ export function WorkPage() {
                 />
                 <Tabs.Panel value="overview" className="space-y-6">
                   <WorkOverview
-                    key={`${environmentId}:${timeZone}`}
+                    key={timeZone}
                     environmentId={environmentId}
                     timeZone={timeZone}
                     projects={overview.projects}
+                    canAddEntry={overview.profile !== null && overview.projects.length > 0}
+                    onAddEntry={() => {
+                      setEditing(null);
+                      setEntryOpen(true);
+                    }}
                   />
                 </Tabs.Panel>
-                <Tabs.Panel value="time" keepMounted>
-                  <WorkTimePanel
-                    key={`manual-entries:${manualMonth}:${overview.projects.map((project) => project.id).join(":")}`}
-                    active={section === "time"}
+                <Tabs.Panel value="reports">
+                  <WorkReportsPanel
                     environmentId={environmentId}
+                    overview={overview}
                     timeZone={timeZone}
-                    projects={overview.projects}
                     threads={threads}
-                    month={manualMonth}
-                    pending={pending}
-                    onMonthChange={setManualMonth}
-                    onSave={async (input) =>
-                      (await perform(() => mutations.saveManual(input as never))) !== null
-                    }
-                  />
-                </Tabs.Panel>
-                <Tabs.Panel value="reports" keepMounted className="space-y-6">
-                  <WorkMonthlyReport
-                    environmentId={environmentId}
-                    projects={overview.projects}
-                    timeZone={timeZone}
-                    defaultMonth={monthInTimeZone(timeZone)}
-                    onCsv={async (trackingProjectId, month) => {
-                      const result = await mutations.exportCsv({
-                        ...(trackingProjectId ? { trackingProjectId } : {}),
-                        month,
-                      });
-                      if (result._tag === "Success")
-                        download(result.value.filename, result.value.content);
-                      else setError("Could not export the CSV report.");
+                    onEdit={(record) => {
+                      setEditing(record);
+                      setEntryOpen(true);
                     }}
                   />
-                  <details className="rounded-lg border p-5">
-                    <summary className="cursor-pointer text-sm font-medium">
-                      Project snapshots and delivery
-                    </summary>
-                    <div className="mt-5 space-y-5">
-                      <WorkDeliveries
-                        projects={overview.projects}
-                        threads={threads}
-                        deliveries={overview.deliveries}
-                        pending={pending}
-                        onMark={async (trackingProjectId, threadId) =>
-                          (await perform(() =>
-                            mutations.markDelivery({ trackingProjectId, threadId }),
-                          )) !== null
-                        }
-                        onReopen={async (id) =>
-                          (await perform(() => mutations.reopenDelivery({ id }))) !== null
-                        }
-                      />
-                      <WorkReports
-                        key={timeZone}
-                        projects={overview.projects}
-                        reports={overview.reports}
-                        defaultMonth={monthInTimeZone(timeZone)}
-                        pending={pending}
-                        onCreate={async (input) =>
-                          (await perform(() => mutations.createReport(input))) !== null
-                        }
-                        onTransition={async (input) =>
-                          (await perform(() => mutations.transitionReport(input))) !== null
-                        }
-                        onCsv={async (trackingProjectId, month) => {
-                          const result = await mutations.exportCsv({
-                            trackingProjectId,
-                            month,
-                          });
-                          if (result._tag === "Success")
-                            download(result.value.filename, result.value.content);
-                          else setError("Could not export the CSV report.");
-                        }}
-                        onSnapshotCsv={async (id) => {
-                          const result = await mutations.exportReportCsv({ id });
-                          if (result._tag === "Success")
-                            download(result.value.filename, result.value.content);
-                          else setError("Could not export the immutable report snapshot.");
-                        }}
-                        onPrintSnapshot={setPrintReportId}
-                      />
-                    </div>
-                  </details>
                 </Tabs.Panel>
-                <Tabs.Panel value="settings" keepMounted className="space-y-6">
-                  <WorkProfileForm
-                    key={overview.profile?.id ?? "onboarding"}
-                    profile={overview.profile}
-                    pending={pending}
-                    onSave={async (input) => {
-                      await perform(() => mutations.saveProfile(input));
-                    }}
-                  />
-                  <section
-                    className="rounded-lg border p-5"
-                    aria-labelledby="work-tracking-heading"
-                  >
-                    <div>
-                      <h2 id="work-tracking-heading" className="font-medium">
-                        Tracking settings
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Projects are added automatically when tracking is enabled. Repositories
-                        include their worktrees.
-                      </p>
-                    </div>
-                    <div className="mt-4 space-y-4">
-                      {overview.projects.length > 1 ? (
-                        <div className="grid min-w-0 max-w-md gap-1.5 text-sm font-medium">
-                          <label htmlFor="work-settings-project">Tracking project</label>
-                          <WorkSelect
-                            id="work-settings-project"
-                            value={selected?.id ?? ""}
-                            onValueChange={(value) =>
-                              setSelectedId(value as WorkTrackingProject["id"])
-                            }
-                            options={overview.projects.map((project) => ({
-                              value: project.id,
-                              label: project.name,
-                            }))}
-                          />
-                        </div>
-                      ) : null}
-                      {selected ? (
-                        <WorkRepositoryReview
-                          environmentId={environmentId}
-                          project={selected}
-                          pending={pending}
-                          onSave={async (input) =>
-                            (await perform(() =>
-                              mutations.saveRepository({
-                                trackingProjectId: selected.id,
-                                ...input,
-                              }),
-                            )) !== null
-                          }
-                        />
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Tracking projects appear automatically for local T3 projects.
-                        </p>
-                      )}
-                    </div>
-                  </section>
-                  <WorkBackupActions
-                    pending={pending}
-                    onExport={async () => {
-                      const result = await mutations.exportJson();
-                      if (result._tag === "Success") return result.value as WorkExport;
-                      setError("Could not export the JSON backup.");
-                      return null;
-                    }}
-                    onImport={async (backup) =>
-                      (await perform(() => mutations.importJson({ mode: "merge", backup }))) !==
-                      null
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Reporting timezone: {timeZone}. Active and waiting time remain unavailable when
-                    provider events do not supply them.
-                  </p>
-                </Tabs.Panel>
-                {printReportId ? (
-                  <WorkReportSnapshotPrint
-                    environmentId={environmentId}
-                    reportId={printReportId}
-                    onPrinted={() => setPrintReportId(null)}
-                  />
-                ) : null}
+                <WorkEntryDialog
+                  open={entryOpen}
+                  onOpenChange={setEntryOpen}
+                  record={editing}
+                  projects={overview.projects}
+                  threads={threads}
+                  onSave={async (input) => (await mutations.saveManual(input))._tag === "Success"}
+                />
               </>
-            ) : null}
+            )}
           </WorkspacePageContainer>
         </ScrollArea>
       </Tabs.Root>

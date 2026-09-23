@@ -31,15 +31,17 @@ const totals = [
 ];
 
 describe("WorkOverviewChart", () => {
-  it("aggregates all projects by selected day and fills gaps without adding time measures", () => {
-    expect(buildWorkOverviewSeries(["2026-09-21", "2026-09-22"], totals, "developerMs")).toEqual([
-      { date: "2026-09-21", value: 180_000 },
-      { date: "2026-09-22", value: 0 },
+  it("combines manual and agent work across projects, excludes overlapping tasks, and fills gaps", () => {
+    expect(buildWorkOverviewSeries(["2026-09-21", "2026-09-22"], totals)).toEqual([
+      {
+        date: "2026-09-21",
+        value: 1_080_000,
+        manualMs: 180_000,
+        agentElapsedMs: 900_000,
+        taskMs: 60_000,
+      },
+      { date: "2026-09-22", value: 0, manualMs: 0, agentElapsedMs: 0, taskMs: 0 },
     ]);
-    expect(buildWorkOverviewSeries(["2026-09-21"], totals, "agentElapsedMs")[0]?.value).toBe(
-      900_000,
-    );
-    expect(buildWorkOverviewSeries(["2026-09-21"], totals, "taskMs")[0]?.value).toBe(60_000);
   });
 
   it("exposes a daily total when focused and clears it on blur", () => {
@@ -47,22 +49,55 @@ describe("WorkOverviewChart", () => {
     act(() => {
       renderer = create(
         createElement(WorkOverviewChart, {
-          days: ["2026-09-21"],
+          days: ["2026-09-21", "2026-09-22"],
           dailyTotals: totals,
-          metric: "developerMs",
-          label: "Developer time",
         }),
       );
     });
-    const day = renderer!.root.findByType("g");
+    const day = renderer!.root.findAllByType("g")[0]!;
     act(() => day.props.onFocus());
     expect(renderer!.root.findByProps({ "aria-live": "polite" }).children.join("")).toContain(
-      "3m developer time",
+      "Total 18m · Manual 3m · Agent 15m · Tasks 1m (not added to total)",
     );
     act(() => day.props.onBlur());
     expect(renderer!.root.findByProps({ "aria-live": "polite" }).children.join("")).toBe(
       "Hover or focus a day to see its total.",
     );
+    act(() => day.props.onPointerEnter());
+    expect(renderer!.root.findByProps({ "aria-live": "polite" }).children.join("")).toContain(
+      "Total 18m · Manual 3m · Agent 15m · Tasks 1m (not added to total)",
+    );
+    act(() => renderer!.root.findByType("svg").props.onPointerLeave());
+    expect(renderer!.root.findByProps({ "aria-live": "polite" }).children.join("")).toBe(
+      "Hover or focus a day to see its total.",
+    );
+  });
+
+  it("shows today's full aggregated total without requiring hover or inventing hourly data", () => {
+    let renderer: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        createElement(WorkOverviewChart, {
+          days: ["2026-09-21"],
+          dailyTotals: totals,
+        }),
+      );
+    });
+    const summary = () => renderer!.root.findByProps({ "aria-live": "polite" }).children.join("");
+    const day = renderer!.root.findByType("g");
+    expect(summary()).toContain("Total 18m");
+    expect(day.props["aria-label"]).toBe("2026-09-21: 18m total recorded work");
+    expect(renderer!.root.findAllByType("circle")).toHaveLength(0);
+    const bar = day.findAllByType("rect").find((node) => node.props.fill === "currentColor");
+    expect(bar?.props.height).toBeGreaterThan(0);
+    act(() => day.props.onFocus());
+    expect(summary()).toContain("Total 18m");
+    act(() => day.props.onBlur());
+    expect(summary()).toContain("Total 18m");
+    act(() => day.props.onPointerEnter());
+    expect(summary()).toContain("Total 18m");
+    act(() => renderer!.root.findByType("svg").props.onPointerLeave());
+    expect(summary()).toContain("Total 18m");
   });
 
   it("shows an honest empty-period message", () => {
@@ -72,13 +107,11 @@ describe("WorkOverviewChart", () => {
         createElement(WorkOverviewChart, {
           days: [],
           dailyTotals: [],
-          metric: "developerMs",
-          label: "Developer time",
         }),
       );
     });
     expect(renderer!.root.findByProps({ "aria-live": "polite" }).children.join("")).toBe(
-      "No developer time recorded in this period.",
+      "No work recorded in this period.",
     );
   });
 });

@@ -21,6 +21,7 @@ export type SettingsPath =
   | "/settings/integrations"
   | "/settings/source-control"
   | "/settings/storage"
+  | "/settings/work"
   | "/settings/connections"
   | "/settings/archived";
 
@@ -90,6 +91,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/integrations": "Integrations",
   "/settings/source-control": "Source Control",
   "/settings/storage": "Storage",
+  "/settings/work": "Work",
   "/settings/connections": "Connections",
   "/settings/archived": "Archive",
 };
@@ -127,6 +129,27 @@ const KEYBINDING_SEARCH_ITEMS = STATIC_KEYBINDING_COMMANDS.toSorted((left, right
  * that may not be mounted point at their nearest stable section instead.
  */
 export const SETTINGS_SEARCH_ITEMS = [
+  {
+    id: "work-profile",
+    title: "Work profile",
+    to: "/settings/work",
+    scope: "environment",
+    searchTerms: ["time tracking manual agent display name timezone enable disable"],
+  },
+  {
+    id: "work-tracking",
+    title: "Tracking settings",
+    to: "/settings/work",
+    scope: "environment",
+    searchTerms: ["work projects repositories worktrees include exclude attribution"],
+  },
+  {
+    id: "work-backup",
+    title: "Work backup and export",
+    to: "/settings/work",
+    scope: "environment",
+    searchTerms: ["ledger history JSON import merge restore"],
+  },
   {
     id: "storage-worktrees",
     title: "Worktree cleanup",
@@ -820,6 +843,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/integrations": null,
   "/settings/source-control": "environment-defaults",
   "/settings/storage": "project-defaults",
+  "/settings/work": "environment",
   "/settings/connections": "connections",
   "/settings/archived": "project-defaults",
 };
