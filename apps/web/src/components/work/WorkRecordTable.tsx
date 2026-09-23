@@ -1,13 +1,14 @@
 import { useAtomValue } from "@effect/atom-react";
 import type {
   EnvironmentId,
+  WorkOverview,
   WorkOverviewInput,
   WorkRecord,
   WorkTrackingProject,
 } from "@t3tools/contracts";
 import { formatTokens } from "@t3tools/shared/usageFormat";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { useState } from "react";
 import { serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
@@ -15,13 +16,17 @@ import { WorkPagination, WORK_PAGE_SIZE } from "./WorkPagination";
 import { formatWorkDuration } from "./workMonthlySeries";
 import { workRecordPresentation } from "./workOverviewPresentation";
 
+const inactiveOverview = Atom.make(AsyncResult.initial<WorkOverview>());
+
 export function WorkRecordTable({
+  active = true,
   environmentId,
   window,
   projects,
   timeZone,
   onEdit,
 }: {
+  readonly active?: boolean;
   readonly environmentId: EnvironmentId;
   readonly window: WorkOverviewInput;
   readonly projects: ReadonlyArray<WorkTrackingProject>;
@@ -30,16 +35,18 @@ export function WorkRecordTable({
 }) {
   const [page, setPage] = useState(0);
   const result = useAtomValue(
-    serverEnvironment.workOverview({
-      environmentId,
-      input: {
-        ...window,
-        includeRecords: true,
-        includeAdjustments: false,
-        recordLimit: WORK_PAGE_SIZE,
-        recordOffset: page * WORK_PAGE_SIZE,
-      },
-    }),
+    active
+      ? serverEnvironment.workOverview({
+          environmentId,
+          input: {
+            ...window,
+            includeRecords: true,
+            includeAdjustments: false,
+            recordLimit: WORK_PAGE_SIZE,
+            recordOffset: page * WORK_PAGE_SIZE,
+          },
+        })
+      : inactiveOverview,
   );
   const overview = Option.getOrNull(AsyncResult.value(result));
   if (overview?.recordPage) {

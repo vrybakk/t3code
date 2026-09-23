@@ -7,6 +7,7 @@ import { WorkRecordTable } from "./WorkRecordTable";
 import { workMonthDays } from "./workMonthlySeries";
 
 export function WorkActivity({
+  active = true,
   environmentId,
   projects,
   timeZone,
@@ -14,6 +15,7 @@ export function WorkActivity({
   projectId,
   onEdit,
 }: {
+  active?: boolean;
   environmentId: EnvironmentId;
   projects: ReadonlyArray<WorkTrackingProject>;
   timeZone: string;
@@ -64,6 +66,7 @@ export function WorkActivity({
       </p>
       {window ? (
         <WorkRecordTable
+          active={active}
           key={`${window.since}:${window.until}:${projectId}`}
           environmentId={environmentId}
           window={{

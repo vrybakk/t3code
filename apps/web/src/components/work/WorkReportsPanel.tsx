@@ -15,12 +15,14 @@ import { WorkReports } from "./WorkReports";
 import { WorkReportSnapshotPrint } from "./WorkReportSnapshotPrint";
 
 export function WorkReportsPanel({
+  active,
   environmentId,
   overview,
   timeZone,
   threads,
   onEdit,
 }: {
+  active: boolean;
   environmentId: EnvironmentId;
   overview: WorkOverview;
   timeZone: string;
@@ -79,6 +81,7 @@ export function WorkReportsPanel({
         </p>
       ) : null}
       <WorkMonthlyReport
+        active={active}
         environmentId={environmentId}
         projects={overview.projects}
         timeZone={timeZone}
@@ -128,7 +131,8 @@ export function WorkReportsPanel({
         </div>
       </details>
       <WorkActivity
-        key={`${timeZone}:${month}:${projectId}`}
+        key={`${timeZone}:${month}`}
+        active={active}
         environmentId={environmentId}
         projects={overview.projects}
         timeZone={timeZone}

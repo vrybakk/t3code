@@ -105,8 +105,9 @@ function WorkEnvironmentPage({ environmentId }: { environmentId: EnvironmentId }
                     }}
                   />
                 </Tabs.Panel>
-                <Tabs.Panel value="reports">
+                <Tabs.Panel value="reports" keepMounted>
                   <WorkReportsPanel
+                    active={section === "reports"}
                     environmentId={environmentId}
                     overview={overview}
                     timeZone={timeZone}

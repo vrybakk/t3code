@@ -1,7 +1,12 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId, WorkTrackingProject, WorkTrackingProjectId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  WorkOverview,
+  WorkTrackingProject,
+  WorkTrackingProjectId,
+} from "@t3tools/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -27,7 +32,10 @@ const METRICS = [
   { value: "taskMs", label: "Task time" },
 ] as const;
 
+const inactiveOverview = Atom.make(AsyncResult.initial<WorkOverview>());
+
 export function WorkMonthlyReport({
+  active,
   environmentId,
   projects,
   timeZone,
@@ -37,6 +45,7 @@ export function WorkMonthlyReport({
   onProjectChange: setProjectId,
   onCsv,
 }: {
+  readonly active: boolean;
   readonly environmentId: EnvironmentId;
   readonly projects: ReadonlyArray<WorkTrackingProject>;
   readonly timeZone: string;
@@ -58,14 +67,16 @@ export function WorkMonthlyReport({
     [month, timeZone],
   );
   const result = useAtomValue(
-    serverEnvironment.workOverview({
-      environmentId,
-      input: {
-        ...window,
-        includeRecords: false,
-        ...(selectedProject ? { trackingProjectId: selectedProject.id } : {}),
-      },
-    }),
+    active
+      ? serverEnvironment.workOverview({
+          environmentId,
+          input: {
+            ...window,
+            includeRecords: false,
+            ...(selectedProject ? { trackingProjectId: selectedProject.id } : {}),
+          },
+        })
+      : inactiveOverview,
   );
   const overview = Option.getOrNull(AsyncResult.value(result));
   const chartProjects = selectedProject ? [selectedProject] : projects;
