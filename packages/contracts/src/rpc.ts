@@ -37,6 +37,7 @@ import {
   AgentSessionScanResult,
   AgentSessionScanError,
 } from "./agentSessions.ts";
+import { StorageUsageError, StorageUsageInput, StorageUsageResult } from "./storageUsage.ts";
 import {
   AssetAccessError,
   AssetCreateUrlInput,
@@ -317,6 +318,7 @@ export const WS_METHODS = {
   // Filesystem methods
   filesystemBrowse: "filesystem.browse",
   agentSessionsScan: "agentSessions.scan",
+  storageUsageGet: "storage.getUsage",
   agentSessionsImport: "agentSessions.import",
   assetsCreateUrl: "assets.createUrl",
   attachmentsCreateUploadUrl: "attachments.createUploadUrl",
@@ -1103,6 +1105,12 @@ const WsAgentSessionsScanRpc = Rpc.make(WS_METHODS.agentSessionsScan, {
   error: Schema.Union([AgentSessionScanError, EnvironmentAuthorizationError]),
 });
 
+const WsStorageUsageGetRpc = Rpc.make(WS_METHODS.storageUsageGet, {
+  payload: StorageUsageInput,
+  success: StorageUsageResult,
+  error: Schema.Union([StorageUsageError, EnvironmentAuthorizationError]),
+});
+
 const WsAgentSessionsImportRpc = Rpc.make(WS_METHODS.agentSessionsImport, {
   payload: AgentSessionImportInput,
   success: AgentSessionImportResult,
@@ -1619,6 +1627,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsShellOpenInEditorRpc,
   WsFilesystemBrowseRpc,
   WsAgentSessionsScanRpc,
+  WsStorageUsageGetRpc,
   WsAgentSessionsImportRpc,
   WsAssetsCreateUrlRpc,
   WsAttachmentsCreateUploadUrlRpc,

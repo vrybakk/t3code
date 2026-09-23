@@ -12,7 +12,8 @@ import {
   NumberFieldInput,
 } from "../ui/number-field";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
-import { SettingsScopeNotice } from "./SettingsScopeNotice";
+import { Button } from "../ui/button";
+import { StorageUsagePanel } from "./StorageUsagePanel";
 import type { ScopedSettingsTarget } from "./scopedSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
 import {
@@ -83,7 +84,16 @@ function RetentionControl({
 }
 
 export function StorageSettingsPanel() {
-  const { scope, connectedEnvironments, targets, target } = useSettingsScope();
+  return (
+    <SettingsPageContainer>
+      <StorageUsagePanel />
+      <StorageCleanupControls />
+    </SettingsPageContainer>
+  );
+}
+
+function StorageCleanupControls() {
+  const { scope, connectedEnvironments, targets, target, selectScope } = useSettingsScope();
   const scopedSettings = useScopedSettings();
   const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
   const settings = {
@@ -122,9 +132,12 @@ export function StorageSettingsPanel() {
     )
   ) {
     return (
-      <SettingsScopeNotice target="all">
-        Update the selected machines to configure project worktree cleanup.
-      </SettingsScopeNotice>
+      <div className="space-y-3 px-4 text-sm text-muted-foreground" role="status">
+        <p>Update the selected machines to configure project worktree cleanup.</p>
+        <Button size="xs" variant="outline" onClick={() => selectScope({})}>
+          Open all environments
+        </Button>
+      </div>
     );
   }
 
@@ -134,23 +147,34 @@ export function StorageSettingsPanel() {
     )
   ) {
     return (
-      <SettingsScopeNotice
-        target="environment"
-        eligibleEnvironmentIds={connectedEnvironments
-          .filter(
-            (environment) =>
-              environment.serverConfig?.environment.capabilities.storageCleanup === true,
-          )
-          .map((environment) => environment.environmentId)}
-      >
-        Update the selected environments to use storage cleanup, or choose a machine that supports
-        it.
-      </SettingsScopeNotice>
+      <div className="space-y-3 px-4 text-sm text-muted-foreground" role="status">
+        <p>
+          Update the selected environments to use storage cleanup, or choose a machine that supports
+          it.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {connectedEnvironments
+            .filter(
+              (environment) =>
+                environment.serverConfig?.environment.capabilities.storageCleanup === true,
+            )
+            .map((environment) => (
+              <Button
+                key={environment.environmentId}
+                size="xs"
+                variant="outline"
+                onClick={() => selectScope({ machine: environment.environmentId })}
+              >
+                {environment.label}
+              </Button>
+            ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <SettingsPageContainer>
+    <>
       <SettingsSection id="storage-worktrees" title="Worktrees">
         {isProjectScope && (
           <SettingsRow
@@ -283,6 +307,6 @@ export function StorageSettingsPanel() {
           />
         </SettingsSection>
       )}
-    </SettingsPageContainer>
+    </>
   );
 }

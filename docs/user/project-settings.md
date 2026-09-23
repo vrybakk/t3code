@@ -52,6 +52,19 @@ on each selected environment, and reset returns to the environment's shared list
 For workspace mode, a project's `t3.json` preference applies when the project has no override.
 Browser access changes apply when an agent session next starts.
 
+## Storage usage
+
+In **Settings → Storage**, select one connected machine and scan its storage to find large
+agent histories. The report covers that machine's T3 data and configured Codex and Claude Code
+homes, not your entire disk. Refresh to take a new measurement; search and pagination use the
+last scan. Histories from other providers are not included yet.
+
+File size and allocated disk space can differ. Allocated space is filesystem-reported and is
+not a promise of space recoverable by deletion, especially on filesystems with shared blocks.
+Scan warnings identify incomplete measurements. A history without a matching T3 conversation
+may belong to another app or environment; it is not necessarily unused. This report is
+read-only: deleting a T3 conversation does not delete its provider's native history.
+
 ## Storage cleanup
 
 Open **Settings → Storage** to enable automatic cleanup on one machine or all connected

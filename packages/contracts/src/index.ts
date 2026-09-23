@@ -34,6 +34,7 @@ export * from "./editor.ts";
 export * from "./project.ts";
 export * from "./filesystem.ts";
 export * from "./agentSessions.ts";
+export * from "./storageUsage.ts";
 export * from "./assets.ts";
 export * from "./review.ts";
 export * from "./browserImport.ts";
