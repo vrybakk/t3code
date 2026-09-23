@@ -23,15 +23,14 @@ import { toggleVariants } from "../ui/toggle";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { WorkBackupActions } from "./WorkBackupActions";
-import { WorkBreakdown } from "./WorkBreakdown";
+import { WorkOverview } from "./WorkOverview";
 import { WorkDeliveries } from "./WorkDeliveries";
-import { WorkManualEntries } from "./WorkManualEntries";
+import { WorkTimePanel } from "./WorkTimePanel";
 import { WorkProfileForm } from "./WorkProfileForm";
 import { WorkReports } from "./WorkReports";
 import { WorkMonthlyReport } from "./WorkMonthlyReport";
 import { WorkReportSnapshotPrint } from "./WorkReportSnapshotPrint";
 import { WorkRepositoryReview } from "./WorkRepositoryReview";
-import { WorkSummary } from "./WorkSummary";
 import { WorkSelect } from "./WorkSelect";
 import { WorkRunningSessions } from "./WorkRunningSessions";
 import { workProjectLabels } from "./workPresentation";
@@ -65,26 +64,19 @@ export function WorkPage() {
   const browserZone = useMemo(() => browserTimeZone(), []);
   const bootstrapWindow = useMemo(() => workWindow("month", browserZone), [browserZone]);
   const bootstrap = useAtomValue(
-    serverEnvironment.workOverview({ environmentId, input: bootstrapWindow }),
+    serverEnvironment.workOverview({
+      environmentId,
+      input: { ...bootstrapWindow, includeRecords: false },
+    }),
   );
   const bootstrapOverview = Option.getOrNull(AsyncResult.value(bootstrap));
   const timeZone = bootstrapOverview?.profile?.timeZone ?? browserZone;
-  const windows = useMemo(
-    () => ({
-      today: workWindow("today", timeZone),
-      week: workWindow("week", timeZone),
-      month: workWindow("month", timeZone),
-    }),
-    [timeZone],
-  );
-  const todayResult = useAtomValue(
-    serverEnvironment.workOverview({ environmentId, input: windows.today }),
-  );
-  const weekResult = useAtomValue(
-    serverEnvironment.workOverview({ environmentId, input: windows.week }),
-  );
+  const monthWindow = useMemo(() => workWindow("month", timeZone), [timeZone]);
   const monthResult = useAtomValue(
-    serverEnvironment.workOverview({ environmentId, input: windows.month }),
+    serverEnvironment.workOverview({
+      environmentId,
+      input: { ...monthWindow, includeRecords: false },
+    }),
   );
   const rawOverview = Option.getOrNull(AsyncResult.value(monthResult));
   const sourceProjects = useProjects();
@@ -104,14 +96,6 @@ export function WorkPage() {
   const threads = useThreadShells().filter((thread) => thread.environmentId === environmentId);
   const mutations = useWorkMutations(environmentId);
   const [manualMonth, setManualMonth] = useState(() => monthInTimeZone(browserZone));
-  const manualWindow = useMemo(
-    () => workWindow("month", timeZone, new Date(`${manualMonth}-15T12:00:00.000Z`)),
-    [manualMonth, timeZone],
-  );
-  const manualMonthResult = useAtomValue(
-    serverEnvironment.workManualRecords({ environmentId, input: manualWindow }),
-  );
-  const manualMonthRecords = Option.getOrNull(AsyncResult.value(manualMonthResult)) ?? [];
   const [selectedId, setSelectedId] = useState<WorkTrackingProject["id"] | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -231,30 +215,23 @@ export function WorkPage() {
                   projects={overview.projects}
                   enabled={overview.profile?.trackingEnabled ?? false}
                 />
-                <Tabs.Panel value="overview" keepMounted className="space-y-6">
-                  <WorkSummary
-                    summaries={[
-                      {
-                        label: "Today",
-                        overview: Option.getOrNull(AsyncResult.value(todayResult)),
-                      },
-                      {
-                        label: "This week",
-                        overview: Option.getOrNull(AsyncResult.value(weekResult)),
-                      },
-                      { label: "This month", overview },
-                    ]}
+                <Tabs.Panel value="overview" className="space-y-6">
+                  <WorkOverview
+                    key={`${environmentId}:${timeZone}`}
+                    environmentId={environmentId}
+                    timeZone={timeZone}
+                    projects={overview.projects}
                   />
-                  <WorkBreakdown overview={overview} />
                 </Tabs.Panel>
                 <Tabs.Panel value="time" keepMounted>
-                  <WorkManualEntries
+                  <WorkTimePanel
                     key={`manual-entries:${manualMonth}:${overview.projects.map((project) => project.id).join(":")}`}
+                    active={section === "time"}
+                    environmentId={environmentId}
+                    timeZone={timeZone}
                     projects={overview.projects}
                     threads={threads}
-                    records={manualMonthRecords}
                     month={manualMonth}
-                    monthLoading={manualMonthResult.waiting}
                     pending={pending}
                     onMonthChange={setManualMonth}
                     onSave={async (input) =>

@@ -179,7 +179,7 @@ export const layer = Layer.effect(
       mapSqlError(
         sql<
           Record<string, unknown>
-        >`SELECT id, kind, tracking_project_id AS "trackingProjectId", project_id AS "projectId", thread_id AS "threadId", turn_id AS "turnId", repository_id AS "repositoryId", cross_repository = 1 AS "crossRepository", occurred_at AS "occurredAt", duration_ms AS "durationMs", elapsed_ms AS "elapsedMs", active_ms AS "activeMs", waiting_ms AS "waitingMs", task_ms AS "taskMs", provider, model, effort, surface, json_object('inputTokens', input_tokens, 'cachedInputTokens', cached_input_tokens, 'outputTokens', output_tokens, 'reasoningTokens', reasoning_tokens) AS tokens, tool_usage_json AS "toolUsage", outcome, coverage, category, note, source_event_id AS "sourceEventId", revision, supersedes_id AS "supersedesId", created_at AS "createdAt", updated_at AS "updatedAt" FROM work_records WHERE occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} ORDER BY occurred_at DESC ${limited ? sql`LIMIT 500` : sql``}`,
+        >`SELECT id, kind, tracking_project_id AS "trackingProjectId", project_id AS "projectId", thread_id AS "threadId", turn_id AS "turnId", repository_id AS "repositoryId", cross_repository = 1 AS "crossRepository", occurred_at AS "occurredAt", duration_ms AS "durationMs", elapsed_ms AS "elapsedMs", active_ms AS "activeMs", waiting_ms AS "waitingMs", task_ms AS "taskMs", provider, model, effort, surface, json_object('inputTokens', input_tokens, 'cachedInputTokens', cached_input_tokens, 'outputTokens', output_tokens, 'reasoningTokens', reasoning_tokens) AS tokens, tool_usage_json AS "toolUsage", outcome, coverage, category, note, source_event_id AS "sourceEventId", revision, supersedes_id AS "supersedesId", created_at AS "createdAt", updated_at AS "updatedAt" FROM work_records WHERE occurred_at >= ${input.since} AND occurred_at < ${input.until} AND supersedes_id IS NULL ${input.trackingProjectId === undefined ? sql`` : sql`AND tracking_project_id = ${input.trackingProjectId}`} ORDER BY occurred_at DESC, id DESC ${limited ? sql`LIMIT ${input.recordLimit ?? 500} OFFSET ${input.recordOffset ?? 0}` : sql``}`,
       ).pipe(Effect.flatMap(decodeRecords));
     const manualRecords = (input: WorkOverviewInput) =>
       mapSqlError(
@@ -346,8 +346,10 @@ export const layer = Layer.effect(
       ] = yield* Effect.all([
         readProfile,
         readProjects(),
-        readRecords(input),
-        readAdjustments(input),
+        input.includeRecords === false ? Effect.succeed([]) : readRecords(input),
+        input.includeRecords === false || input.includeAdjustments === false
+          ? Effect.succeed([])
+          : readAdjustments(input),
         readProjectTotals(input),
         readDailyTotals(input),
         readRepositoryInvolvement(input),
@@ -390,6 +392,9 @@ export const layer = Layer.effect(
         projects,
         records,
         adjustments,
+        ...(input.includeRecords !== false && input.recordLimit !== undefined
+          ? { recordPage: { offset: input.recordOffset ?? 0, limit: input.recordLimit } }
+          : {}),
         projectTotals,
         dailyTotals,
         repositoryInvolvement,

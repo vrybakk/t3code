@@ -207,6 +207,123 @@ it.effect(
     }).pipe(Effect.provide(makeTestLayer())),
 );
 
+it.effect("paginates current records beyond 500 while keeping full-window summaries", () =>
+  Effect.gen(function* () {
+    yield* runMigrations({ toMigrationInclusive: 54 });
+    const sql = yield* SqlClient.SqlClient;
+    const work = yield* WorkTrackingService;
+    yield* work.upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true });
+    const first = yield* work.upsertProject({
+      name: "First",
+      t3ProjectIds: [],
+      trackingEnabled: true,
+    });
+    const second = yield* work.upsertProject({
+      name: "Second",
+      t3ProjectIds: [],
+      trackingEnabled: true,
+    });
+    yield* Effect.forEach(
+      Array.from({ length: 525 }, (_, index) => index),
+      (index) =>
+        sql`INSERT INTO work_records(id, kind, tracking_project_id, cross_repository, occurred_at, duration_ms, outcome, coverage, revision, created_at, updated_at) VALUES (${`entry-${String(index).padStart(3, "0")}`}, 'manual', ${first.id}, 0, '2026-09-01T12:00:00.000Z', 60000, 'succeeded', 'complete', 0, '2026-09-01T12:00:00.000Z', '2026-09-01T12:00:00.000Z')`,
+    );
+    const old = yield* work.upsertManualEntry({
+      trackingProjectId: second.id,
+      occurredAt: "2026-09-02T12:00:00.000Z",
+      durationMs: 120_000,
+    });
+    const current = yield* work.upsertManualEntry({
+      id: old.id,
+      trackingProjectId: second.id,
+      occurredAt: "2026-09-02T12:00:00.000Z",
+      durationMs: 180_000,
+    });
+    yield* work.upsertManualEntry({
+      trackingProjectId: first.id,
+      occurredAt: "2026-08-31T12:00:00.000Z",
+      durationMs: 999,
+    });
+    const range = { since: "2026-09-01T00:00:00.000Z", until: "2026-09-03T00:00:00.000Z" };
+    const firstPage = yield* work.overview({
+      ...range,
+      recordLimit: 25,
+      includeAdjustments: false,
+    });
+    const secondPage = yield* work.overview({
+      ...range,
+      recordLimit: 25,
+      recordOffset: 25,
+      includeAdjustments: false,
+    });
+    const beyondLegacyCap = yield* work.overview({ ...range, recordLimit: 25, recordOffset: 500 });
+    assert.equal(firstPage.records.length, 25);
+    assert.deepEqual(firstPage.recordPage, { offset: 0, limit: 25 });
+    assert.deepEqual(secondPage.recordPage, { offset: 25, limit: 25 });
+    assert.equal(firstPage.records[0]?.id, current.id);
+    assert.equal(firstPage.records[1]?.id, "entry-524");
+    assert.equal(firstPage.records[24]?.id, "entry-501");
+    assert.equal(secondPage.records[0]?.id, "entry-500");
+    assert.equal(secondPage.records[24]?.id, "entry-476");
+    assert.equal(beyondLegacyCap.records.length, 25);
+    assert.equal(beyondLegacyCap.records[0]?.id, "entry-025");
+    assert.equal(beyondLegacyCap.records[24]?.id, "entry-001");
+    assert.deepEqual(firstPage.adjustments, []);
+    assert.deepEqual(
+      beyondLegacyCap.adjustments.map((record) => record.id),
+      [old.id],
+    );
+    assert.equal(firstPage.totals.records, 526);
+    assert.equal(firstPage.totals.manualMs, 525 * 60_000 + 180_000);
+    assert.deepEqual(secondPage.totals, firstPage.totals);
+    assert.deepEqual(beyondLegacyCap.dailyTotals, firstPage.dailyTotals);
+    assert.equal(
+      firstPage.projectTotals.find((row) => row.trackingProjectId === first.id)?.totals.records,
+      525,
+    );
+    assert.equal(
+      firstPage.dailyTotals?.reduce((sum, day) => sum + day.developerMs, 0),
+      firstPage.totals.manualMs,
+    );
+    const summary = yield* work.overview({
+      ...range,
+      includeRecords: false,
+      includeAdjustments: true,
+    });
+    assert.deepEqual(summary.records, []);
+    assert.equal(summary.recordPage, undefined);
+    assert.deepEqual(summary.adjustments, []);
+    assert.deepEqual(summary.totals, firstPage.totals);
+    const lastPage = yield* work.overview({ ...range, recordLimit: 25, recordOffset: 525 });
+    assert.deepEqual(
+      lastPage.records.map((record) => record.id),
+      ["entry-000"],
+    );
+    const beyondEnd = yield* work.overview({ ...range, recordLimit: 25, recordOffset: 550 });
+    assert.deepEqual(beyondEnd.records, []);
+    assert.equal(beyondEnd.totals.records, 526);
+    const filtered = yield* work.overview({
+      ...range,
+      trackingProjectId: second.id,
+      recordLimit: 25,
+    });
+    assert.deepEqual(
+      filtered.records.map((record) => record.id),
+      [current.id],
+    );
+    assert.equal(filtered.totals.records, 1);
+    const dateFiltered = yield* work.overview({
+      ...range,
+      until: "2026-09-02T00:00:00.000Z",
+      recordLimit: 25,
+    });
+    assert.equal(dateFiltered.totals.records, 525);
+    assert.equal(dateFiltered.records[0]?.id, "entry-524");
+    assert.equal((yield* work.overview(range)).records.length, 500);
+    assert.equal((yield* work.exportCsv(undefined, "2026-09")).content.split("\n").length, 527);
+  }).pipe(Effect.provide(makeTestLayer())),
+);
+
 it.effect(
   "groups daily project totals in the profile timezone and exports all current project records",
   () =>
@@ -267,7 +384,7 @@ it.effect(
         },
       ]);
       const filtered = yield* work.overview({ ...range, trackingProjectId: first.id });
-    assert.deepEqual(filtered.dailyTotals, overview.dailyTotals?.slice(1));
+      assert.deepEqual(filtered.dailyTotals, overview.dailyTotals?.slice(1));
       const csv = yield* work.exportCsv(undefined, "2026-09");
       assert.equal(csv.content.split("\n").length, 5);
       assert.ok(csv.content.startsWith("project_name,record_id,"));

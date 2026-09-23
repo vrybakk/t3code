@@ -177,6 +177,10 @@ export const WorkOverviewInput = Schema.Struct({
   since: IsoDateTime,
   until: IsoDateTime,
   trackingProjectId: Schema.optional(WorkTrackingProjectId),
+  recordOffset: Schema.optional(NonNegativeInt),
+  recordLimit: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 }))),
+  includeRecords: Schema.optional(Schema.Boolean),
+  includeAdjustments: Schema.optional(Schema.Boolean),
 });
 export type WorkOverviewInput = typeof WorkOverviewInput.Type;
 export const WorkTotals = Schema.Struct({
@@ -233,6 +237,7 @@ export const WorkOverview = Schema.Struct({
   projects: Schema.Array(WorkTrackingProject),
   records: Schema.Array(WorkRecord),
   adjustments: Schema.Array(WorkRecord),
+  recordPage: Schema.optional(Schema.Struct({ offset: NonNegativeInt, limit: NonNegativeInt })),
   projectTotals: Schema.Array(WorkProjectTotals),
   dailyTotals: Schema.optional(Schema.Array(WorkDailyTotals)),
   repositoryInvolvement: Schema.Array(WorkRepositoryInvolvement),

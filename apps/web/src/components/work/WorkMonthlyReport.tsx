@@ -56,7 +56,11 @@ export function WorkMonthlyReport({
   const result = useAtomValue(
     serverEnvironment.workOverview({
       environmentId,
-      input: { ...window, ...(selectedProject ? { trackingProjectId: selectedProject.id } : {}) },
+      input: {
+        ...window,
+        includeRecords: false,
+        ...(selectedProject ? { trackingProjectId: selectedProject.id } : {}),
+      },
     }),
   );
   const overview = Option.getOrNull(AsyncResult.value(result));

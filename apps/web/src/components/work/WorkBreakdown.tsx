@@ -1,68 +1,120 @@
-import type { WorkOverview } from "@t3tools/contracts";
-import { WorkPath } from "./WorkPath";
+import type { EnvironmentId, WorkOverview, WorkOverviewInput } from "@t3tools/contracts";
+import { formatTokens } from "@t3tools/shared/usageFormat";
+import { useState } from "react";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
+import { WorkPagination, WORK_PAGE_SIZE } from "./WorkPagination";
+import { WorkRecordTable } from "./WorkRecordTable";
+import { formatWorkDuration } from "./workMonthlySeries";
 
-const duration = (value: number) => `${Math.round(value / 60_000)}m`;
-
-export function WorkBreakdown({ overview }: { readonly overview: WorkOverview }) {
+export function WorkBreakdown({
+  overview,
+  environmentId,
+  window,
+  timeZone,
+}: {
+  readonly overview: WorkOverview;
+  readonly environmentId: EnvironmentId;
+  readonly window: WorkOverviewInput;
+  readonly timeZone: string;
+}) {
+  const [mode, setMode] = useState<"projects" | "records">("projects");
+  const [page, setPage] = useState(0);
+  const projects = [...overview.projectTotals].sort(
+    (a, b) =>
+      b.totals.manualMs - a.totals.manualMs ||
+      b.totals.agentElapsedMs - a.totals.agentElapsedMs ||
+      a.trackingProjectId.localeCompare(b.trackingProjectId),
+  );
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(projects.length / WORK_PAGE_SIZE) - 1));
   return (
-    <section className="rounded-lg border p-5" aria-labelledby="work-breakdown-heading">
-      <h2 id="work-breakdown-heading" className="font-medium">
-        Project and record breakdown
-      </h2>
-      <div className="mt-3 space-y-2 text-sm">
-        {overview.projectTotals.length === 0 ? (
-          <p className="text-muted-foreground">No current work in this window.</p>
-        ) : (
-          overview.projectTotals.map((summary) => {
-            const project = overview.projects.find((item) => item.id === summary.trackingProjectId);
-            return (
-              <div key={summary.trackingProjectId} className="rounded-md border p-3">
-                <p className="font-medium">{project?.name ?? "Archived tracking project"}</p>
-                <p className="text-muted-foreground">
-                  Developer {duration(summary.totals.manualMs)} · Agent elapsed{" "}
-                  {duration(summary.totals.agentElapsedMs)} · Tasks{" "}
-                  {duration(summary.totals.agentTaskMs)}
-                </p>
-                {project?.repositories.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    {project.repositories
-                      .filter((repository) => repository.inclusion === "included")
-                      .map((repository) => {
-                        const involvement = overview.repositoryInvolvement.find(
-                          (item) => item.repositoryId === repository.id,
-                        );
-                        return (
-                          <div
-                            key={repository.id}
-                            className="flex min-w-0 max-w-full items-center gap-2 rounded-md bg-muted/50 px-2 py-1"
-                          >
-                            <WorkPath path={repository.localRoot} />
-                            {involvement?.records ? (
-                              <span className="shrink-0 tabular-nums">
-                                {involvement.records} records
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })
-        )}
+    <section className="space-y-3" aria-labelledby="work-breakdown-heading">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="work-breakdown-heading" className="text-sm font-medium">
+          Breakdown
+        </h2>
+        <ToggleGroup
+          aria-label="Work breakdown"
+          variant="segmented"
+          value={[mode]}
+          onValueChange={(values) => {
+            if (values[0] === "projects" || values[0] === "records") setMode(values[0]);
+          }}
+        >
+          <Toggle value="projects">Projects</Toggle>
+          <Toggle value="records">Activity</Toggle>
+        </ToggleGroup>
       </div>
-      <div className="mt-4 space-y-2 text-sm">
-        <h3 className="font-medium">Recent records and adjustments</h3>
-        {[...overview.records, ...overview.adjustments].slice(0, 12).map((record) => (
-          <p key={record.id} className="rounded-md border p-2">
-            {record.occurredAt.slice(0, 10)} · {record.kind}
-            {record.revision > 0 ? " · Current adjustment" : ""}
-            {record.supersedesId ? " · Superseded history" : ""}
-            {` · ${record.provider ?? "Provider unavailable"} · ${record.model ?? "Model unavailable"} · ${record.outcome} · ${record.coverage}`}
-          </p>
-        ))}
-      </div>
+      {mode === "records" ? (
+        <WorkRecordTable
+          environmentId={environmentId}
+          window={window}
+          projects={overview.projects}
+          timeZone={timeZone}
+        />
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-120 table-fixed text-sm">
+              <caption className="sr-only">Project totals for the selected period</caption>
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="w-2/5 py-2 pr-3 font-normal" scope="col">
+                    Project
+                  </th>
+                  {["Developer", "Agent", "Tasks", "Tokens"].map((label) => (
+                    <th key={label} className="px-2 py-2 text-right font-normal" scope="col">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {projects.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                      No work recorded in this period.
+                    </td>
+                  </tr>
+                ) : (
+                  projects
+                    .slice(currentPage * WORK_PAGE_SIZE, (currentPage + 1) * WORK_PAGE_SIZE)
+                    .map((summary) => (
+                      <tr
+                        key={summary.trackingProjectId}
+                        className="border-b border-border/50 hover:bg-muted/50"
+                      >
+                        <th scope="row" className="py-3 pr-3 text-left font-normal">
+                          <span className="block truncate">
+                            {overview.projects.find(
+                              (project) => project.id === summary.trackingProjectId,
+                            )?.name ?? "Archived project"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {summary.totals.records.toLocaleString()}{" "}
+                            {summary.totals.records === 1 ? "record" : "records"}
+                          </span>
+                        </th>
+                        <td className="px-2 py-3 text-right tabular-nums">
+                          {formatWorkDuration(summary.totals.manualMs)}
+                        </td>
+                        <td className="px-2 py-3 text-right tabular-nums">
+                          {formatWorkDuration(summary.totals.agentElapsedMs)}
+                        </td>
+                        <td className="px-2 py-3 text-right tabular-nums">
+                          {formatWorkDuration(summary.totals.agentTaskMs)}
+                        </td>
+                        <td className="px-2 py-3 text-right text-muted-foreground tabular-nums">
+                          {formatTokens(summary.totals.inputTokens + summary.totals.outputTokens)}
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <WorkPagination page={currentPage} total={projects.length} onPageChange={setPage} />
+        </>
+      )}
     </section>
   );
 }

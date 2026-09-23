@@ -1,47 +1,74 @@
+import type { WorkOverview } from "@t3tools/contracts";
 import { act, createElement } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("../ui/toggle-group", () => ({ Toggle: "button", ToggleGroup: "div" }));
 
-import { WorkSummary } from "./WorkSummary.tsx";
+import { WorkSummary } from "./WorkSummary";
+
+const overview: WorkOverview = {
+  profile: null,
+  totals: {
+    manualMs: 3_600_000,
+    agentElapsedMs: 7_200_000,
+    agentTaskMs: 1_800_000,
+    agentActiveMs: 0,
+    agentWaitingMs: 0,
+    inputTokens: 1_000,
+    cachedInputTokens: 200,
+    outputTokens: 300,
+    reasoningTokens: 40,
+    toolUses: 5,
+    records: 18,
+  },
+  timeCoverage: { active: "unavailable", waiting: "unavailable" },
+  projects: [],
+  records: [],
+  adjustments: [],
+  projectTotals: [],
+  dailyTotals: [],
+  repositoryInvolvement: [],
+  deliveries: [],
+  reports: [],
+};
 
 describe("WorkSummary", () => {
-  it("shows server-provided token and tool-use totals", () => {
+  it("switches the headline and chart without adding independent time measures", () => {
+    let renderer: ReactTestRenderer;
+    act(() => {
+      renderer = create(createElement(WorkSummary, { overview, days: ["2026-09-23"] }));
+    });
+    const headline = () =>
+      renderer!.root
+        .findAllByType("span")
+        .filter((node) => node.props.className?.includes("text-4xl"))
+        .map((node) => node.children.join(""));
+    expect(headline()).toEqual(["1h"]);
+    act(() =>
+      renderer!.root
+        .findByProps({ "aria-label": "Work chart metric" })
+        .props.onValueChange(["agentElapsedMs"]),
+    );
+    expect(headline()).toEqual(["2h"]);
+    expect(renderer!.root.findAllByType("h2").map((node) => node.children.join(""))).toContain(
+      "Daily agent elapsed",
+    );
+  });
+
+  it("keeps old-server totals without inventing daily history", () => {
+    const { dailyTotals: _daily, ...legacyOverview } = overview;
     let renderer: ReactTestRenderer;
     act(() => {
       renderer = create(
-        createElement(WorkSummary, {
-          summaries: [
-            {
-              label: "This month",
-              overview: {
-                totals: {
-                  manualMs: 0,
-                  agentElapsedMs: 0,
-                  agentActiveMs: 0,
-                  agentWaitingMs: 0,
-                  agentTaskMs: 0,
-                  inputTokens: 1_000,
-                  cachedInputTokens: 200,
-                  outputTokens: 300,
-                  reasoningTokens: 40,
-                  toolUses: 5,
-                  records: 1,
-                },
-                timeCoverage: { active: "unavailable", waiting: "unavailable" },
-              } as never,
-            },
-          ],
-        }),
+        createElement(WorkSummary, { overview: legacyOverview, days: ["2026-09-23"] }),
       );
     });
-    const text = renderer!.root.findAllByType("p").map((paragraph) => paragraph.children.join(""));
-    expect(text).toContain("1,000");
-    expect(text).toContain("200");
-    expect(text).toContain("300");
-    expect(text).toContain("40");
-    expect(text).toContain("5");
-    expect(text.filter((value) => value.includes("unavailable"))).toHaveLength(0);
+    const paragraphs = renderer!.root.findAllByType("p").map((node) => node.children.join(""));
+    expect(paragraphs.some((text) => text.includes("Daily history is unavailable"))).toBe(true);
+    expect(renderer!.root.findAllByType("svg")).toHaveLength(0);
+    expect(renderer!.root.findAllByType("span").map((node) => node.children.join(""))).toContain(
+      "200",
+    );
   });
 });
