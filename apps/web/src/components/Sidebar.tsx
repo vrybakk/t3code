@@ -1682,6 +1682,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                       />
                       <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
                     </Tooltip>
+                  ) : topStatus?.icon === "done" ? (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-xs font-medium",
+                        topStatus.className,
+                      )}
+                    >
+                      <CircleCheckIcon aria-hidden className="size-3 shrink-0" />
+                      <span role="status">{topStatus.label}</span>
+                    </span>
                   ) : (
                     <span className="text-xs">
                       {variantAction === "unsettle"
