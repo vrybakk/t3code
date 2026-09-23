@@ -96,8 +96,17 @@ type ComposerPersistState =
   | { capturedState: ComposerDraftStoreState }
   | PersistedComposerDraftStoreState;
 
+const composerBaseStorage = (() => {
+  try {
+    if (typeof localStorage !== "undefined") return localStorage;
+  } catch {
+    // Access itself can throw when browser policy blocks local storage.
+  }
+  return createMemoryStorage();
+})();
+
 const composerDebouncedStorage = createDeferredStorage<StorageValue<ComposerPersistState>>(
-  typeof localStorage !== "undefined" ? localStorage : createMemoryStorage(),
+  composerBaseStorage,
   (value) =>
     JSON.stringify({
       state:

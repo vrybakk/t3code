@@ -121,6 +121,12 @@ the current prompt and its attachments for later. Wait for uploads to finish fir
 With an empty composer, the same shortcut restores a single stash or opens the
 stash menu when there are several.
 
+Stashes are saved on this device and survive closing and reopening the app in
+the same profile (or the same browser and site). They do not sync between devices.
+If local storage is unavailable or full, stashing leaves your prompt in the
+composer instead of saving a temporary copy. Wait for images to finish saving
+before closing; the prompt is saved first.
+
 Stashes containing uploaded files must be restored in their original environment.
 Those files are retained for 24 hours. After an upload expires, restore the prompt
 and use **Attach again** or remove the missing file before sending.

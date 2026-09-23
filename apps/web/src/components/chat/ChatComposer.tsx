@@ -4472,7 +4472,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       // mid-encode still leaves the prompt recoverable, while clearing before
       // the async image work means edits typed during encoding are not wiped.
       // Images are appended to the stored entry as they finish encoding.
-      const { evicted, written, durable } = stashEntryToQueue({
+      const { evicted, written } = stashEntryToQueue({
         id: entryId,
         createdAt: new Date().toISOString(),
         prompt,
@@ -4493,24 +4493,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           type: "error",
           title: "Could not stash this prompt",
           description:
-            "Browser storage rejected the write, so the composer was left as-is. Free up site data and try again.",
+            "Local storage is unavailable or full, so your prompt was left in the composer. Enable storage or free up space and try again.",
           data: { hideCopyButton: true },
         });
         return;
       }
-      // Written but only into the in-memory fallback (localStorage blocked):
-      // the entry is visible and restorable this session, so proceed with the
-      // clear, but say it won't survive a reload.
-      if (!durable) {
-        toastManager.add({
-          type: "warning",
-          title: "Stashed prompt will not survive a reload",
-          description:
-            "Browser storage is unavailable, so this stash is kept in memory only for this session.",
-          data: { hideCopyButton: true },
-        });
-      }
-
       // Everything the entry carries leaves the draft with it.
       promptRef.current = "";
       clearComposerDraftPromptAndImages(stashTarget);
@@ -4585,10 +4572,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         // The second phase can be rejected on its own: the text-only entry
         // fit, but adding image payloads pushed past the quota. Disk would
         // then still hold the phase-one entry with pendingImageCount set,
-        // which reads as an orphan after reload — so say so now. Gated on the
-        // entry write having been durable: on the in-memory fallback nothing
-        // is ever durable, and the session-only warning already covered it.
-        if (!imagesDurable && durable && images.length > 0) {
+        // which reads as an orphan after reload — so say so now.
+        if (!imagesDurable && images.length > 0) {
           toastManager.add({
             type: "warning",
             title: "Stashed images were not saved",
