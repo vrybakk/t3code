@@ -83,20 +83,18 @@ let renderer: ReactTestRenderer | undefined;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   mocks.scopes = ["orchestration:operate"];
-  mocks.review
-    .mockReset()
-    .mockResolvedValue(
-      AsyncResult.success({
-        planId: "review-a",
-        expiresAt: "2026-09-23T11:00:00Z",
-        trashSupported: true,
-        eligibleCount: 0,
-        blockedCount: 0,
-        totals: page.result.totals,
-        items: [],
-        warnings: [],
-      }),
-    );
+  mocks.review.mockReset().mockResolvedValue(
+    AsyncResult.success({
+      planId: "review-a",
+      expiresAt: "2026-09-23T11:00:00Z",
+      trashSupported: true,
+      eligibleCount: 0,
+      blockedCount: 0,
+      totals: page.result.totals,
+      items: [],
+      warnings: [],
+    }),
+  );
 });
 afterEach(async () => {
   await act(async () => renderer?.unmount());
