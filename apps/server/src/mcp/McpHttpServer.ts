@@ -15,6 +15,9 @@ import { McpProtocol, McpSchema, McpServer, Tool } from "effect/unstable/ai";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import packageJson from "../../package.json" with { type: "json" };
+import { VideoToolkitRegistrationLive } from "./toolkits/video/registration.ts";
+import * as VideoInspection from "../video/VideoInspectionService.ts";
+import * as ProcessRunner from "../processRunner.ts";
 import * as ServerConfig from "../config.ts";
 import * as DeviceService from "../device/DeviceService.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
@@ -632,4 +635,7 @@ export const layer = Layer.mergeAll(
   PreviewToolkitRegistrationLive,
   PullRequestsToolkitRegistrationLive,
   DeviceToolkitRegistrationLive,
+  VideoToolkitRegistrationLive.pipe(
+    Layer.provide(VideoInspection.layer.pipe(Layer.provide(ProcessRunner.layer))),
+  ),
 ).pipe(Layer.provideMerge(McpTransportLive));
