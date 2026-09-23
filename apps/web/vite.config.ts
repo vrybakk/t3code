@@ -1,4 +1,5 @@
 import * as NodeZlib from "node:zlib";
+import * as NodeURL from "node:url";
 
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
@@ -12,6 +13,7 @@ import pkg from "./package.json" with { type: "json" };
 import { DEV_PROXIED_PATH_PREFIXES } from "@t3tools/shared/devProxy";
 
 import { loadRepoEnv } from "../../scripts/lib/public-config";
+import { createNerdReleaseNotes } from "../../scripts/lib/nerd-release-notes";
 import { thirdPartyLicensesPlugin } from "../../scripts/lib/third-party-licenses";
 import { tailwindPlugins } from "./vite/tailwind";
 
@@ -41,6 +43,13 @@ const configuredRelayTracingDataset = repoEnv.VITE_RELAY_OTLP_TRACES_DATASET?.tr
 const configuredRelayTracingToken = repoEnv.VITE_RELAY_OTLP_TRACES_TOKEN?.trim() || "";
 const configuredHostedAppChannel = process.env.VITE_HOSTED_APP_CHANNEL?.trim() || "";
 const configuredAppVersion = process.env.APP_VERSION?.trim() || pkg.version;
+const nerdReleaseNotes =
+  process.env.T3CODE_DESKTOP_EDITION === "nerd"
+    ? createNerdReleaseNotes({
+        repoRoot: NodeURL.fileURLToPath(new URL("../..", import.meta.url)),
+        version: configuredAppVersion,
+      })
+    : null;
 const configuredHostedAppUrl = (() => {
   const explicitHostedAppUrl = process.env.VITE_HOSTED_APP_URL?.trim();
   if (explicitHostedAppUrl) {
@@ -216,6 +225,7 @@ export default defineConfig(() => {
       "import.meta.env.VITE_HOSTED_APP_URL": JSON.stringify(configuredHostedAppUrl ?? ""),
       "import.meta.env.VITE_HOSTED_APP_CHANNEL": JSON.stringify(configuredHostedAppChannel),
       "import.meta.env.APP_VERSION": JSON.stringify(configuredAppVersion),
+      __T3CODE_NERD_RELEASE_NOTES__: JSON.stringify(nerdReleaseNotes),
     },
     resolve: {
       tsconfigPaths: true,

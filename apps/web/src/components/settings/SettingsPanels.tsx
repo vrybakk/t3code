@@ -49,6 +49,7 @@ import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
+import { nerdReleaseNotes, openWhatsNew } from "../../nerdReleaseNotes";
 import {
   canCheckForUpdate,
   getDesktopUpdateButtonTooltip,
@@ -3190,6 +3191,17 @@ export function GeneralSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="about" title="About">
+        {nerdReleaseNotes ? (
+          <SettingsRow
+            title="What’s new in Nerd"
+            description="Highlights from Nerd and T3 Code included in this build."
+            control={
+              <Button size="sm" variant="outline" onClick={openWhatsNew}>
+                What’s new
+              </Button>
+            }
+          />
+        ) : null}
         {isElectron || HOSTED_APP_CHANNEL ? (
           <AboutVersionSection />
         ) : (

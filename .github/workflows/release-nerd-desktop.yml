@@ -251,6 +251,33 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.source.outputs.version }}
         run: node scripts/update-release-package-versions.ts "$RELEASE_VERSION"
+      - name: Select release notes baseline
+        id: release_notes
+        if: steps.source.outputs.skip != 'true'
+        working-directory: scripts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+          IS_NIGHTLY: ${{ steps.source.outputs.nightly }}
+          UPSTREAM_SHA: ${{ steps.source.outputs.upstream_sha }}
+        run: |
+          previous_tag="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 100 --json tagName | node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import * as Effect from "effect/Effect";
+            import { resolvePreviousReleaseTag } from "./resolve-previous-release-tag.ts";
+            const releases = JSON.parse(readFileSync(0, "utf8"));
+            const previous = await Effect.runPromise(resolvePreviousReleaseTag(
+              process.env.IS_NIGHTLY === "true" ? "nightly" : "stable",
+              process.env.RELEASE_TAG, releases.map(({ tagName }) => tagName)));
+            process.stdout.write(previous ?? "");
+          ')"
+          echo "T3CODE_NERD_PREVIOUS_RELEASE=$previous_tag" >> "$GITHUB_ENV"
+          if [[ "$UPSTREAM_SHA" == "not-applicable" ]]; then
+            git remote get-url upstream >/dev/null 2>&1 || git remote add upstream https://github.com/pingdotgg/t3code.git
+            git fetch --no-tags upstream main
+            UPSTREAM_SHA="$(git merge-base HEAD FETCH_HEAD)"
+          fi
+          echo "upstream_sha=$UPSTREAM_SHA" >> "$GITHUB_OUTPUT"
       - id: signing
         if: steps.source.outputs.skip != 'true'
         shell: bash
@@ -302,6 +329,8 @@ jobs:
         if: steps.source.outputs.skip != 'true'
         env:
           RELEASE_VERSION: ${{ steps.source.outputs.version }}
+          T3CODE_NERD_FORK_SHA: ${{ steps.source.outputs.fork_sha }}
+          T3CODE_NERD_UPSTREAM_SHA: ${{ steps.release_notes.outputs.upstream_sha }}
           T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
           T3CODE_DESKTOP_SIGNED: ${{ steps.signing.outputs.enabled }}
           CSC_LINK: ${{ steps.signing.outputs.enabled == 'true' && secrets.CSC_LINK || '' }}

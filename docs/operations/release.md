@@ -275,6 +275,14 @@ signed combined build from the fork. A fork-only change therefore rides the next
 nightly instead of inventing a private client version. Merge conflicts fail the workflow without
 publishing; resolve them on the fork before the next run.
 
+Nerd bundles an offline What's New summary at build time. The release workflow compares the exact
+fork and upstream sources against the previous published release in the same channel; it does not
+read the latest upstream notes at app startup. For reviewed wording (including AI-assisted drafts),
+add full commit hashes and short user-facing summaries to `apps/desktop/release-highlights.json`.
+Only entries whose commits are included in the release are used. Other feature, fix, and performance
+commit titles supply the fallback highlights. Local builds without a release baseline label their
+notes as included highlights, not changes since the user's last install.
+
 Fork server features are supported when T3 Code Nerd hosts the environment because the desktop app
 bundles the merged server. Do not use the standard **Update server** action to install this version
 on an independently hosted environment: `t3@<version>` is the upstream runtime and does not contain

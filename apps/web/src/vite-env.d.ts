@@ -1,6 +1,7 @@
 /// <reference types="vite-plus/client" />
 
 import type { DesktopBridge } from "@t3tools/contracts";
+import type { NerdReleaseNotes } from "@t3tools/shared/nerdReleaseNotes";
 
 interface ImportMetaEnv {
   readonly VITE_HTTP_URL: string;
@@ -21,6 +22,7 @@ interface ImportMeta {
 }
 
 declare global {
+  const __T3CODE_NERD_RELEASE_NOTES__: NerdReleaseNotes | null;
   interface Window {
     desktopBridge?: DesktopBridge;
   }

@@ -65,6 +65,12 @@ or use a package manager:
 | Arch Linux         | `yay -S t3code-bin`             |
 | Arch Linux nightly | `yay -S t3code-nightly-bin`     |
 
+### What’s new in T3 Code Nerd
+
+Nerd shows a short summary on the first launch of each new build, with separate Nerd and
+T3 Code highlights. Dismiss it once, or reopen it from **Settings → General → About → What’s new**.
+The summary works offline and describes the installed app, not updates to a connected remote server.
+
 ### Windows Subsystem for Linux
 
 Choose a WSL distro in **Settings → Connections** to run agents and projects

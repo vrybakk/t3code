@@ -31,6 +31,7 @@ import { ThreadNotificationCoordinator } from "../components/ThreadNotificationC
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
 import { SlowRpcRequestToastCoordinator } from "../components/SlowRpcRequestToastCoordinator";
 import { ThemeEditorHost } from "../components/settings/ThemeEditorHost";
+import { WhatsNewDialogHost } from "../components/WhatsNewDialog";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useDefaultThemeAdoption } from "../hooks/useDefaultTheme";
 import { useEnvironmentThemeSync } from "../hooks/useEnvironmentTheme";
@@ -238,6 +239,7 @@ function RootRouteView() {
           {/* Above the router: a theme draft is judged by walking the app, so the
               editor has to survive navigation away from settings. */}
           <ThemeEditorHost />
+          <WhatsNewDialogHost />
         </FirstRunGate>
       </AnchoredToastProvider>
     </ToastProvider>
