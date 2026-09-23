@@ -1646,7 +1646,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             {/* The PR badge stays outside the hover-fading slot: it must
               remain visible AND clickable while the row is hovered. Only
               the time/jump label yields to the settle affordance. */}
-            {prBadge}
+            {props.showProjectIdentity && prBadge}
             {sortable?.isDragging ? (
               dragDestination
             ) : (
