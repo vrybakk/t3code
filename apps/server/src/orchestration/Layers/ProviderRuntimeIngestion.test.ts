@@ -639,14 +639,14 @@ describe("ProviderRuntimeIngestion", () => {
   it("keeps task activity projection alive when work-ledger recording fails", async () => {
     const harness = await createHarness();
     await harness.workTracking
-      .upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true })
-      .pipe(Effect.runPromise);
-    await harness.workTracking
       .upsertProject({
         name: "Tracked project",
         t3ProjectIds: [asProjectId("project-1")],
         trackingEnabled: true,
       })
+      .pipe(Effect.runPromise);
+    await harness.workTracking
+      .upsertProfile({ displayName: "Developer", timeZone: "UTC", trackingEnabled: true })
       .pipe(Effect.runPromise);
     await harness.dropWorkRecords();
     await harness.emitAndDrain([
