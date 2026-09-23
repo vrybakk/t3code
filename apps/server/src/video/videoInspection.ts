@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-export const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
+export { PROVIDER_SEND_TURN_MAX_VIDEO_BYTES as MAX_VIDEO_BYTES } from "@t3tools/contracts";
 export const MAX_VIDEO_SECONDS = 600;
 export const VIDEO_FRAME_BUDGET = 96;
 export const MAX_FRAME_BYTES = 512 * 1024;

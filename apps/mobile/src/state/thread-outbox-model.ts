@@ -204,7 +204,11 @@ export type ThreadOutboxDispatchStep =
  */
 export function resolveThreadOutboxDispatchStep(input: {
   readonly deliveryAction: ThreadOutboxDeliveryAction;
-  readonly fileAttachments: ReadonlyArray<{ readonly name: string; readonly sizeBytes: number }>;
+  readonly fileAttachments: ReadonlyArray<{
+    readonly name: string;
+    readonly mimeType?: string;
+    readonly sizeBytes: number;
+  }>;
   /** Null while the environment's server config has not synced yet. */
   readonly serverConfig: { readonly maxFileUploadBytes: number | undefined } | null;
 }): ThreadOutboxDispatchStep {
@@ -223,10 +227,17 @@ export function resolveThreadOutboxDispatchStep(input: {
   }
   const effectiveMaxBytes = clampFileAttachmentUploadBytes(maxBytes);
   const oversized = input.fileAttachments.find(
-    (attachment) => attachment.sizeBytes > effectiveMaxBytes,
+    (attachment) =>
+      attachment.sizeBytes > clampFileAttachmentUploadBytes(effectiveMaxBytes, attachment),
   );
   return oversized
-    ? { step: "restore", reason: fileAttachmentTooLargeMessage(oversized.name, effectiveMaxBytes) }
+    ? {
+        step: "restore",
+        reason: fileAttachmentTooLargeMessage(
+          oversized.name,
+          clampFileAttachmentUploadBytes(effectiveMaxBytes, oversized),
+        ),
+      }
     : { step: "send" };
 }
 

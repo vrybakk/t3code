@@ -3,6 +3,8 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
+import { FetchHttpClient, HttpClient } from "effect/unstable/http";
+import { downloadVideo } from "./downloadVideo.ts";
 import * as Semaphore from "effect/Semaphore";
 import { ProcessRunner } from "../processRunner.ts";
 import { extractVideoFrames } from "./extractVideoFrames.ts";
@@ -29,7 +31,9 @@ export class VideoInspection extends Context.Service<
 export const layer = Layer.effect(
   VideoInspection,
   Effect.gen(function* () {
-    const services = yield* Effect.context<FileSystem.FileSystem | Path.Path | ProcessRunner>();
+    const services = yield* Effect.context<
+      FileSystem.FileSystem | Path.Path | ProcessRunner | HttpClient.HttpClient
+    >();
     // The owner is the credential scope object. Revoking it releases its counters for GC.
     const budgets = new WeakMap<object, Map<string, number>>();
     const semaphore = yield* Semaphore.make(2);
@@ -37,12 +41,19 @@ export const layer = Layer.effect(
       function* (owner: object, input: VideoInspectInput) {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        if (!path.isAbsolute(input.source)) {
+        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-video-" });
+        const remote = /^https?:/i.test(input.source);
+        if (!remote && !path.isAbsolute(input.source)) {
           return yield* new VideoInspectionError({
-            message: "Provide an absolute path to a video on this environment.",
+            message:
+              "Provide an absolute video path on this environment or a downloadable HTTP(S) URL.",
           });
         }
-        const source = yield* fs.realPath(input.source);
+        const source = remote
+          ? path.join(directory, "source.video")
+          : yield* fs.realPath(input.source);
+        if (remote) yield* downloadVideo(input.source, source);
+        const budgetKey = remote ? input.source : source;
         const stats = yield* fs.stat(source);
         if (stats.type !== "File" || Number(stats.size) > MAX_VIDEO_BYTES) {
           return yield* new VideoInspectionError({
@@ -56,17 +67,17 @@ export const layer = Layer.effect(
         });
         const budget = budgets.get(owner) ?? new Map<string, number>();
         budgets.set(owner, budget);
-        const used = budget.get(source) ?? 0;
+        const used = budget.get(budgetKey) ?? 0;
         if (used + times.length > VIDEO_FRAME_BUDGET) {
           return yield* new VideoInspectionError({
             message: `Video frame budget reached: ${VIDEO_FRAME_BUDGET - used} frames remain in this provider session. Reduce frameCount or report the unexamined intervals.`,
           });
         }
-        budget.set(source, used + times.length);
-        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-video-" });
+        budget.set(budgetKey, used + times.length);
+
         const frames = yield* extractVideoFrames(source, directory, times, input, metadata).pipe(
           Effect.onError(() =>
-            Effect.sync(() => budget.set(source, (budget.get(source) ?? 0) - times.length)),
+            Effect.sync(() => budget.set(budgetKey, (budget.get(budgetKey) ?? 0) - times.length)),
           ),
         );
         return {
@@ -75,23 +86,26 @@ export const layer = Layer.effect(
           coverage: {
             startSeconds: input.startSeconds ?? 0,
             endSeconds: input.endSeconds ?? metadata.durationSeconds,
-            remainingFrames: VIDEO_FRAME_BUDGET - (budget.get(source) ?? 0),
+            remainingFrames: VIDEO_FRAME_BUDGET - (budget.get(budgetKey) ?? 0),
             note: "Sampled still images only; intervals between timestamps and audio were not examined. Inspect suspicious ranges more densely. Cite timestamps and distinguish observations from inferred causes.",
           },
         } satisfies Inspection;
       },
       Effect.scoped,
+      Effect.timeout("3 minutes"),
       semaphore.withPermits(1),
       Effect.mapError((error) =>
         error._tag === "VideoInspectionError"
           ? error
           : new VideoInspectionError({
               message:
-                "Could not read or prepare the video file. Check that it exists and is readable on this environment.",
+                error._tag === "TimeoutError"
+                  ? "Video inspection exceeded three minutes. Request fewer frames or a shorter clip."
+                  : "Could not read or prepare the video file. Check that it exists and is readable on this environment.",
             }),
       ),
       Effect.provide(services),
     );
     return VideoInspection.of({ inspect });
   }),
-);
+).pipe(Layer.provide(FetchHttpClient.layer));

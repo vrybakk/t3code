@@ -1,5 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off - Detect optional FFmpeg binaries before registering integration tests.
 import * as NodeChildProcess from "node:child_process";
+import * as NodeHttp from "node:http";
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -104,15 +105,63 @@ const client = McpSchema.McpServerClient.of({
       expect(crop.isError).toBe(false);
       const invalid = yield* call({ source, frameCount: 13 });
       expect(invalid.isError).toBe(true);
-      const denied = yield* server
-        .callTool({ name: "video_inspect", arguments: { source } })
-        .pipe(
-          Effect.provideService(McpInvocationContext, {
-            ...invocation,
-            capabilities: new Set<"video">(),
-          }),
-          Effect.provideService(McpSchema.McpServerClient, client),
-        );
+      const denied = yield* server.callTool({ name: "video_inspect", arguments: { source } }).pipe(
+        Effect.provideService(McpInvocationContext, {
+          ...invocation,
+          capabilities: new Set<"video">(),
+        }),
+        Effect.provideService(McpSchema.McpServerClient, client),
+      );
       expect(denied.isError).toBe(true);
+
+      const bytes = yield* fs.readFile(source);
+      const downloadServer = yield* Effect.acquireRelease(
+        Effect.promise(
+          () =>
+            new Promise<NodeHttp.Server>((resolve) => {
+              const listener = NodeHttp.createServer((request, response) => {
+                if (request.url === "/private") {
+                  response.writeHead(403).end();
+                  return;
+                }
+                if (request.url === "/page") {
+                  response
+                    .writeHead(200, { "content-type": "text/html" })
+                    .end("<html>Login</html>");
+                  return;
+                }
+                if (request.url === "/oversized") {
+                  response.writeHead(200, { "content-length": String(251 * 1024 * 1024) }).end();
+                  return;
+                }
+                if (request.url === "/redirect") {
+                  response.writeHead(302, { location: "/clip" }).end();
+                  return;
+                }
+                response.writeHead(200, { "content-type": "video/mp4" }).end(bytes);
+              });
+              listener.listen(0, "127.0.0.1", () => resolve(listener));
+            }),
+        ),
+        (listener) =>
+          Effect.promise(
+            () =>
+              new Promise<void>((resolve) => {
+                listener.closeAllConnections();
+                listener.close(() => resolve());
+              }),
+          ),
+      );
+      const address = downloadServer.address();
+      if (!address || typeof address === "string")
+        return yield* Effect.die("Missing fixture server port");
+      const origin = `http://127.0.0.1:${address.port}`;
+      const downloaded = yield* call({ source: `${origin}/redirect`, frameCount: 1 });
+      expect(downloaded.isError).toBe(false);
+      expect(downloaded.content.filter((item) => item.type === "image")).toHaveLength(1);
+      for (const endpoint of ["private", "page", "oversized"]) {
+        const rejected = yield* call({ source: `${origin}/${endpoint}` });
+        expect(rejected.isError).toBe(true);
+      }
     }).pipe(Effect.scoped, Effect.provide(testLayer)),
 );

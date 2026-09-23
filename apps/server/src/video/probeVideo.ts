@@ -75,6 +75,12 @@ export const probeVideo = Effect.fn("video.probe")(function* (source: string, si
       message: "The file has no video stream with a known positive duration and dimensions.",
     });
   }
+  if (video.width > 16384 || video.height > 16384) {
+    return yield* new VideoInspectionError({
+      message:
+        "Video dimensions exceed the decoding limit (16384 pixels). Provide a smaller recording.",
+    });
+  }
   if (duration > MAX_VIDEO_SECONDS) {
     return yield* new VideoInspectionError({
       message: "Video exceeds ten minutes. Trim it to the relevant interval before inspection.",

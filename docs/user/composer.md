@@ -212,6 +212,10 @@ If nothing on the device can show a format, save or share it to open it elsewher
 
 ## Images and videos in messages
 
+Codex and Claude can inspect QA recordings attached to a message, saved on the connected environment, or available through a downloadable link. Ask the agent to investigate the recording; it can examine timestamped frames, look more closely at an interval, and crop small UI details. Videos can be up to 250 MiB and ten minutes long. Other files remain limited to 50 MiB. The environment running the agent needs FFmpeg and ffprobe installed and available on PATH.
+
+Inspection uses sampled images and does not analyze audio. Ask for timestamps and closer inspection of brief glitches; sampled frames cannot prove that every event was examined. Private task attachments must first be retrieved through an authenticated connector. Links to login pages or unsupported hosted players require a downloadable copy.
+
 Select an image or video attachment or link to preview it. Playback support depends
 on your browser or device; save an unsupported video to open it in another app.
 

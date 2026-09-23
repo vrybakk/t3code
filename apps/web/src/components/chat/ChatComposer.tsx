@@ -1,3 +1,4 @@
+import { clampFileAttachmentUploadBytes } from "@t3tools/client-runtime/state/attachments";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
 import { usePrimaryEnvironmentId } from "../../state/environments";
@@ -1758,14 +1759,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     const invalidFiles =
       maxFileAttachmentBytes === null
         ? composerFiles
-        : composerFiles.filter((file) => file.sizeBytes > maxFileAttachmentBytes);
+        : composerFiles.filter(
+            (file) => file.sizeBytes > clampFileAttachmentUploadBytes(maxFileAttachmentBytes, file),
+          );
     for (const attachment of attachmentsToReleaseOnUploadCapabilityLoss(invalidFiles)) {
       releaseAttachmentUpload(attachment.id);
     }
     const uploadableFiles =
       maxFileAttachmentBytes === null
         ? []
-        : composerFiles.filter((file) => file.sizeBytes <= maxFileAttachmentBytes);
+        : composerFiles.filter(
+            (file) =>
+              file.sizeBytes <= clampFileAttachmentUploadBytes(maxFileAttachmentBytes, file),
+          );
     const uploadableAttachments = [...composerImages, ...uploadableFiles];
     for (const attachment of uploadableAttachments) {
       // A needs-reattach file has no bytes to upload and no upload to verify.
@@ -1794,7 +1800,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         !attachmentUploadsCapabilityKnown ||
         !supportsAttachmentUploads ||
         maxFileAttachmentBytes === null ||
-        file.sizeBytes > maxFileAttachmentBytes
+        file.sizeBytes > clampFileAttachmentUploadBytes(maxFileAttachmentBytes, file)
       ) {
         continue;
       }
@@ -5301,8 +5307,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           error = `'${file.name}' is empty or could not be read.`;
           continue;
         }
-        if (file.size > fileStagingLimit) {
-          error = fileAttachmentTooLargeMessage(file.name, fileStagingLimit);
+        const fileLimit = clampFileAttachmentUploadBytes(fileStagingLimit, {
+          name: file.name,
+          mimeType: fileMimeType,
+        });
+        if (file.size > fileLimit) {
+          error = fileAttachmentTooLargeMessage(file.name, fileLimit);
           continue;
         }
         const attachmentFile =
@@ -6579,7 +6589,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       const fileCanUpload =
                         supportsAttachmentUploads &&
                         maxFileAttachmentBytes !== null &&
-                        file.sizeBytes <= maxFileAttachmentBytes;
+                        file.sizeBytes <=
+                          clampFileAttachmentUploadBytes(maxFileAttachmentBytes, file);
                       const upload = fileCanUpload ? uploadsByImageId[file.id] : undefined;
                       return (
                         <div
@@ -6665,11 +6676,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       const fileCanUpload =
                         supportsAttachmentUploads &&
                         maxFileAttachmentBytes !== null &&
-                        file.sizeBytes <= maxFileAttachmentBytes;
+                        file.sizeBytes <=
+                          clampFileAttachmentUploadBytes(maxFileAttachmentBytes, file);
                       const upload = fileCanUpload ? uploadsByImageId[file.id] : undefined;
                       const needsReattach = composerFileNeedsReattach(file);
                       const canReattachFile =
-                        fileStagingLimit !== null && file.sizeBytes <= fileStagingLimit;
+                        fileStagingLimit !== null &&
+                        file.sizeBytes <= clampFileAttachmentUploadBytes(fileStagingLimit, file);
                       return (
                         <div
                           key={file.id}
