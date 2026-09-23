@@ -90,7 +90,7 @@ export function WorkManualEntries({
           <WorkSelect
             id="work-manual-project"
             value={projectId ?? ""}
-            disabled={pending}
+            disabled={pending || record != null}
             onValueChange={(value) => {
               setProjectId(projects.find((project) => project.id === value)?.id);
               setRepositoryId(undefined);

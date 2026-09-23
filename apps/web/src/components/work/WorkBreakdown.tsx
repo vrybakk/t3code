@@ -54,7 +54,7 @@ export function WorkBreakdown({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-120 table-fixed text-sm">
+            <table className="w-full min-w-160 table-fixed text-sm">
               <caption className="sr-only">Project totals for the selected period</caption>
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
