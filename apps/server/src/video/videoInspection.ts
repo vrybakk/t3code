@@ -17,7 +17,7 @@ export const VideoInspectInput = Schema.Struct({
   endSeconds: Schema.optional(Seconds),
   frameCount: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 12 }))),
   maxDimension: Schema.optional(
-    Schema.Int.check(Schema.isBetween({ minimum: 256, maximum: 3840 })),
+    Schema.Int.check(Schema.isBetween({ minimum: 256, maximum: 16384 })),
   ),
   crop: Schema.optional(
     Schema.Struct({
@@ -70,6 +70,5 @@ export function sampleVideoTimes(input: VideoInspectInput, duration: number): nu
     });
   }
   const count = start === end ? 1 : (input.frameCount ?? 8);
-  // Midpoints avoid seeking past the last decodable frame, including variable-frame-rate clips.
   return Array.from({ length: count }, (_, i) => start + (end - start) * ((i + 0.5) / count));
 }

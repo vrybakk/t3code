@@ -35,34 +35,42 @@ export const extractVideoFrames = Effect.fn("video.extractFrames")(function* (
     (time, index) =>
       Effect.gen(function* () {
         const output = path.join(directory, `${index}.jpg`);
-        const result = yield* runVideoProcess("ffmpeg", [
-          "-nostdin",
-          "-hide_banner",
-          "-loglevel",
-          "info",
-          "-threads",
-          "1",
-          "-protocol_whitelist",
-          "file",
-          "-ss",
-          time.toFixed(6),
-          "-i",
-          source,
-          "-map",
-          "0:v:0",
-          "-an",
-          "-sn",
-          "-vf",
-          filters,
-          "-frames:v",
-          "1",
-          "-threads",
-          "1",
-          "-q:v",
-          "3",
-          "-y",
-          output,
-        ]);
+        const extract = (tail: boolean) =>
+          runVideoProcess("ffmpeg", [
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "info",
+            "-threads",
+            "1",
+            "-protocol_whitelist",
+            "file",
+            ...(tail ? ["-noaccurate_seek"] : []),
+            "-ss",
+            time.toFixed(6),
+            "-i",
+            source,
+            "-map",
+            "0:v:0",
+            "-an",
+            "-sn",
+            "-vf",
+            filters,
+            ...(tail ? ["-update", "1", "-fps_mode", "passthrough"] : ["-frames:v", "1"]),
+            "-threads",
+            "1",
+            "-pix_fmt",
+            "yuvj420p",
+            "-q:v",
+            "3",
+            "-y",
+            output,
+          ]);
+        let result = yield* extract(false);
+        // A seek in the final held frame can decode nothing. Preserve the preceding
+        // keyframe and decode to EOF, keeping the last image and its actual timestamp.
+        const usedTail = !(yield* fs.exists(output));
+        if (usedTail) result = yield* extract(true);
         const stats = yield* fs.stat(output);
         if (Number(stats.size) > MAX_FRAME_BYTES) {
           return yield* new VideoInspectionError({
@@ -70,7 +78,10 @@ export const extractVideoFrames = Effect.fn("video.extractFrames")(function* (
               "An extracted frame exceeds the image budget. Request a smaller maxDimension or crop.",
           });
         }
-        const actualOffset = result.stderr.match(/\bn:\s*0\s+pts:.*?pts_time:([-\d.e+]+)/)?.[1];
+        const offsets = Array.from(
+          result.stderr.matchAll(/\bn:\s*\d+\s+pts:.*?pts_time:([-\d.e+]+)/g),
+        );
+        const actualOffset = (usedTail ? offsets.at(-1) : offsets[0])?.[1];
         if (actualOffset === undefined || !Number.isFinite(Number(actualOffset))) {
           return yield* new VideoInspectionError({
             message: "Could not establish the extracted frame timestamp.",

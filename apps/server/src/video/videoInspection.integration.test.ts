@@ -114,6 +114,31 @@ const client = McpSchema.McpServerClient.of({
       );
       expect(denied.isError).toBe(true);
 
+      const sparseSource = `${dir}/sparse.mp4`;
+      const sparse = yield* runner.run({
+        command: "ffmpeg",
+        args: [
+          "-nostdin",
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "testsrc2=size=320x240:rate=1:duration=2",
+          "-c:v",
+          "mpeg4",
+          sparseSource,
+        ],
+      });
+      expect(sparse.code).toBe(0);
+      const heldFrame = yield* call({
+        source: sparseSource,
+        startSeconds: 1.875,
+        endSeconds: 1.875,
+      });
+      expect(heldFrame).toMatchObject({ isError: false });
+      expect(heldFrame.structuredContent).toMatchObject({ frames: [{ timestampSeconds: 1 }] });
+
       const bytes = yield* fs.readFile(source);
       const downloadServer = yield* Effect.acquireRelease(
         Effect.promise(

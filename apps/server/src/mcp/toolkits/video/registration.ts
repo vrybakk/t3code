@@ -52,7 +52,7 @@ export const VideoToolkitRegistrationLive = Layer.effectDiscard(
                 () =>
                   new VideoInspectionError({
                     message:
-                      "Invalid video inspection input. Check source, time range, frameCount (1–12), maxDimension (256–3840), and crop dimensions.",
+                      "Invalid video inspection input. Check source, time range, frameCount (1–12), maxDimension (256–16384), and crop dimensions.",
                   }),
               ),
             );
