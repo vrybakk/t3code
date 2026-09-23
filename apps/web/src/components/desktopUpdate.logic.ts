@@ -7,9 +7,7 @@ const OFFICIAL_DESKTOP_RELEASE_HISTORY_URL = "https://github.com/pingdotgg/t3cod
 const NERD_DESKTOP_RELEASE_HISTORY_URL = "https://github.com/vrybakk/t3code/releases";
 
 function resolveDesktopReleaseHistoryUrl(isNerdEdition = IS_NERD_EDITION): string {
-  return isNerdEdition
-    ? NERD_DESKTOP_RELEASE_HISTORY_URL
-    : OFFICIAL_DESKTOP_RELEASE_HISTORY_URL;
+  return isNerdEdition ? NERD_DESKTOP_RELEASE_HISTORY_URL : OFFICIAL_DESKTOP_RELEASE_HISTORY_URL;
 }
 
 /**
