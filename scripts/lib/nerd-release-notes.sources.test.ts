@@ -80,7 +80,9 @@ describe("bundled Nerd release sources", () => {
     expect(notes.nerd.items).toEqual(["New Nerd fix"]);
     expect(notes.upstream?.items).toEqual(["New upstream feature"]);
     expect(notes.buildId).toBe(`1.0.0:${current}`);
-    expect(notes.changelogUrl).toBe(`https://github.com/vrybakk/t3code/compare/${previous}...${fork}`);
+    expect(notes.changelogUrl).toBe(
+      `https://github.com/vrybakk/t3code/compare/${previous}...${fork}`,
+    );
     expect(notes.upstream?.sourceUrl).toBe(
       `https://github.com/pingdotgg/t3code/compare/${oldUpstream}...${upstream}`,
     );
