@@ -123,6 +123,7 @@ describe("GitButlerPanelContent", () => {
       <GitButlerPanelView
         query={{
           data: { ...readyStatus, truncated: true },
+          dataUpdatedAt: 0,
           error: null,
           isPending: false,
           isSuccess: true,
@@ -172,6 +173,7 @@ describe("GitButlerPanelContent", () => {
       <GitButlerPanelView
         query={{
           data: readyStatus,
+          dataUpdatedAt: 0,
           error: "Connection lost",
           isPending: false,
           isSuccess: true,
