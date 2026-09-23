@@ -60,7 +60,7 @@ export const DEFAULT_SIDEBAR_THREAD_SORT_ORDER: SidebarThreadSortOrder = "update
 
 export const SidebarViewMode = Schema.Literals(["threads", "projects"]);
 export type SidebarViewMode = typeof SidebarViewMode.Type;
-export const DEFAULT_SIDEBAR_VIEW_MODE: SidebarViewMode = "threads";
+const DEFAULT_SIDEBAR_VIEW_MODE: SidebarViewMode = "threads";
 
 export const SidebarProjectGroupingMode = Schema.Literals([
   "repository",

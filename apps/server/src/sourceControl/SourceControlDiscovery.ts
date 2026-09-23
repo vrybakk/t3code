@@ -59,7 +59,7 @@ const VCS_PROBES: ReadonlyArray<VcsProbe> = [
   },
 ];
 
-export const GITBUTLER_MINIMUM_VERSION = GitButlerCli.MINIMUM_VERSION;
+const GITBUTLER_MINIMUM_VERSION = GitButlerCli.MINIMUM_VERSION;
 const GITBUTLER_INSTALL_HINT =
   "Install the GitButler CLI on this server from https://docs.gitbutler.com/cli-overview and ensure `but` is on PATH.";
 
@@ -79,7 +79,7 @@ function gitButlerDiscovery(input: {
   };
 }
 
-export function gitButlerDiscoveryFromVersionOutput(output: string): GitButlerDiscoveryItem {
+function gitButlerDiscoveryFromVersionOutput(output: string): GitButlerDiscoveryItem {
   const compatibility = GitButlerCli.versionCompatibilityFromOutput(output);
   return compatibility.status === "available"
     ? gitButlerDiscovery(compatibility)
