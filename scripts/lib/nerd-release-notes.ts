@@ -110,7 +110,7 @@ export function createNerdReleaseNotes({
     version,
     commit,
     comparedToPreviousRelease: previous !== null,
-    changelogUrl: sourceUrl("vrybakk/t3code", commit, previous),
+    changelogUrl: sourceUrl("vrybakk/t3code", fork, previous),
     nerd: section(
       "vrybakk/t3code",
       fork,

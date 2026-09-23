@@ -119,7 +119,7 @@ export function WhatsNewDialog({ release }: { release: NerdReleaseNotes }) {
               void openDesktopUpdateReleaseNotes(window.desktopBridge, release.changelogUrl);
             }}
           >
-            Full changelog
+            Nerd changelog
           </Button>
           <Button onClick={close}>Got it</Button>
         </DialogFooter>

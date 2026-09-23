@@ -123,7 +123,7 @@ it("can reopen from Settings without losing the dismissal", async () => {
   await click("Got it");
   await act(async () => openWhatsNew());
   expect(isOpen()).toBe(true);
-  await click("Full changelog");
+  await click("Nerd changelog");
   expect(openDesktopUpdateReleaseNotes).toHaveBeenCalledWith(undefined, release.changelogUrl);
   await click("Dismiss");
   expect(isOpen()).toBe(false);
