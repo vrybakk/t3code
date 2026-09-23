@@ -68,8 +68,24 @@ combined sizes count shared files only once. Missing metadata does not mean a hi
 File size and allocated disk space can differ. Allocated space is filesystem-reported and is
 not a promise of space recoverable by deletion, especially on filesystems with shared blocks.
 Scan warnings identify incomplete measurements. A history without a matching T3 conversation
-may belong to another app or environment; it is not necessarily unused. This report is
-read-only: deleting a T3 conversation does not delete its provider's native history.
+may belong to another app or environment; it is not necessarily unused. Deleting a T3
+conversation does not delete its provider's native history.
+
+To clean native histories, select conversations or individual histories under **Usage →
+Histories** and review the selection. Suggestions help prioritize review; histories are never
+automatically deleted merely because they are unlinked. Stop other agent activity on that machine
+before confirming. T3 checks its tracked chat sessions; activity in other apps, other T3 servers,
+and background provider helpers cannot be fully verified.
+Changed files and T3-open sessions are blocked and must be reviewed again.
+
+Cleanup runs on the selected machine. It removes native provider history, not project files or
+the T3 conversation. Native resume may stop working, and provider indexes may still list a removed
+session. Existing T3 messages are not a backup of the provider's full history.
+
+**Move to Trash** is the default on macOS hosts. Restore through that machine's Trash if needed;
+space is not reclaimed until Trash is emptied. Other hosts currently require an explicit permanent
+delete choice. Permanent deletion cannot be undone in T3, and neither mode promises the full
+reported size as reclaimed space. Trash failures never fall back to permanent deletion.
 
 ## Storage cleanup
 

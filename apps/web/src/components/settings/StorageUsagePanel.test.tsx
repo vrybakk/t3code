@@ -16,6 +16,9 @@ const fixtures = vi.hoisted(() => ({
   ],
 }));
 vi.mock("../../state/storageUsage", () => ({ storageUsageGet: {} }));
+vi.mock("../../state/session", () => ({
+  useEnvironmentSessionState: () => ({ data: null, isPending: false, hasError: false }),
+}));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => fixtures.command }));
 vi.mock("./SettingsScopeContext", () => ({ useSettingsScope: () => fixtures }));
 vi.mock("./settingsLayout", () => ({

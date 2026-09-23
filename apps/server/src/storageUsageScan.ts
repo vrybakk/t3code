@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off -- Native stat.blocks and O_NOFOLLOW are needed for allocated bytes and bounded safe header reads.
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
+import * as NodeCrypto from "node:crypto";
 import type { StorageHistory, StorageUsageCategory, StorageUsageTotals } from "@t3tools/contracts";
 import { readStorageMetadata } from "./storageUsageMetadata.ts";
 import { createStorageTree, type StorageTreeNode } from "./storageUsageTree.ts";
@@ -20,6 +21,9 @@ export interface ScannedHistory extends StorageHistory {
   readonly homePaths?: ReadonlyArray<string>;
   readonly parentSessionId?: string | undefined;
   readonly metadataConflict?: boolean;
+  readonly modifiedMs: number;
+  readonly changedMs: number;
+  readonly linkCount: number;
 }
 export interface StorageScan {
   readonly categories: StorageUsageCategory[];
@@ -200,6 +204,7 @@ export async function scanStorageRoots(
         if (category === "Histories" && root.provider !== "t3" && filePath.endsWith(".jsonl")) {
           historyIndexes.set(identity, histories.length);
           histories.push({
+            id: NodeCrypto.randomUUID(),
             filePath,
             provider: root.provider,
             logicalBytes: stat.size,
@@ -213,6 +218,9 @@ export async function scanStorageRoots(
             inode: stat.ino,
             birthtimeMs: stat.birthtimeMs,
             homePath: root.path,
+            modifiedMs: stat.mtimeMs,
+            changedMs: stat.ctimeMs,
+            linkCount: stat.nlink,
           });
         }
       } catch {

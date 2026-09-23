@@ -7,3 +7,13 @@ export const storageUsageGet = createEnvironmentRpcCommand(connectionAtomRuntime
   label: "environment-data:storage:usage",
   tag: WS_METHODS.storageUsageGet,
 });
+
+export const storageReviewCleanup = createEnvironmentRpcCommand(connectionAtomRuntime, {
+  label: "environment-data:storage:review-cleanup",
+  tag: WS_METHODS.storageReviewCleanup,
+});
+
+export const storageExecuteCleanup = createEnvironmentRpcCommand(connectionAtomRuntime, {
+  label: "environment-data:storage:execute-cleanup",
+  tag: WS_METHODS.storageExecuteCleanup,
+});

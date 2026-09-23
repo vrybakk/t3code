@@ -20,6 +20,9 @@ function history(id: string, parentSessionId?: string, homePath = "/account-a"):
     device: 1,
     inode: 0,
     birthtimeMs: 0,
+    modifiedMs: 0,
+    changedMs: 0,
+    linkCount: 1,
   };
 }
 const binding = (native: string, account = "/account-a") => ({

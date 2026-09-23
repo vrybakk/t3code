@@ -5,16 +5,19 @@ import {
   type StorageUsageResult,
 } from "@t3tools/contracts";
 import type { StorageTreeNode } from "./storageUsageTree.ts";
+import type { ScannedHistory } from "./storageUsageScan.ts";
 
 export interface StorageUsageSnapshot extends StorageUsageResult {
   readonly nodes?: ReadonlyArray<StorageTreeNode>;
+  readonly cleanupFiles?: ReadonlyArray<ScannedHistory>;
+  readonly cleanupConfiguration?: string;
 }
 
 export function createStorageUsageCache(scan: () => Promise<StorageUsageSnapshot>) {
   let snapshot: StorageUsageSnapshot | undefined;
   let pending: Promise<StorageUsageSnapshot> | undefined;
   let groupSearch = new Map<string, string[]>();
-  return async (input: StorageUsageInput): Promise<StorageUsageResult> => {
+  const getUsage = async (input: StorageUsageInput): Promise<StorageUsageResult> => {
     const navigating = input.directoryId !== undefined || input.groupId !== undefined;
     if (
       (!snapshot && input.snapshotId) ||
@@ -58,6 +61,8 @@ export function createStorageUsageCache(scan: () => Promise<StorageUsageSnapshot
       histories: allHistories,
       groups: allGroups = [],
       directory: _directory,
+      cleanupFiles: _cleanupFiles,
+      cleanupConfiguration: _cleanupConfiguration,
       ...base
     } = current;
     const search = input.search.trim().toLocaleLowerCase();
@@ -132,4 +137,10 @@ export function createStorageUsageCache(scan: () => Promise<StorageUsageSnapshot
     );
     return { ...base, histories: page(histories), groups: [], matchedHistories: histories.length };
   };
+  return Object.assign(getUsage, {
+    getSnapshot: () => snapshot,
+    invalidate: () => {
+      snapshot = undefined;
+    },
+  });
 }

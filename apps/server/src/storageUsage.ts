@@ -3,6 +3,11 @@ import {
   StorageUsageError,
   type StorageUsageInput,
   type StorageUsageResult,
+  StorageCleanupError,
+  type StorageCleanupReviewInput,
+  type StorageCleanupReviewResult,
+  type StorageCleanupExecuteInput,
+  type StorageCleanupExecuteResult,
 } from "@t3tools/contracts";
 import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
 import { ServerConfig } from "./config.ts";
@@ -14,6 +19,10 @@ import { scanStorageRoots } from "./storageUsageScan.ts";
 import { createStorageHistoryLinker } from "./storageUsageLinks.ts";
 import { createStorageUsageCache } from "./storageUsageCache.ts";
 import { groupStorageHistories } from "./storageUsageGroups.ts";
+import {
+  makeStorageHistoryCleanupService,
+  storageCleanupConfigurationKey,
+} from "./storageHistoryCleanupService.ts";
 const isStorageUsageError = Schema.is(StorageUsageError);
 
 export class StorageUsage extends Context.Service<
@@ -22,6 +31,12 @@ export class StorageUsage extends Context.Service<
     readonly getUsage: (
       input: StorageUsageInput,
     ) => Effect.Effect<StorageUsageResult, StorageUsageError>;
+    readonly reviewCleanup: (
+      input: StorageCleanupReviewInput,
+    ) => Effect.Effect<StorageCleanupReviewResult, StorageCleanupError>;
+    readonly executeCleanup: (
+      input: StorageCleanupExecuteInput,
+    ) => Effect.Effect<StorageCleanupExecuteResult, StorageCleanupError>;
   }
 >()("t3/storageUsage") {
   static readonly make = Effect.gen(function* () {
@@ -32,7 +47,8 @@ export class StorageUsage extends Context.Service<
     const environment = yield* HostProcessEnvironment;
     const scan = Effect.gen(function* () {
       const started = performance.now();
-      const homes = yield* resolveProviderStorageHomes(yield* settings.getSettings, environment);
+      const currentSettings = yield* settings.getSettings;
+      const homes = yield* resolveProviderStorageHomes(currentSettings, environment);
       const result = yield* Effect.promise(() =>
         scanStorageRoots([
           ...homes.map((home) => ({
@@ -83,6 +99,8 @@ export class StorageUsage extends Context.Service<
       return {
         ...result,
         histories,
+        cleanupFiles: result.histories.map((file, index) => ({ ...file, ...histories[index] })),
+        cleanupConfiguration: storageCleanupConfigurationKey(currentSettings),
         groups,
         totalGroups: groups.length,
         matchedGroups: groups.length,
@@ -90,10 +108,11 @@ export class StorageUsage extends Context.Service<
         scanDurationMs: Math.round(performance.now() - started),
         totalHistories: histories.length,
         matchedHistories: histories.length,
-      } satisfies StorageUsageResult;
+      };
     });
     const runScan = Effect.runPromiseWith(yield* Effect.context<Path.Path>());
     const getCachedUsage = createStorageUsageCache(() => runScan(scan));
+    const cleanup = yield* makeStorageHistoryCleanupService(getCachedUsage);
     const getUsage = (input: StorageUsageInput) =>
       Effect.tryPromise({
         try: () => getCachedUsage(input),
@@ -106,7 +125,7 @@ export class StorageUsage extends Context.Service<
                   "Could not inspect storage. Check access to the configured provider homes and try again.",
               }),
       });
-    return StorageUsage.of({ getUsage });
+    return StorageUsage.of({ getUsage, ...cleanup });
   });
   static readonly layer = Layer.effect(StorageUsage, StorageUsage.make);
 }

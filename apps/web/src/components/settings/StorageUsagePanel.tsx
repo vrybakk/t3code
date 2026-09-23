@@ -1,14 +1,12 @@
-import type { EnvironmentId, StorageHistoryGroup } from "@t3tools/contracts";
-import { useState } from "react";
+import type { EnvironmentId } from "@t3tools/contracts";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsSection } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
-import { StorageUsageHistories } from "./StorageUsageHistories";
 import { formatStorageBytes } from "./StorageUsage.logic";
-import { initialStorageQuery, useStorageUsage } from "./StorageUsageState";
-import { StorageUsageGroups } from "./StorageUsageGroups";
+import { useStorageUsage } from "./StorageUsageState";
 import { StorageUsageDirectory } from "./StorageUsageDirectory";
+import { StorageHistoryManager } from "./StorageHistoryManager";
 
 export function StorageUsagePanel({
   section = "histories",
@@ -40,6 +38,9 @@ export function StorageUsagePanel({
           environmentId={environment.environmentId}
           label={environment.label}
           section={section}
+          cleanupSupported={
+            environment.serverConfig?.environment.capabilities.nativeHistoryCleanup === true
+          }
         />
       )}
     </SettingsSection>
@@ -50,13 +51,14 @@ export function StorageUsageDashboard({
   environmentId,
   label,
   section,
+  cleanupSupported,
 }: {
   environmentId: EnvironmentId;
   label: string;
   section: "overview" | "breakdown" | "histories";
+  cleanupSupported: boolean;
 }) {
   const { historyPage: page, directoryPage, loading, error, load } = useStorageUsage(environmentId);
-  const [expanded, setExpanded] = useState<StorageHistoryGroup | null>(null);
   const result = page?.result;
   const largestCategory = Math.max(
     1,
@@ -78,7 +80,6 @@ export function StorageUsageDashboard({
           variant="outline"
           disabled={loading}
           onClick={() => {
-            setExpanded(null);
             void load(true);
           }}
         >
@@ -215,58 +216,23 @@ export function StorageUsageDashboard({
             </div>
           )}
           <div hidden={section !== "histories"} className="space-y-6">
-            {page?.query.groupId && (
-              <div className="space-y-2">
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={loading}
-                  onClick={() => {
-                    setExpanded(null);
-                    void load(false, initialStorageQuery);
-                  }}
-                >
-                  Back to conversations
-                </Button>
-                {expanded && (
-                  <p className="text-sm">
-                    {expanded.label} · {formatStorageBytes(expanded.logicalBytes)} across{" "}
-                    {expanded.fileCount} histories
-                  </p>
-                )}
-              </div>
-            )}
-            {page && page.query.view === "groups" && result.groups ? (
-              <StorageUsageGroups
-                key={`${result.snapshotId}:${page.query.search}`}
-                groups={result.groups}
-                count={result.matchedGroups ?? result.groups.length}
-                search={page.query.search}
-                offset={page.query.offset}
+            {page && (
+              <StorageHistoryManager
+                key={result.snapshotId ?? result.scannedAt}
+                environmentId={environmentId}
+                label={label}
+                cleanupSupported={cleanupSupported}
+                page={page}
                 loading={loading}
-                onPage={(search, offset) => void load(false, { ...page.query, search, offset })}
-                onExpand={(group) => {
-                  setExpanded(group);
-                  void load(false, { view: "histories", groupId: group.id, search: "", offset: 0 });
-                }}
+                load={load}
               />
-            ) : (
-              page && (
-                <StorageUsageHistories
-                  key={`${result.scannedAt}:${page.query.groupId}:${page.query.search}`}
-                  result={result}
-                  search={page.query.search}
-                  offset={page.query.offset}
-                  loading={loading}
-                  onPage={(search, offset) => void load(false, { ...page.query, search, offset })}
-                />
-              )
             )}
           </div>
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
             Provider histories may also be used by Codex, Claude Code or another T3 installation.
-            Unmatched and deleted-chat histories are not automatically safe to remove. This view is
-            read-only; rules in Storage settings do not delete provider histories.
+            Unmatched and deleted-chat histories are not automatically safe to remove. Native
+            histories are removed only after reviewing and confirming a selection; rules in Storage
+            settings do not remove them automatically.
           </p>
         </>
       )}

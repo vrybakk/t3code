@@ -59,6 +59,9 @@ describe("bounded storage metadata and directory snapshots", () => {
         inode: 0,
         birthtimeMs: 0,
         homePath: String(index),
+        modifiedMs: 0,
+        changedMs: 0,
+        linkCount: 1,
       });
     }
     const result = await readStorageMetadata(
@@ -102,6 +105,8 @@ describe("bounded storage metadata and directory snapshots", () => {
       return {
         ...scan,
         ...grouped,
+        cleanupFiles: scan.histories,
+        cleanupConfiguration: "private-configuration-fingerprint",
         scannedAt: "2026-09-23T00:00:00.000Z",
         scanDurationMs: 1,
         totalHistories: scan.histories.length,
@@ -114,6 +119,8 @@ describe("bounded storage metadata and directory snapshots", () => {
     expect(scans).toBe(0);
     const roots = await cache({ ...input, view: "directory" });
     expect(roots).not.toHaveProperty("nodes");
+    expect(roots).not.toHaveProperty("cleanupFiles");
+    expect(roots).not.toHaveProperty("cleanupConfiguration");
     expect(roots.histories).toEqual([]);
     const root = roots.directory!.entries[0]!;
     expect(root.logicalBytes).toBe(roots.totals.logicalBytes);
@@ -134,6 +141,8 @@ describe("bounded storage metadata and directory snapshots", () => {
     });
     expect(second.directory?.entries[0]).toMatchObject({ kind: "symlink", status: "skipped" });
     const groups = await cache({ ...input, view: "groups", search: "child.jsonl" });
+    expect(groups).not.toHaveProperty("cleanupFiles");
+    expect(groups).not.toHaveProperty("cleanupConfiguration");
     expect(groups.groups).toHaveLength(1);
     expect(groups.groups?.[0]?.fileCount).toBe(2);
     const members = await cache({
@@ -143,6 +152,8 @@ describe("bounded storage metadata and directory snapshots", () => {
       groupId: groups.groups![0]!.id,
     });
     expect(members.histories).toHaveLength(1);
+    expect(members).not.toHaveProperty("cleanupFiles");
+    expect(members).not.toHaveProperty("cleanupConfiguration");
     expect(members.matchedHistories).toBe(2);
     await expect(
       cache({ ...input, snapshotId: roots.snapshotId!, directoryId: "/etc", view: "directory" }),

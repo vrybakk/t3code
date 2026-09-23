@@ -13,6 +13,20 @@ const claudeCursor = Schema.Struct({
   resume: Schema.optional(Schema.String),
   sessionId: Schema.optional(Schema.String),
 });
+const decodeCodexCursor = Schema.decodeUnknownOption(codexCursor);
+const decodeClaudeCursor = Schema.decodeUnknownOption(claudeCursor);
+
+export function storageNativeSessionId(provider: string, cursor: unknown): string | undefined {
+  if (provider === "codex") {
+    const decoded = decodeCodexCursor(cursor);
+    return Option.isSome(decoded) ? decoded.value.threadId : undefined;
+  }
+  if (provider === "claudeAgent") {
+    const decoded = decodeClaudeCursor(cursor);
+    return Option.isSome(decoded) ? (decoded.value.resume ?? decoded.value.sessionId) : undefined;
+  }
+  return undefined;
+}
 
 export function createStorageHistoryLinker(
   shells: ReadonlyArray<OrchestrationShellSnapshot>,
@@ -81,6 +95,9 @@ export function createStorageHistoryLinker(
         homePaths: _homePaths,
         parentSessionId: _parentSessionId,
         metadataConflict: _metadataConflict,
+        modifiedMs: _modifiedMs,
+        changedMs: _changedMs,
+        linkCount: _linkCount,
         ...history
       }) => {
         const linkedIds = new Set(

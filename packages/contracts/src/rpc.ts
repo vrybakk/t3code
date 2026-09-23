@@ -39,6 +39,13 @@ import {
 } from "./agentSessions.ts";
 import { StorageUsageError, StorageUsageInput, StorageUsageResult } from "./storageUsage.ts";
 import {
+  StorageCleanupError,
+  StorageCleanupReviewInput,
+  StorageCleanupReviewResult,
+  StorageCleanupExecuteInput,
+  StorageCleanupExecuteResult,
+} from "./storageHistoryCleanup.ts";
+import {
   AssetAccessError,
   AssetCreateUrlInput,
   AssetCreateUrlResult,
@@ -319,6 +326,8 @@ export const WS_METHODS = {
   filesystemBrowse: "filesystem.browse",
   agentSessionsScan: "agentSessions.scan",
   storageUsageGet: "storage.getUsage",
+  storageReviewCleanup: "storage.reviewCleanup",
+  storageExecuteCleanup: "storage.executeCleanup",
   agentSessionsImport: "agentSessions.import",
   assetsCreateUrl: "assets.createUrl",
   attachmentsCreateUploadUrl: "attachments.createUploadUrl",
@@ -1110,6 +1119,16 @@ const WsStorageUsageGetRpc = Rpc.make(WS_METHODS.storageUsageGet, {
   success: StorageUsageResult,
   error: Schema.Union([StorageUsageError, EnvironmentAuthorizationError]),
 });
+const WsStorageReviewCleanupRpc = Rpc.make(WS_METHODS.storageReviewCleanup, {
+  payload: StorageCleanupReviewInput,
+  success: StorageCleanupReviewResult,
+  error: Schema.Union([StorageCleanupError, EnvironmentAuthorizationError]),
+});
+const WsStorageExecuteCleanupRpc = Rpc.make(WS_METHODS.storageExecuteCleanup, {
+  payload: StorageCleanupExecuteInput,
+  success: StorageCleanupExecuteResult,
+  error: Schema.Union([StorageCleanupError, EnvironmentAuthorizationError]),
+});
 
 const WsAgentSessionsImportRpc = Rpc.make(WS_METHODS.agentSessionsImport, {
   payload: AgentSessionImportInput,
@@ -1628,6 +1647,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsFilesystemBrowseRpc,
   WsAgentSessionsScanRpc,
   WsStorageUsageGetRpc,
+  WsStorageReviewCleanupRpc,
+  WsStorageExecuteCleanupRpc,
   WsAgentSessionsImportRpc,
   WsAssetsCreateUrlRpc,
   WsAttachmentsCreateUploadUrlRpc,

@@ -2,6 +2,8 @@ import type { StorageHistoryGroup } from "@t3tools/contracts";
 import { Button } from "../ui/button";
 import { formatStorageBytes } from "./StorageUsage.logic";
 import { StorageUsageList } from "./StorageUsageList";
+import { Checkbox } from "../ui/checkbox";
+import { storageReviewSuggestion } from "./StorageCleanup.logic";
 
 export function StorageUsageGroups({
   groups,
@@ -11,6 +13,8 @@ export function StorageUsageGroups({
   loading,
   onPage,
   onExpand,
+  selection,
+  scannedAt,
 }: {
   groups: readonly StorageHistoryGroup[];
   count: number;
@@ -19,6 +23,10 @@ export function StorageUsageGroups({
   loading: boolean;
   onPage: (search: string, offset: number) => void;
   onExpand: (group: StorageHistoryGroup) => void;
+  scannedAt: string;
+  selection?:
+    | { ids: ReadonlySet<string>; toggle: (id: string) => void; disabled: boolean }
+    | undefined;
 }) {
   return (
     <StorageUsageList
@@ -41,7 +49,16 @@ export function StorageUsageGroups({
             key={group.id}
             className="flex min-w-0 items-start justify-between gap-3 rounded-md px-3 py-3 hover:bg-muted/30"
           >
-            <div className="min-w-0 space-y-1">
+            {selection && (
+              <Checkbox
+                className="mt-1"
+                aria-label={`Select ${group.label}`}
+                checked={selection.ids.has(group.id)}
+                disabled={loading || selection.disabled}
+                onCheckedChange={() => selection.toggle(group.id)}
+              />
+            )}
+            <div className="min-w-0 flex-1 space-y-1">
               <Button
                 size="xs"
                 variant="ghost"
@@ -67,6 +84,11 @@ export function StorageUsageGroups({
               {group.parentMissing && (
                 <p className="text-xs text-muted-foreground">
                   Parent history not found; measured descendants only
+                </p>
+              )}
+              {storageReviewSuggestion(group, scannedAt) && (
+                <p className="text-xs text-muted-foreground">
+                  {storageReviewSuggestion(group, scannedAt)}
                 </p>
               )}
             </div>

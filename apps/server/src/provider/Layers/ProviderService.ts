@@ -58,6 +58,7 @@ import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import * as ServerConfig from "../../config.ts";
 import * as DeviceService from "../../device/DeviceService.ts";
 import { ensureAgentDeviceShim } from "../../device/AgentDeviceShim.ts";
+import { withProviderHistoryAdmission } from "../historyAdmission.ts";
 import type * as McpInvocationContext from "../../mcp/McpInvocationContext.ts";
 import {
   increment,
@@ -1306,6 +1307,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
           operation: "recover",
         }),
       }),
+      withProviderHistoryAdmission,
     );
   });
 
@@ -1562,6 +1564,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
               operation: "start",
             }),
         }),
+        withProviderHistoryAdmission,
       );
     },
   );
@@ -2228,16 +2231,18 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         "provider.thread_id": input.threadId,
         "provider.rollback_turns": input.numTurns,
       });
-      yield* routed.adapter.rollbackThread(routed.threadId, input.numTurns);
-      const session = (yield* routed.adapter.listSessions()).find(
-        (session) => session.threadId === routed.threadId,
-      );
-      if (session) {
-        yield* upsertSessionBinding(
-          { ...session, providerInstanceId: routed.instanceId },
-          input.threadId,
+      yield* Effect.gen(function* () {
+        yield* routed.adapter.rollbackThread(routed.threadId, input.numTurns);
+        const session = (yield* routed.adapter.listSessions()).find(
+          (session) => session.threadId === routed.threadId,
         );
-      }
+        if (session) {
+          yield* upsertSessionBinding(
+            { ...session, providerInstanceId: routed.instanceId },
+            input.threadId,
+          );
+        }
+      }).pipe(withProviderHistoryAdmission);
       yield* analytics.record("provider.conversation.rolled_back", {
         provider: routed.adapter.provider,
         turns: input.numTurns,

@@ -37,6 +37,7 @@ export const StorageThreadLink = Schema.Struct({
 export type StorageThreadLink = typeof StorageThreadLink.Type;
 
 export const StorageHistory = Schema.Struct({
+  id: Schema.optionalKey(Schema.String),
   filePath: Schema.String,
   provider: Schema.Literals(["codex", "claudeAgent"]),
   logicalBytes: NonNegativeInt,

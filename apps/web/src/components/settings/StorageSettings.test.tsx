@@ -6,6 +6,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
 const mocks = vi.hoisted(() => ({ command: vi.fn(), update: vi.fn(), clear: vi.fn() }));
 vi.mock("../../state/storageUsage", () => ({ storageUsageGet: {} }));
+vi.mock("../../state/session", () => ({
+  useEnvironmentSessionState: () => ({ data: null, isPending: false, hasError: false }),
+}));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => mocks.command }));
 vi.mock("./useScopedSettings", () => ({
   useScopedSettings: () => DEFAULT_SERVER_SETTINGS,

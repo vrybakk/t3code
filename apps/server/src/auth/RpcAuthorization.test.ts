@@ -61,6 +61,14 @@ describe("RPC authorization scopes", () => {
   it("allows storage measurements with the same read permission as filesystem browsing", () => {
     expect(requiredScopeForRpcMethod(WS_METHODS.storageUsageGet)).toBe(AuthOrchestrationReadScope);
   });
+  it("requires operation permission to review or execute native history cleanup", () => {
+    expect(requiredScopeForRpcMethod(WS_METHODS.storageReviewCleanup)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+    expect(requiredScopeForRpcMethod(WS_METHODS.storageExecuteCleanup)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+  });
 
   it("reads the reviewer menu under the same scope as the pull request it belongs to", () => {
     // The candidate list is a read like the detail beside it, and asking somebody for a review is

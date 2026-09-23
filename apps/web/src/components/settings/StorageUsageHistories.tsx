@@ -6,6 +6,8 @@ import {
   storageHistoryStatus,
 } from "./StorageUsage.logic";
 import { StorageUsageList } from "./StorageUsageList";
+import { Checkbox } from "../ui/checkbox";
+import { storageReviewSuggestion } from "./StorageCleanup.logic";
 
 export function StorageUsageHistories({
   result,
@@ -13,12 +15,16 @@ export function StorageUsageHistories({
   offset,
   loading,
   onPage,
+  selection,
 }: {
   result: StorageUsageResult;
   search: string;
   offset: number;
   loading: boolean;
   onPage: (search: string, offset: number) => void;
+  selection?:
+    | { ids: ReadonlySet<string>; toggle: (id: string) => void; disabled: boolean }
+    | undefined;
 }) {
   return (
     <StorageUsageList
@@ -41,7 +47,16 @@ export function StorageUsageHistories({
             key={history.filePath}
             className="flex min-w-0 items-start justify-between gap-3 rounded-md px-3 py-3 hover:bg-muted/30"
           >
-            <div className="min-w-0 space-y-1">
+            {selection && history.id && (
+              <Checkbox
+                className="mt-1"
+                aria-label={`Select ${storageHistoryLabel(history)}`}
+                checked={selection.ids.has(history.id)}
+                disabled={loading || selection.disabled}
+                onCheckedChange={() => selection.toggle(history.id!)}
+              />
+            )}
+            <div className="min-w-0 flex-1 space-y-1">
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -68,6 +83,11 @@ export function StorageUsageHistories({
               <p className="text-xs text-muted-foreground">
                 Modified {new Date(history.modifiedAt).toLocaleString()}
               </p>
+              {storageReviewSuggestion(history, result.scannedAt) && (
+                <p className="text-xs text-muted-foreground">
+                  {storageReviewSuggestion(history, result.scannedAt)}
+                </p>
+              )}
             </div>
             <div className="shrink-0 space-y-1 text-right tabular-nums">
               <p className="text-sm">{formatStorageBytes(history.logicalBytes)}</p>

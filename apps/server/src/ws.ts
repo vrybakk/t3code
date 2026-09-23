@@ -3227,6 +3227,14 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.storageUsageGet, storageUsage.getUsage(input), {
             "rpc.aggregate": "environment",
           }),
+        [WS_METHODS.storageReviewCleanup]: (input) =>
+          observeRpcEffect(WS_METHODS.storageReviewCleanup, storageUsage.reviewCleanup(input), {
+            "rpc.aggregate": "environment",
+          }),
+        [WS_METHODS.storageExecuteCleanup]: (input) =>
+          observeRpcEffect(WS_METHODS.storageExecuteCleanup, storageUsage.executeCleanup(input), {
+            "rpc.aggregate": "environment",
+          }),
         [WS_METHODS.agentSessionsImport]: (input) =>
           observeRpcEffect(
             WS_METHODS.agentSessionsImport,
