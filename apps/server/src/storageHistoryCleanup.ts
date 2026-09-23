@@ -168,6 +168,9 @@ export function createStorageHistoryCleanup(options: CleanupOptions) {
       });
     plan.mode = input.mode;
     plan.pending = (async () => {
+      const deadline = now() + 30_000;
+      const budgetExceeded = () =>
+        now() >= deadline ? "Cleanup time limit reached. Review the remaining files again." : null;
       const [roots, protection] = await Promise.all([options.getRoots(), options.getProtection()]);
       const activeGroups = activeStorageGroups(snapshot.cleanupFiles ?? [], protection);
       const items: Array<StorageCleanupExecuteResult["items"][number]> = [];
@@ -175,12 +178,15 @@ export function createStorageHistoryCleanup(options: CleanupOptions) {
       for (const [index, file] of plan.files.entries()) {
         const blocked =
           plan.review.items[index]!.reason ??
-          (await validateHistoryForCleanup(file, roots, protection, activeGroups));
+          budgetExceeded() ??
+          (await validateHistoryForCleanup(file, roots, protection, activeGroups)) ??
+          budgetExceeded();
         if (blocked) {
           items.push({ id: file.id!, filePath: file.filePath, status: "blocked", reason: blocked });
           continue;
         }
         try {
+          // Keep admission until this mutation settles, even if it outlasts the batch budget.
           if (input.mode === "trash") await options.trash(file.filePath);
           else await NodeFSP.unlink(file.filePath);
           items.push({

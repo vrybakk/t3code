@@ -72,14 +72,7 @@ export function createStorageHistoryLinker(
   }
   for (const binding of bindings) {
     if (!binding.providerInstanceId) continue;
-    let id: string | undefined;
-    if (binding.provider === "codex") {
-      const cursor = Schema.decodeUnknownOption(codexCursor)(binding.resumeCursor);
-      if (Option.isSome(cursor)) id = cursor.value.threadId;
-    } else if (binding.provider === "claudeAgent") {
-      const cursor = Schema.decodeUnknownOption(claudeCursor)(binding.resumeCursor);
-      if (Option.isSome(cursor)) id = cursor.value.resume ?? cursor.value.sessionId;
-    }
+    const id = storageNativeSessionId(binding.provider, binding.resumeCursor);
     if (id)
       add(bySession, `${binding.provider}:${binding.providerInstanceId}:${id}`, binding.threadId);
   }

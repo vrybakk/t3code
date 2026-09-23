@@ -47,7 +47,7 @@ export function StorageUsagePanel({
   );
 }
 
-export function StorageUsageDashboard({
+function StorageUsageDashboard({
   environmentId,
   label,
   section,

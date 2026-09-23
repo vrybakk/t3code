@@ -131,4 +131,3 @@ export class StorageUsage extends Context.Service<
 }
 
 export const make = StorageUsage.make;
-export const layer = StorageUsage.layer;
