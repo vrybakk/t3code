@@ -56,8 +56,14 @@ Browser access changes apply when an agent session next starts.
 
 In **Settings → Storage**, select one connected machine and scan its storage to find large
 agent histories. The report covers that machine's T3 data and configured Codex and Claude Code
-homes, not your entire disk. Refresh to take a new measurement; search and pagination use the
-last scan. Histories from other providers are not included yet.
+homes, not your entire disk. Refresh to take a new measurement; folder navigation, search and
+pagination use the last scan. Histories from other providers are not included yet.
+
+Under **Usage**, open **Overview** for totals, **Breakdown** for categories and folder/file
+drill-down, or **Histories** to find the largest conversations. Codex subagents are grouped with
+their parent conversation when native history metadata proves the relationship. Open a group to
+inspect its individual histories;
+combined sizes count shared files only once. Missing metadata does not mean a history is unused.
 
 File size and allocated disk space can differ. Allocated space is filesystem-reported and is
 not a promise of space recoverable by deletion, especially on filesystems with shared blocks.
@@ -67,9 +73,9 @@ read-only: deleting a T3 conversation does not delete its provider's native hist
 
 ## Storage cleanup
 
-Open **Settings → Storage** to enable automatic cleanup on one machine or all connected
-environments. Policies are off by default and run on the server at startup, when changed, and
-hourly. Offline machines keep their existing policies.
+Open **Settings → Storage → Settings** to configure worktree and artifact cleanup
+on one machine or all connected environments. Policies are off by default and run on the server
+at startup, when changed, and hourly. Offline machines keep their existing policies.
 
 Select a project to set **Automatic worktree cleanup** to **Inherit**, **Off**, or **Custom**.
 Inherit follows each machine's rules; Off keeps that project's worktrees until you remove them

@@ -1,9 +1,9 @@
 // @effect-diagnostics nodeBuiltinImport:off -- Native stat.blocks and O_NOFOLLOW are needed for allocated bytes and bounded safe header reads.
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
-import * as NodeFS from "node:fs";
-import { Schema, Option } from "effect";
 import type { StorageHistory, StorageUsageCategory, StorageUsageTotals } from "@t3tools/contracts";
+import { readStorageMetadata } from "./storageUsageMetadata.ts";
+import { createStorageTree, type StorageTreeNode } from "./storageUsageTree.ts";
 
 export interface StorageRoot {
   readonly path: string;
@@ -16,6 +16,10 @@ export interface ScannedHistory extends StorageHistory {
   readonly device: number;
   readonly inode: number;
   readonly birthtimeMs: number;
+  readonly homePath: string;
+  readonly homePaths?: ReadonlyArray<string>;
+  readonly parentSessionId?: string | undefined;
+  readonly metadataConflict?: boolean;
 }
 export interface StorageScan {
   readonly categories: StorageUsageCategory[];
@@ -23,12 +27,8 @@ export interface StorageScan {
   readonly totals: StorageUsageTotals;
   readonly warnings: string[];
   readonly truncated: boolean;
+  readonly nodes: StorageTreeNode[];
 }
-const nativeCodexHeader = Schema.Struct({
-  type: Schema.Literal("session_meta"),
-  payload: Schema.Struct({ id: Schema.String }),
-});
-const nativeClaudeHeader = Schema.Struct({ sessionId: Schema.String });
 const emptyTotals = (): StorageUsageTotals => ({
   logicalBytes: 0,
   allocatedBytes: 0,
@@ -67,41 +67,6 @@ function classify(provider: StorageRoot["provider"], relative: string) {
   return "Other";
 }
 
-async function readSessionId(
-  filePath: string,
-  provider: StorageHistory["provider"],
-  bytes: number,
-) {
-  // O_NOFOLLOW closes the final-component race between lstat and opening a transcript.
-  const handle = await NodeFSP.open(
-    filePath,
-    NodeFS.constants.O_RDONLY | NodeFS.constants.O_NOFOLLOW,
-  );
-  try {
-    const buffer = Buffer.alloc(bytes);
-    const { bytesRead } = await handle.read(buffer, 0, bytes, 0);
-    const lines = buffer.subarray(0, bytesRead).toString("utf8").split("\n");
-    for (const line of lines) {
-      let value: unknown;
-      try {
-        value = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (provider === "codex") {
-        const decoded = Schema.decodeUnknownOption(nativeCodexHeader)(value);
-        if (Option.isSome(decoded)) return decoded.value.payload.id;
-      } else {
-        const decoded = Schema.decodeUnknownOption(nativeClaudeHeader)(value);
-        if (Option.isSome(decoded)) return decoded.value.sessionId;
-      }
-    }
-    return undefined;
-  } finally {
-    await handle.close();
-  }
-}
-
 export async function scanStorageRoots(
   roots: ReadonlyArray<StorageRoot>,
   limits = {
@@ -118,10 +83,10 @@ export async function scanStorageRoots(
   const warnings = new Set<string>();
   const seen = new Set<string>();
   const historyIndexes = new Map<string, number>();
+  const tree = createStorageTree(100_000);
   const canonicalRoots = new Map<string, StorageRoot>();
   let operations = 0;
   let files = 0;
-  let headerBytes = 0;
   let truncated = false;
   const withinBudget = () => {
     const allowed =
@@ -158,12 +123,14 @@ export async function scanStorageRoots(
   for (const root of [...canonicalRoots.values()].sort(
     (a, b) => b.path.length - a.path.length || a.path.localeCompare(b.path),
   )) {
-    const visit = async (filePath: string): Promise<void> => {
+    const visit = async (filePath: string, parentId: string | null): Promise<void> => {
       if (!withinBudget()) return;
       operations++;
+      let nodeId: string | undefined;
       try {
         const stat = await NodeFSP.lstat(filePath);
         if (stat.isSymbolicLink()) {
+          tree.add(filePath, parentId, "symlink", "skipped");
           warnings.add(
             "Nested symbolic links are not followed; linked external data is outside this scan.",
           );
@@ -172,32 +139,54 @@ export async function scanStorageRoots(
         const identity =
           Number.isSafeInteger(stat.ino) && stat.ino > 0 ? `${stat.dev}:${stat.ino}` : filePath;
         if (seen.has(identity)) {
+          tree.add(filePath, parentId, stat.isDirectory() ? "directory" : "file", "shared");
           const index = historyIndexes.get(identity);
           const history = index === undefined ? undefined : histories[index];
           if (index !== undefined && history?.provider === root.provider) {
             histories[index] = {
               ...history,
               instanceIds: [...new Set([...history.instanceIds, ...root.instanceIds])],
+              homePaths: [...new Set([...(history.homePaths ?? [history.homePath]), root.path])],
             };
           }
           return;
         }
         seen.add(identity);
         if (stat.isDirectory()) {
-          if (!withinBudget()) return;
+          nodeId = tree.add(filePath, parentId, "directory");
+          if (!nodeId) {
+            truncated = true;
+            return;
+          }
+          if (!withinBudget()) {
+            tree.mark(nodeId, "partial");
+            return;
+          }
           operations++;
           const directory = await NodeFSP.opendir(filePath);
           for await (const entry of directory) {
-            if (!withinBudget()) break;
-            await visit(NodePath.join(filePath, entry.name));
+            if (!withinBudget()) {
+              tree.mark(nodeId, "partial");
+              break;
+            }
+            await visit(NodePath.join(filePath, entry.name), nodeId);
           }
           return;
         }
-        if (!stat.isFile()) return;
+        if (!stat.isFile()) {
+          tree.add(filePath, parentId, "unmeasured", "skipped");
+          return;
+        }
+        nodeId = tree.add(filePath, parentId, "file");
+        if (!nodeId) {
+          truncated = true;
+          return;
+        }
         files++;
         const allocatedBytes =
           Number.isFinite(stat.blocks) && stat.blocks >= 0 ? stat.blocks * 512 : null;
         const totals = { logicalBytes: stat.size, allocatedBytes, fileCount: 1 };
+        tree.update(nodeId, totals);
         const relative = NodePath.relative(root.path, filePath);
         const category = classify(root.provider, relative);
         const id = `${root.provider}:${root.path}:${category}`;
@@ -209,27 +198,6 @@ export async function scanStorageRoots(
           ...addStorageTotals(previous ?? emptyTotals(), totals),
         });
         if (category === "Histories" && root.provider !== "t3" && filePath.endsWith(".jsonl")) {
-          let sessionId: string | undefined;
-          if (withinBudget() && headerBytes < limits.totalHeaderBytes) {
-            operations++;
-            const bytes = Math.min(
-              stat.size,
-              limits.headerBytes,
-              limits.totalHeaderBytes - headerBytes,
-            );
-            headerBytes += bytes;
-            try {
-              sessionId = await readSessionId(filePath, root.provider, bytes);
-            } catch {
-              warnings.add(
-                "Some transcript headers could not be read; their sizes are included but links may be unavailable.",
-              );
-            }
-          }
-          if (!sessionId)
-            warnings.add(
-              "Some histories have unavailable or oversized native headers, or the header-read budget was reached. Their sizes are included, but thread links may be incomplete.",
-            );
           historyIndexes.set(identity, histories.length);
           histories.push({
             filePath,
@@ -239,19 +207,37 @@ export async function scanStorageRoots(
             modifiedAt: stat.mtime.toISOString(),
             archived: relative.split(NodePath.sep)[0] === "archived_sessions",
             threads: [],
-            sessionId,
+            sessionId: undefined,
             instanceIds: root.instanceIds,
             device: stat.dev,
             inode: stat.ino,
             birthtimeMs: stat.birthtimeMs,
+            homePath: root.path,
           });
         }
       } catch {
+        nodeId ??= tree.add(filePath, parentId, "unmeasured", "partial");
+        tree.mark(nodeId ?? parentId ?? undefined, "partial");
         warnings.add(`Some entries could not be read under ${root.path}; totals are partial.`);
         truncated = true;
       }
     };
-    await visit(root.path);
+    await visit(root.path, null);
+  }
+  await readStorageMetadata(histories, limits, () => {
+    if (operations >= limits.operations || performance.now() - started >= limits.durationMs)
+      return false;
+    operations++;
+    return true;
+  });
+  if (histories.some((history) => !history.sessionId))
+    warnings.add(
+      "Some native headers could not be read within the metadata budget. Sizes are measured, but conversation grouping is incomplete.",
+    );
+  const { nodes, truncated: treeTruncated } = tree.finish();
+  if (treeTruncated) {
+    truncated = true;
+    warnings.add("Directory snapshot limit reached; sizes and directory contents are partial.");
   }
   const sortedCategories = [...categories.values()].sort(
     (a, b) => b.logicalBytes - a.logicalBytes || a.id.localeCompare(b.id),
@@ -263,5 +249,6 @@ export async function scanStorageRoots(
     totals: sortedCategories.reduce(addStorageTotals, emptyTotals()),
     warnings: [...warnings],
     truncated,
+    nodes,
   };
 }

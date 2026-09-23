@@ -1,20 +1,20 @@
-import type { EnvironmentId, StorageUsageResult } from "@t3tools/contracts";
-import {
-  isAtomCommandInterrupted,
-  squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import { useEffect, useRef, useState } from "react";
-
-import { storageUsageGet } from "../../state/storageUsage";
-import { useAtomCommand } from "../../state/use-atom-command";
+import type { EnvironmentId, StorageHistoryGroup } from "@t3tools/contracts";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsSection } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { StorageUsageHistories } from "./StorageUsageHistories";
-import { formatStorageBytes, STORAGE_HISTORY_PAGE_SIZE } from "./StorageUsage.logic";
+import { formatStorageBytes } from "./StorageUsage.logic";
+import { initialStorageQuery, useStorageUsage } from "./StorageUsageState";
+import { StorageUsageGroups } from "./StorageUsageGroups";
+import { StorageUsageDirectory } from "./StorageUsageDirectory";
 
-export function StorageUsagePanel() {
+export function StorageUsagePanel({
+  section = "histories",
+}: {
+  section?: "overview" | "breakdown" | "histories";
+}) {
   const { scope, connectedEnvironments } = useSettingsScope();
   const environment =
     scope.environmentIds.length === 1
@@ -39,6 +39,7 @@ export function StorageUsagePanel() {
           key={environment.environmentId}
           environmentId={environment.environmentId}
           label={environment.label}
+          section={section}
         />
       )}
     </SettingsSection>
@@ -48,50 +49,14 @@ export function StorageUsagePanel() {
 export function StorageUsageDashboard({
   environmentId,
   label,
+  section,
 }: {
   environmentId: EnvironmentId;
   label: string;
+  section: "overview" | "breakdown" | "histories";
 }) {
-  const getUsage = useAtomCommand(storageUsageGet, { reportFailure: false });
-  const [page, setPage] = useState<{
-    result: StorageUsageResult;
-    search: string;
-    offset: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
-  useEffect(
-    () => () => {
-      requestId.current += 1;
-    },
-    [],
-  );
-
-  async function load(refresh: boolean, search = "", offset = 0) {
-    const id = ++requestId.current;
-    setLoading(true);
-    setError(null);
-    const response = await getUsage({
-      environmentId,
-      input: { refresh, search, offset, limit: STORAGE_HISTORY_PAGE_SIZE },
-    });
-    if (id !== requestId.current) return;
-    setLoading(false);
-    if (response._tag === "Success") {
-      if (offset > 0 && response.value.histories.length === 0) {
-        void load(false, search, 0);
-        return;
-      }
-      setPage({ result: response.value, search, offset });
-    } else if (!isAtomCommandInterrupted(response)) {
-      const failure = squashAtomCommandFailure(response);
-      setError(
-        failure instanceof Error ? failure.message : "Storage scan failed. Try scanning again.",
-      );
-    }
-  }
-
+  const { historyPage: page, directoryPage, loading, error, load } = useStorageUsage(environmentId);
+  const [expanded, setExpanded] = useState<StorageHistoryGroup | null>(null);
   const result = page?.result;
   const largestCategory = Math.max(
     1,
@@ -108,7 +73,15 @@ export function StorageUsageDashboard({
             included.
           </p>
         </div>
-        <Button size="xs" variant="outline" disabled={loading} onClick={() => void load(true)}>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={loading}
+          onClick={() => {
+            setExpanded(null);
+            void load(true);
+          }}
+        >
           {loading ? "Loading…" : result ? "Rescan storage" : "Scan storage"}
         </Button>
       </div>
@@ -119,38 +92,112 @@ export function StorageUsageDashboard({
       )}
       <div role="status" aria-live="polite" className="text-xs text-muted-foreground">
         {loading
-          ? "Reading storage on this machine. Existing files will not be changed."
+          ? "Loading storage results. Existing files will not be changed."
           : !result
             ? "Start a read-only scan to see what is taking up space. Large directories can take a moment."
             : `Scanned ${new Date(result.scannedAt).toLocaleString()} in ${(result.scanDurationMs / 1_000).toFixed(1)}s`}
       </div>
       {result && (
         <>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <dt className="text-xs text-muted-foreground">File sizes</dt>
-              <dd className="mt-1 text-3xl font-medium tracking-tight tabular-nums">
-                {formatStorageBytes(result.totals.logicalBytes)}
-              </dd>
+          <div hidden={section !== "overview"} className="space-y-6">
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-muted-foreground">File sizes</dt>
+                <dd className="mt-1 text-3xl font-medium tracking-tight tabular-nums">
+                  {formatStorageBytes(result.totals.logicalBytes)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Allocated on disk</dt>
+                <dd className="mt-1 text-3xl font-medium tracking-tight tabular-nums">
+                  {formatStorageBytes(result.totals.allocatedBytes)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Files scanned</dt>
+                <dd className="mt-1 text-3xl font-medium tracking-tight tabular-nums">
+                  {result.totals.fileCount.toLocaleString()}
+                </dd>
+              </div>
+            </dl>
+            <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              File sizes are logical bytes; allocated space is filesystem-reported disk usage.
+              Compression, sparse files and APFS clones can differ. Neither total guarantees how
+              much deleting files would free. Sizes use binary units (1 GiB = 1,024 MiB).
+            </p>
+          </div>
+          <div hidden={section !== "breakdown"} className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Storage breakdown</h3>
+              {result.categories.map((category) => (
+                <div key={category.id} className="space-y-1.5">
+                  <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <span
+                            tabIndex={0}
+                            className="truncate outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        }
+                      >
+                        {category.label}
+                      </TooltipTrigger>
+                      <TooltipPopup className="max-w-sm break-all">
+                        {category.rootPath}
+                      </TooltipPopup>
+                    </Tooltip>
+                    <span className="shrink-0 tabular-nums">
+                      {formatStorageBytes(category.logicalBytes)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                    <div
+                      className="h-full rounded-full bg-foreground/60"
+                      style={{ width: `${(category.logicalBytes / largestCategory) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {category.fileCount.toLocaleString()} files ·{" "}
+                    {formatStorageBytes(category.allocatedBytes)} on disk
+                  </p>
+                </div>
+              ))}
             </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Allocated on disk</dt>
-              <dd className="mt-1 text-3xl font-medium tracking-tight tabular-nums">
-                {formatStorageBytes(result.totals.allocatedBytes)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Files scanned</dt>
-              <dd className="mt-1 text-3xl font-medium tracking-tight tabular-nums">
-                {result.totals.fileCount.toLocaleString()}
-              </dd>
-            </div>
-          </dl>
-          <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            File sizes are logical bytes; allocated space is filesystem-reported disk usage.
-            Compression, sparse files and APFS clones can differ. Neither total guarantees how much
-            deleting files would free. Sizes use binary units (1 GiB = 1,024 MiB).
-          </p>
+            {directoryPage?.result.directory ? (
+              <StorageUsageDirectory
+                key={`${directoryPage.result.snapshotId}:${directoryPage.query.directoryId}:${directoryPage.query.search}`}
+                directory={directoryPage.result.directory}
+                search={directoryPage.query.search}
+                offset={directoryPage.query.offset}
+                loading={loading}
+                onPage={(search, offset) =>
+                  void load(false, { ...directoryPage.query, search, offset })
+                }
+                onOpen={(directoryId) =>
+                  void load(false, {
+                    view: "directory",
+                    search: "",
+                    offset: 0,
+                    ...(directoryId ? { directoryId } : {}),
+                  })
+                }
+              />
+            ) : result.snapshotId ? (
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={loading}
+                onClick={() => void load(false, { view: "directory", search: "", offset: 0 })}
+              >
+                Browse folders
+              </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Update this machine's server to browse scanned folders.
+              </p>
+            )}
+          </div>
           {(result.truncated || result.warnings.length > 0) && (
             <div
               role="status"
@@ -167,55 +214,59 @@ export function StorageUsageDashboard({
               ))}
             </div>
           )}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium">Storage breakdown</h3>
-            {result.categories.map((category) => (
-              <div key={category.id} className="space-y-1.5">
-                <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <span
-                          tabIndex={0}
-                          className="truncate outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      }
-                    >
-                      {category.label}
-                    </TooltipTrigger>
-                    <TooltipPopup className="max-w-sm break-all">{category.rootPath}</TooltipPopup>
-                  </Tooltip>
-                  <span className="shrink-0 tabular-nums">
-                    {formatStorageBytes(category.logicalBytes)}
-                  </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                  <div
-                    className="h-full rounded-full bg-foreground/60"
-                    style={{ width: `${(category.logicalBytes / largestCategory) * 100}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {category.fileCount.toLocaleString()} files ·{" "}
-                  {formatStorageBytes(category.allocatedBytes)} on disk
-                </p>
+          <div hidden={section !== "histories"} className="space-y-6">
+            {page?.query.groupId && (
+              <div className="space-y-2">
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => {
+                    setExpanded(null);
+                    void load(false, initialStorageQuery);
+                  }}
+                >
+                  Back to conversations
+                </Button>
+                {expanded && (
+                  <p className="text-sm">
+                    {expanded.label} · {formatStorageBytes(expanded.logicalBytes)} across{" "}
+                    {expanded.fileCount} histories
+                  </p>
+                )}
               </div>
-            ))}
+            )}
+            {page && page.query.view === "groups" && result.groups ? (
+              <StorageUsageGroups
+                key={`${result.snapshotId}:${page.query.search}`}
+                groups={result.groups}
+                count={result.matchedGroups ?? result.groups.length}
+                search={page.query.search}
+                offset={page.query.offset}
+                loading={loading}
+                onPage={(search, offset) => void load(false, { ...page.query, search, offset })}
+                onExpand={(group) => {
+                  setExpanded(group);
+                  void load(false, { view: "histories", groupId: group.id, search: "", offset: 0 });
+                }}
+              />
+            ) : (
+              page && (
+                <StorageUsageHistories
+                  key={`${result.scannedAt}:${page.query.groupId}:${page.query.search}`}
+                  result={result}
+                  search={page.query.search}
+                  offset={page.query.offset}
+                  loading={loading}
+                  onPage={(search, offset) => void load(false, { ...page.query, search, offset })}
+                />
+              )
+            )}
           </div>
-          {page && (
-            <StorageUsageHistories
-              key={`${result.scannedAt}:${page.search}`}
-              result={result}
-              search={page.search}
-              offset={page.offset}
-              loading={loading}
-              onPage={(search, offset) => void load(false, search, offset)}
-            />
-          )}
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
             Provider histories may also be used by Codex, Claude Code or another T3 installation.
             Unmatched and deleted-chat histories are not automatically safe to remove. This view is
-            read-only; existing cleanup rules below do not delete provider histories.
+            read-only; rules in Storage settings do not delete provider histories.
           </p>
         </>
       )}

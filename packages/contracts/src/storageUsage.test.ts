@@ -16,9 +16,19 @@ describe("storage usage contract", () => {
       { limit: 0 },
       { limit: 101 },
       { search: "x".repeat(201) },
+      { view: "filesystem" },
     ]) {
       expect(() => decode({ ...input, ...invalid })).toThrow();
     }
+  });
+
+  it("accepts snapshot-scoped navigation without requiring it for older callers", () => {
+    expect(
+      decode({ ...input, view: "directory", directoryId: "folder-1", snapshotId: "scan-1" }),
+    ).toMatchObject({ view: "directory", directoryId: "folder-1", snapshotId: "scan-1" });
+    expect(
+      decode({ ...input, view: "histories", groupId: "group-1", snapshotId: "scan-1" }),
+    ).toMatchObject({ groupId: "group-1", snapshotId: "scan-1" });
   });
 
   it("represents unknown allocation and incomplete measurements without inventing zero bytes", () => {

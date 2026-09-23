@@ -1,15 +1,11 @@
 import type { StorageUsageResult } from "@t3tools/contracts";
-import { useState } from "react";
-
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   formatStorageBytes,
-  STORAGE_HISTORY_PAGE_SIZE,
   storageHistoryLabel,
   storageHistoryStatus,
 } from "./StorageUsage.logic";
+import { StorageUsageList } from "./StorageUsageList";
 
 export function StorageUsageHistories({
   result,
@@ -24,38 +20,17 @@ export function StorageUsageHistories({
   loading: boolean;
   onPage: (search: string, offset: number) => void;
 }) {
-  const [draft, setDraft] = useState(search);
-  const count = result.matchedHistories;
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium">Largest histories</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Sorted by file size. Shared histories are counted once.
-          </p>
-        </div>
-        <form
-          className="flex w-full items-center gap-2 sm:w-auto"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onPage(draft.trim(), 0);
-          }}
-        >
-          <Input
-            size="compact"
-            type="search"
-            aria-label="Search histories"
-            placeholder="Project, chat or file…"
-            value={draft}
-            maxLength={200}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <Button size="xs" variant="outline" type="submit" disabled={loading}>
-            Search
-          </Button>
-        </form>
-      </div>
+    <StorageUsageList
+      title="Largest histories"
+      description="Sorted by file size. Shared histories are counted once."
+      search={search}
+      offset={offset}
+      count={result.matchedHistories}
+      shown={result.histories.length}
+      loading={loading}
+      onPage={onPage}
+    >
       <ul
         className="divide-y divide-border/60"
         aria-label="Histories by file size"
@@ -87,6 +62,9 @@ export function StorageUsageHistories({
                   : " · Not linked to a chat on this environment"}
               </p>
               <p className="text-xs text-muted-foreground">{storageHistoryStatus(history)}</p>
+              {history.relationship === "subagent" && (
+                <p className="text-xs text-muted-foreground">Subagent history</p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Modified {new Date(history.modifiedAt).toLocaleString()}
               </p>
@@ -107,35 +85,6 @@ export function StorageUsageHistories({
             : "No provider histories found in the scanned locations."}
         </p>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>
-          {count === 0 ? "0" : `${offset + 1}–${Math.min(offset + result.histories.length, count)}`}{" "}
-          of {count.toLocaleString()}
-          {search ? " matches" : " histories"}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={loading || offset === 0}
-            onClick={() => onPage(search, Math.max(0, offset - STORAGE_HISTORY_PAGE_SIZE))}
-          >
-            Previous
-          </Button>
-          <span>
-            Page {Math.floor(offset / STORAGE_HISTORY_PAGE_SIZE) + 1} of{" "}
-            {Math.max(1, Math.ceil(count / STORAGE_HISTORY_PAGE_SIZE))}
-          </span>
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={loading || offset + STORAGE_HISTORY_PAGE_SIZE >= count}
-            onClick={() => onPage(search, offset + STORAGE_HISTORY_PAGE_SIZE)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
-    </div>
+    </StorageUsageList>
   );
 }

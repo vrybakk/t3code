@@ -14,8 +14,7 @@ const claudeCursor = Schema.Struct({
   sessionId: Schema.optional(Schema.String),
 });
 
-export function linkStorageHistories(
-  histories: ReadonlyArray<ScannedHistory>,
+export function createStorageHistoryLinker(
   shells: ReadonlyArray<OrchestrationShellSnapshot>,
   bindings: ReadonlyArray<ProviderRuntimeBindingWithMetadata>,
   imports: ReadonlyArray<{
@@ -70,30 +69,51 @@ export function linkStorageHistories(
     if (id)
       add(bySession, `${binding.provider}:${binding.providerInstanceId}:${id}`, binding.threadId);
   }
-  return histories.map(({ sessionId, instanceIds, device, inode, birthtimeMs, ...history }) => {
-    const linkedIds = new Set(
-      byIdentity.get(`${history.provider}:${device}:${inode}:${birthtimeMs}`),
+  return (histories: ReadonlyArray<ScannedHistory>) =>
+    histories.map(
+      ({
+        sessionId,
+        instanceIds,
+        device,
+        inode,
+        birthtimeMs,
+        homePath: _homePath,
+        homePaths: _homePaths,
+        parentSessionId: _parentSessionId,
+        metadataConflict: _metadataConflict,
+        ...history
+      }) => {
+        const linkedIds = new Set(
+          byIdentity.get(`${history.provider}:${device}:${inode}:${birthtimeMs}`),
+        );
+        if (sessionId)
+          for (const instanceId of instanceIds) {
+            for (const id of bySession.get(`${history.provider}:${instanceId}:${sessionId}`) ?? [])
+              linkedIds.add(id);
+          }
+        const links: StorageThreadLink[] = [...linkedIds].map((id) => {
+          const thread = threads.get(id);
+          return {
+            threadId: id,
+            title: thread?.title ?? `Thread ${id}`,
+            projectName: thread
+              ? (projects.get(thread.projectId) ?? "Unknown project")
+              : "Unavailable thread metadata",
+            status: thread?.archivedAt
+              ? "archived"
+              : thread?.latestTurn?.state === "running"
+                ? "active"
+                : "linked",
+          };
+        });
+        return { ...history, threads: links };
+      },
     );
-    if (sessionId)
-      for (const instanceId of instanceIds) {
-        for (const id of bySession.get(`${history.provider}:${instanceId}:${sessionId}`) ?? [])
-          linkedIds.add(id);
-      }
-    const links: StorageThreadLink[] = [...linkedIds].map((id) => {
-      const thread = threads.get(id);
-      return {
-        threadId: id,
-        title: thread?.title ?? `Thread ${id}`,
-        projectName: thread
-          ? (projects.get(thread.projectId) ?? "Unknown project")
-          : "Unavailable thread metadata",
-        status: thread?.archivedAt
-          ? "archived"
-          : thread?.latestTurn?.state === "running"
-            ? "active"
-            : "linked",
-      };
-    });
-    return { ...history, threads: links };
-  });
+}
+
+export function linkStorageHistories(
+  histories: ReadonlyArray<ScannedHistory>,
+  ...metadata: Parameters<typeof createStorageHistoryLinker>
+) {
+  return createStorageHistoryLinker(...metadata)(histories);
 }

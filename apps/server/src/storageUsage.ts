@@ -1,4 +1,4 @@
-import { Context, DateTime, Effect, Layer, Path } from "effect";
+import { Context, DateTime, Effect, Layer, Path, Schema } from "effect";
 import {
   StorageUsageError,
   type StorageUsageInput,
@@ -11,8 +11,10 @@ import { ProviderSessionDirectory } from "./provider/Services/ProviderSessionDir
 import { ProjectionSnapshotQuery } from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import { resolveProviderStorageHomes } from "./project/providerStorageHomes.ts";
 import { scanStorageRoots } from "./storageUsageScan.ts";
-import { linkStorageHistories } from "./storageUsageLinks.ts";
+import { createStorageHistoryLinker } from "./storageUsageLinks.ts";
 import { createStorageUsageCache } from "./storageUsageCache.ts";
+import { groupStorageHistories } from "./storageUsageGroups.ts";
+const isStorageUsageError = Schema.is(StorageUsageError);
 
 export class StorageUsage extends Context.Service<
   StorageUsage,
@@ -46,12 +48,7 @@ export class StorageUsage extends Context.Service<
         projection.getShellSnapshot(),
         projection.getArchivedShellSnapshot(),
       ]).pipe(Effect.option);
-      let histories: StorageUsageResult["histories"] = linkStorageHistories(
-        result.histories,
-        [],
-        [],
-        [],
-      );
+      let link = createStorageHistoryLinker([], [], []);
       if (metadata._tag === "Some") {
         const [bindings, active, archived] = metadata.value;
         const projectIds = [
@@ -66,8 +63,7 @@ export class StorageUsage extends Context.Service<
           result.warnings.push(
             "Imported thread links are unavailable; filesystem sizes remain accurate within the scan scope.",
           );
-        histories = linkStorageHistories(
-          result.histories,
+        link = createStorageHistoryLinker(
           [active, archived],
           bindings,
           imported._tag === "Some" ? imported.value.flat() : [],
@@ -76,9 +72,20 @@ export class StorageUsage extends Context.Service<
         result.warnings.push(
           "Thread metadata is unavailable; filesystem sizes remain accurate within the scan scope.",
         );
+      const { histories, groups, unresolvedAncestry } = groupStorageHistories(
+        result.histories,
+        link,
+      );
+      if (unresolvedAncestry)
+        result.warnings.push(
+          "Some native parent relationships conflict, form cycles, or exceed the ancestry limit. Those histories remain separate instead of guessing their conversation.",
+        );
       return {
         ...result,
         histories,
+        groups,
+        totalGroups: groups.length,
+        matchedGroups: groups.length,
         scannedAt: DateTime.formatIso(yield* DateTime.now),
         scanDurationMs: Math.round(performance.now() - started),
         totalHistories: histories.length,
@@ -90,11 +97,14 @@ export class StorageUsage extends Context.Service<
     const getUsage = (input: StorageUsageInput) =>
       Effect.tryPromise({
         try: () => getCachedUsage(input),
-        catch: () =>
-          new StorageUsageError({
-            detail:
-              "Could not inspect storage. Check access to the configured provider homes and try again.",
-          }),
+        catch: (cause) =>
+          isStorageUsageError(cause)
+            ? cause
+            : new StorageUsageError({
+                reason: "scan-failed",
+                detail:
+                  "Could not inspect storage. Check access to the configured provider homes and try again.",
+              }),
       });
     return StorageUsage.of({ getUsage });
   });
