@@ -10,8 +10,7 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { ServerSecretStore } from "../auth/ServerSecretStore.ts";
 
-export const DEFAULT_CLICKUP_REDIRECT_URI =
-  "http://localhost:6326/api/integrations/clickup/callback";
+const DEFAULT_CLICKUP_REDIRECT_URI = "http://localhost:6326/api/integrations/clickup/callback";
 const SECRET_NAME = "clickup-oauth-config";
 const Credentials = Schema.Struct({
   clientId: Schema.String,
@@ -22,7 +21,7 @@ const decodeCredentials = Schema.decodeEffect(Schema.fromJsonString(Credentials)
 const encodeCredentials = Schema.encodeSync(Schema.fromJsonString(Credentials));
 const failure = (message: string) => new ClickUpError({ message });
 
-export function isValidClickUpRedirectUri(value: string): boolean {
+function isValidClickUpRedirectUri(value: string): boolean {
   try {
     const url = new URL(value);
     return (
