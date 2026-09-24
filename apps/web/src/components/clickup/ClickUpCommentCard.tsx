@@ -5,15 +5,18 @@ import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ClickUpAttachments } from "./ClickUpAttachments";
 import { taskDate } from "./taskFormatting";
+import { splitSelfMentions } from "./commentMentions";
 
 export function ClickUpCommentCard({
   comment,
   userId,
+  username,
   resolution,
   children,
 }: {
   comment: ClickUpComment;
   userId: number;
+  username: string | undefined;
   resolution?: { busy: boolean; refreshing: boolean; error: string | null; toggle: () => void };
   children?: ReactNode;
 }) {
@@ -46,7 +49,20 @@ export function ClickUpCommentCard({
           {assignedToMe ? "Assigned to you" : "Mentions you"}
         </p>
       )}
-      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{comment.text}</p>
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+        {splitSelfMentions(comment.text, username).map((part) =>
+          part.isMention ? (
+            <mark
+              key={part.offset}
+              className="rounded-sm bg-primary/15 px-0.5 font-medium text-primary"
+            >
+              {part.text}
+            </mark>
+          ) : (
+            part.text
+          ),
+        )}
+      </p>
       {!!comment.attachments?.length && <ClickUpAttachments attachments={comment.attachments} />}
       {comment.assignee && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">

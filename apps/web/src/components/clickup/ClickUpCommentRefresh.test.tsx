@@ -14,10 +14,11 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: (query: unknown) =>
-    typeof query === "string" ? state.results.get(query) : AsyncResult.initial(),
+    (typeof query === "string" ? state.results.get(query) : undefined) ?? AsyncResult.initial(),
 }));
 vi.mock("../../state/server", () => ({
   serverEnvironment: {
+    clickUpConnection: () => "connection",
     clickUpTask: () => "task",
     clickUpThreads: () => "links",
     clickUpComments: ({ input }: { input: { cursor?: { id: string } } }) =>
@@ -67,6 +68,58 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   state.results.clear();
   vi.clearAllMocks();
+});
+
+it("highlights the connected user's mentions in both comments and expanded replies", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  state.results.set(
+    "connection",
+    AsyncResult.success({ user: { id: 17, username: "Vladyslav Rybak" } }),
+  );
+  state.results.set(
+    "replies",
+    AsyncResult.success({
+      comments: [{ id: "reply", author: "PM", text: "Thanks @Vladyslav Rybak!" }],
+    }),
+  );
+  await act(async () => {
+    renderer = create(
+      <ClickUpTaskActivity
+        environmentId={EnvironmentId.make("test")}
+        input={input}
+        details={{
+          ...details,
+          comments: [
+            { ...initialComment, text: "@Vladyslav Rybak please check with @Other User." },
+          ],
+        }}
+      />,
+    );
+  });
+  expect(renderer.root.findAllByType("mark").map((mark) => mark.children.join(""))).toEqual([
+    "@Vladyslav Rybak",
+  ]);
+  await act(async () => {
+    renderer.root.findByProps({ "aria-expanded": false }).props.onClick();
+  });
+  expect(renderer.root.findAllByType("mark").map((mark) => mark.children.join(""))).toEqual([
+    "@Vladyslav Rybak",
+    "@Vladyslav Rybak",
+  ]);
+  state.results.set(
+    "connection",
+    AsyncResult.success({ user: { id: 18, username: "Vladyslav Rybak" } }),
+  );
+  await act(async () => {
+    renderer.update(
+      <ClickUpTaskActivity
+        environmentId={EnvironmentId.make("test")}
+        input={input}
+        details={details}
+      />,
+    );
+  });
+  expect(renderer.root.findAllByType("mark")).toHaveLength(0);
 });
 
 it("uses the detail comment page until pagination and preserves the first-page cursor", async () => {
