@@ -40,6 +40,18 @@ import {
 } from "./providerInstance.ts";
 import { PullRequestMergeMethod } from "./pullRequest.ts";
 
+export const ClickUpWorkflowModels = Schema.Struct({
+  research: Schema.NullOr(ModelSelection),
+  implementation: Schema.NullOr(ModelSelection),
+  review: Schema.NullOr(ModelSelection),
+});
+export type ClickUpWorkflowModels = typeof ClickUpWorkflowModels.Type;
+export const DEFAULT_CLICKUP_WORKFLOW_MODELS: ClickUpWorkflowModels = {
+  research: null,
+  implementation: null,
+  review: null,
+};
+
 // ── Client Settings (local-only) ───────────────────────────────
 
 export const TimestampFormat = Schema.Literals(["locale", "12-hour", "24-hour"]);
@@ -1094,6 +1106,12 @@ export const ServerSettings = Schema.Struct({
   projectAgentBrowserAccessOverrides: Schema.Record(ProjectId, Schema.Boolean).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
+  clickUpWorkflowModels: ClickUpWorkflowModels.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_CLICKUP_WORKFLOW_MODELS)),
+  ),
+  clickUpProjectMappings: Schema.Record(TrimmedNonEmptyString, Schema.Array(ProjectId)).pipe(
+    Schema.withDecodingDefault(Effect.succeed({})),
+  ),
   defaultAutoPull: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   defaultProjectScripts: Schema.Array(ProjectScript).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
@@ -1439,6 +1457,10 @@ export const ServerSettingsPatch = Schema.Struct({
   enableAgentBrowserAccess: Schema.optionalKey(Schema.Boolean),
   projectAgentBrowserAccessOverrides: Schema.optionalKey(
     Schema.Record(ProjectId, Schema.NullOr(Schema.Boolean)),
+  ),
+  clickUpWorkflowModels: Schema.optionalKey(ClickUpWorkflowModels),
+  clickUpProjectMappings: Schema.optionalKey(
+    Schema.Record(TrimmedNonEmptyString, Schema.NullOr(Schema.Array(ProjectId))),
   ),
   defaultAutoPull: Schema.optionalKey(Schema.Boolean),
   defaultProjectScripts: Schema.optionalKey(Schema.Array(ProjectScript)),

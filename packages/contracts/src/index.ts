@@ -1,3 +1,5 @@
+export * from "./clickupWorkflow.ts";
+export * from "./clickupTaskEditing.ts";
 export * from "./baseSchemas.ts";
 export * from "./assistantCitations.ts";
 export * from "./composerContext.ts";
@@ -55,3 +57,7 @@ export {
   PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
   fileAttachmentMaxBytes,
 } from "./video.ts";
+
+export * from "./clickup.ts";
+export * from "./clickupSprints.ts";
+export * from "./clickupInteractions.ts";

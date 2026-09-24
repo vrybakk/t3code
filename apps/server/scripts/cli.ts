@@ -125,6 +125,13 @@ const buildExeCmd = Command.make(
       const serverDir = path.join(repoRoot, "apps/server");
 
       yield* Effect.log("[cli] Building single-executable...");
+      yield* runCommand(
+        ChildProcess.make(process.execPath, ["scripts/generate-studio-workflow.ts"], {
+          cwd: serverDir,
+          stdout: "ignore",
+          stderr: "inherit",
+        }),
+      );
       const spawnCommand = yield* resolveSpawnCommand("vp", ["pack"]);
       yield* runCommand(
         ChildProcess.make(spawnCommand.command, spawnCommand.args, {

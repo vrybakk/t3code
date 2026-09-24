@@ -1,5 +1,15 @@
+import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
+import * as ClickUpWorkflowStore from "./clickup/ClickUpWorkflowStore.ts";
+import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
+
+import * as ClickUpApi from "./clickup/ClickUpApi.ts";
+import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
+import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
+import * as ClickUpSprints from "./clickup/ClickUpSprints.ts";
+import * as ClickUpInteractions from "./clickup/ClickUpInteractions.ts";
+import { callbackLayer as clickUpCallbackLayer } from "./clickup/http.ts";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -585,12 +595,21 @@ export const makeRoutesLayer = Layer.mergeAll(
     deviceHubProxyRouteLayer,
     staticAndDevRouteLayer,
     websocketRpcRouteLayer,
+    clickUpCallbackLayer,
   ),
   McpHttpServer.layer.pipe(Layer.provide(McpSessionRegistry.layer)),
 ).pipe(
   // Both transports consume the same service instance, so caches single-flight across clients
   // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
+  Layer.provide(ClickUpWorkflow.layer),
+  Layer.provide(ClickUpWorkflowStore.layer),
   Layer.provide(PullRequestServiceLive),
+  Layer.provide(ClickUpTasks.layer),
+  Layer.provide(ClickUpSprints.layer),
+  Layer.provide(ClickUpInteractions.layer),
+  Layer.provide(ClickUpTaskEditing.layer),
+  Layer.provide(ClickUpConnection.layer),
+  Layer.provide(ClickUpApi.layer),
   Layer.provide(PreviewAutomationBroker.layer),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(DesktopAppUpdateLayerLive))),
   Layer.provide(commandReadinessLayer),

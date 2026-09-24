@@ -606,6 +606,16 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     )(function* (event, attachmentSideEffects) {
       switch (event.type) {
         case "thread.created":
+          yield* sql`DELETE FROM projection_thread_clickup_tasks WHERE thread_id = ${event.payload.threadId}`.pipe(
+            Effect.mapError(toPersistenceSqlError("ClickUpThreadTasks.clear")),
+          );
+          if (event.payload.clickUpTask) {
+            const task = event.payload.clickUpTask;
+            yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id, name)
+              VALUES (${event.payload.threadId}, ${task.workspaceId}, ${task.taskId}, ${task.name})`.pipe(
+              Effect.mapError(toPersistenceSqlError("ClickUpThreadTasks.insert")),
+            );
+          }
           // A draft retry can re-create this id; links belong to the old incarnation.
           yield* projectionThreadPullRequestRepository.deleteByThreadId({
             threadId: event.payload.threadId,

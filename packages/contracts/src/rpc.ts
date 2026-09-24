@@ -1,3 +1,34 @@
+import {
+  ClickUpWorkflow,
+  ClickUpHandoff,
+  ClickUpWorkflowInput,
+  ClickUpSubmitWorkflowInput,
+} from "./clickupWorkflow.ts";
+import {
+  ClickUpTaskOptions,
+  ClickUpSetStatusInput,
+  ClickUpSetTagInput,
+} from "./clickupTaskEditing.ts";
+import { ClickUpSprintsInput, ClickUpSprintWindow } from "./clickupSprints.ts";
+import {
+  ClickUpCommentsInput,
+  ClickUpCommentsPage,
+  ClickUpCreateCommentInput,
+  ClickUpCommentRepliesInput,
+  ClickUpCommentReplies,
+  ClickUpCreateReplyInput,
+  ClickUpSetCommentResolutionInput,
+  ClickUpSetChecklistItemResolutionInput,
+} from "./clickupInteractions.ts";
+import {
+  ClickUpConnection,
+  ClickUpError,
+  ClickUpTasksInput,
+  ClickUpTaskInput,
+  ClickUpTaskPage,
+  ClickUpTaskDetails,
+  ClickUpThreadLink,
+} from "./clickup.ts";
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
@@ -363,6 +394,24 @@ export const WS_METHODS = {
 
   // GitButler methods
   gitButlerWorkspaceStatus: "gitButler.workspaceStatus",
+  clickUpConnection: "clickup.connection",
+  clickUpConnect: "clickup.connect",
+  clickUpDisconnect: "clickup.disconnect",
+  clickUpTasks: "clickup.tasks",
+  clickUpSprints: "clickup.sprints",
+  clickUpTaskOptions: "clickup.taskOptions",
+  clickUpWorkflow: "clickup.workflow",
+  clickUpSubmitWorkflow: "clickup.submitWorkflow",
+  clickUpSetStatus: "clickup.setStatus",
+  clickUpSetTag: "clickup.setTag",
+  clickUpComments: "clickup.comments",
+  clickUpCreateComment: "clickup.createComment",
+  clickUpCommentReplies: "clickup.commentReplies",
+  clickUpCreateReply: "clickup.createReply",
+  clickUpSetCommentResolution: "clickup.setCommentResolution",
+  clickUpSetChecklistItemResolution: "clickup.setChecklistItemResolution",
+  clickUpTask: "clickup.task",
+  clickUpThreads: "clickup.threads",
 
   // Review methods
   reviewGetDiffPreview: "review.getDiffPreview",
@@ -646,6 +695,100 @@ const WsServerDiscoverSourceControlRpc = Rpc.make(WS_METHODS.serverDiscoverSourc
   payload: Schema.Struct({}),
   success: SourceControlDiscoveryResult,
   error: EnvironmentAuthorizationError,
+});
+
+const WsClickUpWorkflowRpc = Rpc.make(WS_METHODS.clickUpWorkflow, {
+  payload: ClickUpWorkflowInput,
+  success: ClickUpWorkflow,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSubmitWorkflowRpc = Rpc.make(WS_METHODS.clickUpSubmitWorkflow, {
+  payload: ClickUpSubmitWorkflowInput,
+  success: ClickUpHandoff,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpConnectionRpc = Rpc.make(WS_METHODS.clickUpConnection, {
+  payload: Schema.Struct({}),
+  success: ClickUpConnection,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpConnectRpc = Rpc.make(WS_METHODS.clickUpConnect, {
+  payload: Schema.Struct({ returnToApp: Schema.optional(Schema.Boolean) }),
+  success: Schema.Struct({ url: Schema.String }),
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpDisconnectRpc = Rpc.make(WS_METHODS.clickUpDisconnect, {
+  payload: Schema.Struct({}),
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpTasksRpc = Rpc.make(WS_METHODS.clickUpTasks, {
+  payload: ClickUpTasksInput,
+  success: ClickUpTaskPage,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSprintsRpc = Rpc.make(WS_METHODS.clickUpSprints, {
+  payload: ClickUpSprintsInput,
+  success: ClickUpSprintWindow,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpTaskOptionsRpc = Rpc.make(WS_METHODS.clickUpTaskOptions, {
+  payload: ClickUpTaskInput,
+  success: ClickUpTaskOptions,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetStatusRpc = Rpc.make(WS_METHODS.clickUpSetStatus, {
+  payload: ClickUpSetStatusInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetTagRpc = Rpc.make(WS_METHODS.clickUpSetTag, {
+  payload: ClickUpSetTagInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpCommentsRpc = Rpc.make(WS_METHODS.clickUpComments, {
+  payload: ClickUpCommentsInput,
+  success: ClickUpCommentsPage,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpCreateCommentRpc = Rpc.make(WS_METHODS.clickUpCreateComment, {
+  payload: ClickUpCreateCommentInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpCommentRepliesRpc = Rpc.make(WS_METHODS.clickUpCommentReplies, {
+  payload: ClickUpCommentRepliesInput,
+  success: ClickUpCommentReplies,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpCreateReplyRpc = Rpc.make(WS_METHODS.clickUpCreateReply, {
+  payload: ClickUpCreateReplyInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetCommentResolutionRpc = Rpc.make(WS_METHODS.clickUpSetCommentResolution, {
+  payload: ClickUpSetCommentResolutionInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetChecklistItemResolutionRpc = Rpc.make(
+  WS_METHODS.clickUpSetChecklistItemResolution,
+  {
+    payload: ClickUpSetChecklistItemResolutionInput,
+    success: Schema.Void,
+    error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+  },
+);
+const WsClickUpTaskRpc = Rpc.make(WS_METHODS.clickUpTask, {
+  payload: ClickUpTaskInput,
+  success: ClickUpTaskDetails,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpThreadsRpc = Rpc.make(WS_METHODS.clickUpThreads, {
+  payload: ClickUpTaskInput,
+  success: Schema.Array(ClickUpThreadLink),
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 
 const WsGitButlerWorkspaceStatusRpc = Rpc.make(WS_METHODS.gitButlerWorkspaceStatus, {
@@ -1573,6 +1716,25 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerUpdateSettingsRpc,
   WsServerDiscoverSourceControlRpc,
   WsGitButlerWorkspaceStatusRpc,
+  WsClickUpWorkflowRpc,
+  WsClickUpSubmitWorkflowRpc,
+  WsClickUpConnectionRpc,
+  WsClickUpConnectRpc,
+  WsClickUpDisconnectRpc,
+  WsClickUpTasksRpc,
+  WsClickUpSprintsRpc,
+  WsClickUpTaskOptionsRpc,
+  WsClickUpSetStatusRpc,
+  WsClickUpSetTagRpc,
+  WsClickUpCommentsRpc,
+  WsClickUpCreateCommentRpc,
+  WsClickUpCommentRepliesRpc,
+  WsClickUpCreateReplyRpc,
+  WsClickUpSetCommentResolutionRpc,
+  WsClickUpSetChecklistItemResolutionRpc,
+  WsClickUpTaskRpc,
+  WsClickUpThreadsRpc,
+
   WsServerGetTraceDiagnosticsRpc,
   WsServerGetProcessDiagnosticsRpc,
   WsServerGetHostResourcesRpc,

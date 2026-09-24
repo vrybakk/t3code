@@ -841,6 +841,7 @@ export const PullRequestDetail = Schema.Struct({
   deletions: NonNegativeInt,
   changedFiles: NonNegativeInt,
   headBranch: TrimmedNonEmptyString,
+  headSha: Schema.optional(TrimmedNonEmptyString),
   headRepositoryNameWithOwner: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   baseBranch: TrimmedNonEmptyString,
   createdAt: IsoDateTime,

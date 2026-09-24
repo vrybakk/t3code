@@ -1,3 +1,9 @@
+import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
+import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
+import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
+import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
+import * as ClickUpSprints from "./clickup/ClickUpSprints.ts";
+import * as ClickUpInteractions from "./clickup/ClickUpInteractions.ts";
 import {
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
@@ -649,6 +655,12 @@ const makeWsRpcLayer = (
       const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
       const sourceControlDiscovery = yield* SourceControlDiscovery.SourceControlDiscovery;
       const gitButlerWorkspace = yield* GitButlerWorkspace.GitButlerWorkspace;
+      const clickUpConnection = yield* ClickUpConnection.ClickUpConnection;
+      const clickUpTasks = yield* ClickUpTasks.ClickUpTasks;
+      const clickUpSprints = yield* ClickUpSprints.ClickUpSprints;
+      const clickUpInteractions = yield* ClickUpInteractions.ClickUpInteractions;
+      const clickUpWorkflow = yield* ClickUpWorkflow.ClickUpWorkflow;
+      const clickUpTaskEditing = yield* ClickUpTaskEditing.ClickUpTaskEditing;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -1413,6 +1425,9 @@ const makeWsRpcLayer = (
                 commandId: yield* serverCommandId("bootstrap-thread-create"),
                 threadId: command.threadId,
                 projectId: bootstrap.createThread.projectId,
+                ...(bootstrap.createThread.clickUpTask
+                  ? { clickUpTask: bootstrap.createThread.clickUpTask }
+                  : {}),
                 title: bootstrap.createThread.title,
                 modelSelection: bootstrap.createThread.modelSelection,
                 runtimeMode: bootstrap.createThread.runtimeMode,
@@ -2579,6 +2594,27 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
+        [WS_METHODS.clickUpConnection]: () => clickUpConnection.status,
+        [WS_METHODS.clickUpConnect]: ({ returnToApp }) =>
+          clickUpConnection.begin(currentSession.sessionId, returnToApp),
+        [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
+        [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
+        [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
+        [WS_METHODS.clickUpWorkflow]: (input) => clickUpWorkflow.read(input),
+        [WS_METHODS.clickUpSubmitWorkflow]: (input) => clickUpWorkflow.submit(input),
+        [WS_METHODS.clickUpTaskOptions]: (input) => clickUpTaskEditing.options(input),
+        [WS_METHODS.clickUpSetStatus]: (input) => clickUpTaskEditing.setStatus(input),
+        [WS_METHODS.clickUpSetTag]: (input) => clickUpTaskEditing.setTag(input),
+        [WS_METHODS.clickUpComments]: (input) => clickUpInteractions.comments(input),
+        [WS_METHODS.clickUpCommentReplies]: (input) => clickUpInteractions.replies(input),
+        [WS_METHODS.clickUpCreateComment]: (input) => clickUpInteractions.createComment(input),
+        [WS_METHODS.clickUpCreateReply]: (input) => clickUpInteractions.createReply(input),
+        [WS_METHODS.clickUpSetCommentResolution]: (input) =>
+          clickUpInteractions.setCommentResolution(input),
+        [WS_METHODS.clickUpSetChecklistItemResolution]: (input) =>
+          clickUpInteractions.setChecklistItemResolution(input),
+        [WS_METHODS.clickUpTask]: (input) => clickUpTasks.detail(input),
+        [WS_METHODS.clickUpThreads]: (input) => clickUpTasks.threads(input),
         [WS_METHODS.gitButlerWorkspaceStatus]: ({ projectId }) =>
           observeRpcEffect(
             WS_METHODS.gitButlerWorkspaceStatus,
@@ -3876,6 +3912,12 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         ),
     });
     const pullRequests = yield* PullRequestService.PullRequestService;
+    const clickUpConnectionService = yield* ClickUpConnection.ClickUpConnection;
+    const clickUpTasksService = yield* ClickUpTasks.ClickUpTasks;
+    const clickUpSprintsService = yield* ClickUpSprints.ClickUpSprints;
+    const clickUpInteractionsService = yield* ClickUpInteractions.ClickUpInteractions;
+    const clickUpWorkflowService = yield* ClickUpWorkflow.ClickUpWorkflow;
+    const clickUpTaskEditingService = yield* ClickUpTaskEditing.ClickUpTaskEditing;
     const sql = yield* SqlClient.SqlClient;
     const storageUsage = yield* StorageUsage.make;
     return HttpRouter.add(
@@ -3927,6 +3969,18 @@ export const websocketRpcRouteLayer = Layer.unwrap(
               // One server-lifetime service means clients share the same PR caches, and a WS
               // mutation invalidates the HTTP diff cache that every client reads from.
               Layer.provide(Layer.succeed(PullRequestService.PullRequestService, pullRequests)),
+              Layer.provide(
+                Layer.succeed(ClickUpConnection.ClickUpConnection, clickUpConnectionService),
+              ),
+              Layer.provide(Layer.succeed(ClickUpTasks.ClickUpTasks, clickUpTasksService)),
+              Layer.provide(Layer.succeed(ClickUpWorkflow.ClickUpWorkflow, clickUpWorkflowService)),
+              Layer.provide(
+                Layer.succeed(ClickUpTaskEditing.ClickUpTaskEditing, clickUpTaskEditingService),
+              ),
+              Layer.provide(Layer.succeed(ClickUpSprints.ClickUpSprints, clickUpSprintsService)),
+              Layer.provide(
+                Layer.succeed(ClickUpInteractions.ClickUpInteractions, clickUpInteractionsService),
+              ),
               Layer.provide(
                 SourceControlDiscovery.layer.pipe(
                   Layer.provide(

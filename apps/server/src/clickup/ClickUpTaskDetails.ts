@@ -1,0 +1,120 @@
+import * as Schema from "effect/Schema";
+import { customFieldValue } from "./ClickUpCustomFields.ts";
+import { ApiTask, ApiUser, normalizeUser, nullableNumber } from "./ClickUpApi.ts";
+
+const OptionalText = Schema.optional(Schema.NullOr(Schema.String));
+const OptionalNumber = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number])));
+
+export const ApiTaskDetails = Schema.Struct({
+  ...ApiTask.fields,
+  assignees: Schema.optional(Schema.NullOr(Schema.Array(ApiUser))),
+  creator: Schema.optional(Schema.NullOr(ApiUser)),
+  watchers: Schema.optional(Schema.NullOr(Schema.Array(ApiUser))),
+  start_date: OptionalText,
+  date_created: OptionalText,
+  date_updated: OptionalText,
+  date_closed: OptionalText,
+  time_spent: OptionalNumber,
+  tags: Schema.optional(Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String })))),
+  checklists: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          name: Schema.String,
+          items: Schema.optional(
+            Schema.Array(
+              Schema.Struct({
+                id: Schema.String,
+                name: Schema.String,
+                resolved: Schema.Boolean,
+                assignee: Schema.optional(Schema.NullOr(ApiUser)),
+              }),
+            ),
+          ),
+        }),
+      ),
+    ),
+  ),
+  subtasks: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          name: Schema.String,
+          status: Schema.Struct({ status: Schema.String }),
+        }),
+      ),
+    ),
+  ),
+  parent: OptionalText,
+  dependencies: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Struct({
+          task_id: Schema.String,
+          depends_on: Schema.String,
+        }),
+      ),
+    ),
+  ),
+  linked_tasks: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Struct({
+          task_id: Schema.String,
+          link_id: Schema.String,
+        }),
+      ),
+    ),
+  ),
+});
+
+export function normalizeTaskMetadata(task: typeof ApiTaskDetails.Type) {
+  const relatedTasks = [
+    ...(task.parent ? [{ id: task.parent, label: "Parent task" }] : []),
+    ...(task.dependencies ?? []).map((dependency) => ({
+      id: dependency.task_id === task.id ? dependency.depends_on : dependency.task_id,
+      label: dependency.task_id === task.id ? "Depends on" : "Blocking",
+    })),
+    ...(task.linked_tasks ?? []).map((link) => ({
+      id: link.task_id === task.id ? link.link_id : link.task_id,
+      label: "Linked task",
+    })),
+  ];
+  return {
+    assignees: (task.assignees ?? []).map(normalizeUser),
+    creator: task.creator ? normalizeUser(task.creator) : null,
+    watchers: (task.watchers ?? []).map(normalizeUser),
+    priority: task.priority?.priority ?? null,
+    startDate: task.start_date ?? null,
+    dueDate: task.due_date ?? null,
+    createdAt: task.date_created ?? null,
+    updatedAt: task.date_updated ?? null,
+    closedAt: task.date_closed ?? null,
+    timeEstimate: nullableNumber(task.time_estimate),
+    timeSpent: nullableNumber(task.time_spent),
+    tags: (task.tags ?? []).map((tag) => tag.name),
+    customFields: (task.custom_fields ?? []).map((field) => ({
+      id: field.id,
+      name: field.name,
+      type: field.type,
+      valueText: customFieldValue(field),
+    })),
+    checklists: (task.checklists ?? []).map((checklist) => ({
+      ...checklist,
+      items: (checklist.items ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        resolved: item.resolved,
+        assignee: item.assignee ? normalizeUser(item.assignee) : null,
+      })),
+    })),
+    subtasks: (task.subtasks ?? []).map((task) => ({
+      id: task.id,
+      name: task.name,
+      status: task.status.status,
+    })),
+    relatedTasks,
+  };
+}

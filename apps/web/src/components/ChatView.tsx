@@ -8027,6 +8027,7 @@ export default function ChatView(props: ChatViewProps) {
                   interactionMode: target.interactionMode,
                   bootstrap: {
                     createThread: {
+                      ...(draftThread?.clickUpTask ? { clickUpTask: draftThread.clickUpTask } : {}),
                       projectId: activeProject.id,
                       title,
                       modelSelection: target.selection,
@@ -8364,6 +8365,7 @@ export default function ChatView(props: ChatViewProps) {
               ...(isLocalDraftThread
                 ? {
                     createThread: {
+                      ...(draftThread?.clickUpTask ? { clickUpTask: draftThread.clickUpTask } : {}),
                       projectId: activeProject.id,
                       title,
                       modelSelection: threadCreateModelSelection,
@@ -9866,6 +9868,19 @@ export default function ChatView(props: ChatViewProps) {
             onDeleteProjectScript={deleteProjectScript}
           />
         </WorkspacePageHeader>
+
+        {isLocalDraftThread && draftId && draftThread?.clickUpTask && (
+          <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">
+            <span className="min-w-0 flex-1 truncate">ClickUp: {draftThread.clickUpTask.name}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDraftThreadContext(draftId, { clickUpTask: null })}
+            >
+              Unlink task
+            </Button>
+          </div>
+        )}
 
         {/* Main content area with optional plan sidebar */}
         <div className="flex min-h-0 min-w-0 flex-1">
