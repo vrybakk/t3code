@@ -9,6 +9,13 @@ export const normalizeComment = (comment: typeof ApiComment.Type) => ({
   avatarUrl: comment.user.profilePicture ?? null,
   replyCount: nullableNumber(comment.reply_count),
   assignee: comment.assignee ? normalizeUser(comment.assignee) : null,
+  mentionedUserIds: [
+    ...new Set(
+      (comment.comment ?? []).flatMap((block) =>
+        block.type === "tag" && block.user ? [block.user.id] : [],
+      ),
+    ),
+  ],
   resolved: comment.resolved ?? false,
   attachments: (comment.comment ?? []).flatMap((block) =>
     [block.attachment, block.image, block.video]

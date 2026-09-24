@@ -48,6 +48,8 @@ export const ApiComment = Schema.Struct({
     Schema.NullOr(
       Schema.Array(
         Schema.Struct({
+          type: OptionalText,
+          user: Schema.optional(Schema.NullOr(Schema.Struct({ id: Schema.Int }))),
           attachment: Schema.optional(Schema.NullOr(ApiAttachment)),
           image: Schema.optional(Schema.NullOr(ApiAttachment)),
           video: Schema.optional(Schema.NullOr(ApiAttachment)),

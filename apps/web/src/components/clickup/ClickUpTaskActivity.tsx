@@ -10,6 +10,7 @@ import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { CheckIcon, MessageSquareIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
+import { cn } from "../../lib/utils";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -141,6 +142,8 @@ function CommentCard({
   const update = useAtomCommand(serverEnvironment.clickUpSetCommentResolution);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const assignedToMe = comment.assignee?.id === input.userId;
+  const mentionsMe = comment.mentionedUserIds?.includes(input.userId) === true;
   async function toggle() {
     setBusy(true);
     setError(null);
@@ -166,7 +169,13 @@ function CommentCard({
     }
   }
   return (
-    <article className="space-y-3 rounded-lg border border-border bg-background p-3">
+    <article
+      className={cn(
+        "space-y-3 rounded-lg border border-border bg-background p-3",
+        (assignedToMe || mentionsMe) &&
+          "border-primary/30 bg-linear-to-br from-primary/10 to-background",
+      )}
+    >
       <div className="flex items-center gap-2">
         <span
           aria-hidden
@@ -181,6 +190,11 @@ function CommentCard({
           )}
         </div>
       </div>
+      {(assignedToMe || mentionsMe) && (
+        <p className="text-xs font-medium text-primary">
+          {assignedToMe ? "Assigned to you" : "Mentions you"}
+        </p>
+      )}
       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{comment.text}</p>
       {!!comment.attachments?.length && <ClickUpAttachments attachments={comment.attachments} />}
       {comment.assignee && (

@@ -96,6 +96,40 @@ it("reads generic attachment and video blocks without treating text as a URL", (
   );
 });
 
+it("preserves unique user IDs from structured mentions, independently of author and assignee", () => {
+  const comment = normalizeComment(
+    decodeComment({
+      ...base,
+      assignee: { id: 99, username: "Reviewer" },
+      comment: [
+        { text: "@Developer please review" },
+        { type: "tag", user: { id: 23 } },
+        { type: "tag", user: { id: 42 } },
+        { type: "tag", user: { id: 23 } },
+        { type: "text", user: { id: 17 }, text: "Not a mention" },
+        { type: "tag", user: null },
+      ],
+    }),
+  );
+  assert.deepEqual(comment.mentionedUserIds, [23, 42]);
+  assert.equal(comment.assignee?.id, 99);
+});
+
+it("does not infer mentions from plain text, the comment author, or assignment", () => {
+  const comment = normalizeComment(
+    decodeComment({
+      ...base,
+      comment_text: "@Developer",
+      assignee: { id: 17, username: "Developer" },
+    }),
+  );
+  assert.deepEqual(comment.mentionedUserIds, []);
+  assert.deepEqual(
+    normalizeComment(decodeComment({ ...base, comment: null })).mentionedUserIds,
+    [],
+  );
+});
+
 it("accepts missing or null media and assignments", () => {
   assert.deepEqual(normalizeComment(decodeComment(base)).attachments, []);
   const comment = normalizeComment(

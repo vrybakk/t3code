@@ -35,6 +35,7 @@ export const ClickUpComment = Schema.Struct({
   avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
   replyCount: Schema.optional(Schema.NullOr(Schema.Number)),
   assignee: Schema.optional(Schema.NullOr(ClickUpUser)),
+  mentionedUserIds: Schema.optional(Schema.Array(Schema.Int)),
   resolved: Schema.optional(Schema.Boolean),
   attachments: Schema.optional(Schema.Array(ClickUpAttachment)),
 });
