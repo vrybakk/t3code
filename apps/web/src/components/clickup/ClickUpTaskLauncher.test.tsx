@@ -1,4 +1,9 @@
-import { EnvironmentId, ProjectId, type ClickUpTaskDetails } from "@t3tools/contracts";
+import {
+  DEFAULT_SERVER_SETTINGS,
+  EnvironmentId,
+  ProjectId,
+  type ClickUpTaskDetails,
+} from "@t3tools/contracts";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -12,7 +17,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../composerDraftStore", () => ({ useComposerDraftStore: { getState: () => mocks } }));
 vi.mock("../../hooks/useHandleNewThread", () => ({ useNewThreadHandler: () => mocks.newThread }));
 vi.mock("../../hooks/useSettings", () => ({
-  useEnvironmentSettings: () => ({ "42:list::list": ["repo"] }),
+  useEnvironmentSettings: (_: unknown, selector: (settings: unknown) => unknown) =>
+    selector({ ...DEFAULT_SERVER_SETTINGS, clickUpProjectMappings: { "42:list::list": ["repo"] } }),
 }));
 vi.mock("../../state/entities", () => ({
   useProjects: () => [
@@ -20,6 +26,7 @@ vi.mock("../../state/entities", () => ({
     { id: "other", environmentId: "remote", title: "Other environment" },
   ],
 }));
+vi.mock("./ClickUpWorkflowModels", () => ({ ClickUpWorkflowModelPicker: "model-picker" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/select", () => ({
   Select: "select",
@@ -55,12 +62,12 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
   vi.unstubAllGlobals();
 });
-async function mount(action: ClickUpTaskAction) {
+async function mount(action: ClickUpTaskAction, taskDetails = details) {
   await act(async () => {
     renderer = create(
       <ClickUpTaskLauncher
         environmentId={EnvironmentId.make("test")}
-        details={details}
+        details={taskDetails}
         action={action}
       />,
     );
@@ -72,7 +79,7 @@ function prepare() {
     .find((button) => button.children.includes("Prepare thread"))!;
 }
 it.each([
-  ["requirements", "plan", "Check requirements only"],
+  ["requirements", "default", "Check requirements only"],
   ["estimate", "default", "Estimate this task only"],
   ["implement", "default", "Implement the agreed scope"],
 ] as const)(
@@ -112,4 +119,21 @@ it("does not write draft context after launch fails", async () => {
   expect(renderer.root.findByProps({ role: "alert" }).children.join("")).toContain(
     "Could not prepare",
   );
+});
+
+it("blocks implementation for no agent tasks but permits requirements review", async () => {
+  const tagged = { ...details, task: { ...details.task, tags: ["no agent"] } };
+  await mount("implement", tagged);
+  expect(prepare().props.disabled).toBe(true);
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).not.toHaveBeenCalled();
+  await act(async () => renderer.unmount());
+  await mount("requirements", tagged);
+  expect(prepare().props.disabled).toBe(false);
+});
+it("does not prepare an estimation draft once an estimate exists", async () => {
+  await mount("estimate", { ...details, task: { ...details.task, timeEstimate: 60000 } });
+  expect(prepare().props.disabled).toBe(true);
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).not.toHaveBeenCalled();
 });

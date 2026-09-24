@@ -6,6 +6,8 @@ import { ClickUpConnection } from "../../../clickup/ClickUpConnection.ts";
 import { ClickUpTasks } from "../../../clickup/ClickUpTasks.ts";
 import { ClickUpTaskEditing } from "../../../clickup/ClickUpTaskEditing.ts";
 import { requireMcpCapability } from "../../McpInvocationContext.ts";
+import { ClickUpWorkflow } from "../../../clickup/ClickUpWorkflow.ts";
+import { getStudioTaskWorkflow } from "../../../studio/StudioTaskWorkflow.ts";
 import { ClickUpToolkit } from "./tools.ts";
 
 const decodeTaskInput = Schema.decodeUnknownEffect(ClickUpTaskInput);
@@ -15,6 +17,7 @@ const make = Effect.gen(function* () {
   const connection = yield* ClickUpConnection;
   const tasks = yield* ClickUpTasks;
   const editing = yield* ClickUpTaskEditing;
+  const workflow = yield* ClickUpWorkflow;
   const linkedTask = Effect.fn("ClickUpToolkit.linkedTask")(function* () {
     const scope = yield* requireMcpCapability("clickup");
     const rows = yield* sql<{ workspaceId: string; taskId: string }>`
@@ -45,6 +48,17 @@ const make = Effect.gen(function* () {
     );
   });
   return ClickUpToolkit.of({
+    get_studio_task_workflow: (input) =>
+      linkedTask().pipe(Effect.map(() => getStudioTaskWorkflow(input.mode))),
+    start_linked_clickup_implementation: () => linkedTask().pipe(Effect.flatMap(workflow.start)),
+    post_linked_clickup_findings: (input) =>
+      linkedTask().pipe(Effect.flatMap((task) => workflow.findings(task, input))),
+    prepare_linked_clickup_handoff: (input) =>
+      Effect.gen(function* () {
+        const task = yield* linkedTask();
+        const scope = yield* requireMcpCapability("clickup");
+        return yield* workflow.prepare(task, scope.threadId, input);
+      }),
     get_linked_clickup_task: () => linkedTask().pipe(Effect.flatMap(tasks.detail)),
     complete_clickup_estimation: (input) =>
       linkedTask().pipe(

@@ -24,6 +24,31 @@ import {
 const FOLDED_SERVER_SETTINGS = { ...DEFAULT_SERVER_SETTINGS, projectSettingsFolded: true };
 
 describe("serverSettings helpers", () => {
+  it("replaces workflow model selections without carrying traits into another model and supports reset", () => {
+    const previous = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
+      clickUpWorkflowModels: {
+        research: {
+          instanceId: ProviderInstanceId.make("codex"),
+          model: "old",
+          options: [{ id: "effort", value: "high" }],
+        },
+        implementation: null,
+        review: null,
+      },
+    });
+    const next = applyServerSettingsPatch(previous, {
+      clickUpWorkflowModels: {
+        ...previous.clickUpWorkflowModels,
+        research: { instanceId: ProviderInstanceId.make("claude"), model: "new" },
+      },
+    });
+    expect(next.clickUpWorkflowModels.research).toEqual({ instanceId: "claude", model: "new" });
+    expect(
+      applyServerSettingsPatch(next, {
+        clickUpWorkflowModels: DEFAULT_SERVER_SETTINGS.clickUpWorkflowModels,
+      }).clickUpWorkflowModels,
+    ).toEqual({ research: null, implementation: null, review: null });
+  });
   it("replaces and removes one ClickUp mapping while preserving other mappings and shared repositories", () => {
     const api = ProjectId.make("api"),
       mobile = ProjectId.make("mobile"),

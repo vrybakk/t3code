@@ -151,20 +151,18 @@ export const layer = Layer.effect(
       const marker = task.tags?.find(
         (tag) => tag.name.trim().toLowerCase() === "estimation needed",
       );
-      if (!marker) {
+      const estimateMs = input.estimateMinutes * 60_000;
+      const existingEstimate = nullableNumber(task.time_estimate);
+      if (existingEstimate !== null)
         return yield* new ClickUpError({
           message:
-            "This task no longer has the estimation needed tag. Refresh the task before estimating.",
+            "This task already has an estimate. Existing estimates are never overwritten by the agent.",
         });
-      }
-      const estimateMs = input.estimateMinutes * 60_000;
-      if (nullableNumber(task.time_estimate) !== estimateMs) {
-        yield* api.request(`task/${encodeURIComponent(input.taskId)}`, {
-          token,
-          method: "PUT",
-          body: { time_estimate: estimateMs },
-        });
-      }
+      yield* api.request(`task/${encodeURIComponent(input.taskId)}`, {
+        token,
+        method: "PUT",
+        body: { time_estimate: estimateMs },
+      });
       const saved = yield* readTask(input, token).pipe(
         Effect.mapError(
           () =>
@@ -180,6 +178,7 @@ export const layer = Layer.effect(
             "ClickUp did not confirm the requested estimate. The estimation tag was kept; refresh the task before retrying.",
         });
       }
+      if (!marker) return { estimateMinutes: input.estimateMinutes, tagRemoved: true };
       const tagRemoved = yield* api
         .request(
           `task/${encodeURIComponent(input.taskId)}/tag/${encodeURIComponent(marker.name)}`,

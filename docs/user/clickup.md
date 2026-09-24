@@ -41,26 +41,35 @@ choice. Project badges use the ClickUp Project-field color when available.
 
 Use **Check requirements**, **Estimate task**, or **Implement** from the sprint table or task page.
 Choose a repository and select **Prepare thread**, then review the request, model and permissions
-and send it to begin. Requirements checks request a review of gaps without editing files or
-ClickUp; native plan mode applies when enabled in your settings and supported by the selected provider.
-Review the thread's mode and permissions before sending. Estimates research the time to a review-ready result without implementing; when the task
-has **estimation needed**, the agent can save the estimate and remove the tag. Otherwise it proposes
-the estimate in the thread. Implement follows the studio implementation and verification workflow.
-The existing worktree setup creates an isolated checkout. The task link is saved when the thread
-is created; return to the task to find its coding threads and their linked pull requests. You can open additional threads for
-other repositories involved in the same task.
+and send it to begin. Configure research, implementation, and review model defaults in
+**Settings → Integrations → ClickUp**, or override them for one launch. An unset role uses the
+thread's model. If a provider cannot use a requested model, the agent asks how to continue.
 
-When a linked task has the **estimation needed** tag, the agent researches the scope and
-proposes an AI-assisted estimate for reaching a review-ready result: implementation,
-verification, and likely fixes, excluding waiting for CTO review or deployment. During
-authorized estimation or implementation it saves the estimate in ClickUp, verifies it, then removes the tag. In plan
-mode it only proposes the estimate. Unclear requirements need clarification first. A failed
-tag removal leaves the saved estimate intact and is reported separately. Refresh task details
-to see agent updates; existing provider sessions may need restarting to pick up the new tools.
+**Check requirements** researches gaps and questions without implementing or changing status.
+It posts one short, plain-language findings comment only when something needs attention.
+A clean check does not post a comment. **Estimate task** researches AI-assisted time to a
+review-ready result, including implementation, verification, and likely fixes, excluding waiting
+for CTO review or deployment. It saves the missing estimate without posting a comment, then
+removes **estimation needed** if present. Existing estimates are preserved and hide the action.
+Unclear requirements need clarification first. If tag removal fails, the saved estimate remains.
 
-Description edits, inbox notifications,
-and automated PR handoff are not available yet. The task association
-does not change Work reports or export time to ClickUp.
+**Implement** coordinates the linked repositories, moves the task to In Progress when coding
+starts, verifies the result, and requests an independent review. It fixes findings before preparing
+draft pull requests and a handoff in **Linked work**. The agent asks for help if required testing
+is blocked; continuing without that check requires your explicit approval. Tasks tagged
+**no agent** cannot start implementation, but can still be checked or estimated.
+
+The task link is saved when the thread is created. Return to the task to find its coding threads,
+linked pull requests, and handoffs. Complete your manual check, then select **Submit** on the
+handoff to mark its pull requests ready, request review from **vrybakk** unless he authored the
+pull request, move the task to Code Review, and post a short result with the pull request links.
+Merge and deployment remain with the CTO. A partial submission shows which steps succeeded;
+refresh before continuing after an unconfirmed response.
+
+Studio instructions are updated with app releases and loaded again when work resumes.
+Refresh task details to see agent updates; existing provider sessions may need restarting to
+pick up new tools. Description edits and inbox notifications are not available yet. The task
+association does not change Work reports or export time to ClickUp.
 
 Disconnecting removes Nerd's saved ClickUp credential for that environment. It does not revoke
 the app's authorization in ClickUp or remove existing task context from coding threads.

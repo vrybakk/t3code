@@ -112,7 +112,7 @@ export function ClickUpSprintTable({
                     <TableCell className="pr-5">
                       <ClickUpTaskActionButtons
                         compact
-                        taskName={task.name}
+                        task={task}
                         onSelect={(action) => setSelection({ task, action })}
                       />
                     </TableCell>

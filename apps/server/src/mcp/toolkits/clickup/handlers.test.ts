@@ -15,6 +15,7 @@ import type { Tool } from "effect/unstable/ai";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { ClickUpConnection } from "../../../clickup/ClickUpConnection.ts";
 import { ClickUpTaskEditing } from "../../../clickup/ClickUpTaskEditing.ts";
+import { ClickUpWorkflow } from "../../../clickup/ClickUpWorkflow.ts";
 import { ClickUpTasks } from "../../../clickup/ClickUpTasks.ts";
 import { McpInvocationContext, type McpCapability } from "../../McpInvocationContext.ts";
 import { ClickUpToolkitHandlersLive } from "./handlers.ts";
@@ -40,9 +41,16 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
     accountReads: 0,
     reads: [] as ClickUpTaskInput[],
     estimates: [] as ClickUpCompleteEstimationInput[],
+    starts: [] as ClickUpTaskInput[],
   };
   const userId = options.userId === undefined ? 73 : options.userId;
   const dependencies = Layer.mergeAll(
+    Layer.mock(ClickUpWorkflow)({
+      start: (task) =>
+        Effect.sync(() => {
+          calls.starts.push(task);
+        }),
+    }),
     Layer.succeed(SqlClient.SqlClient, sql),
     Layer.mock(ClickUpConnection)({
       account: Effect.sync(() => {
@@ -196,5 +204,18 @@ it.effect("propagates provider errors instead of producing a success receipt", (
       .pipe(Effect.flip);
     assert.equal(failure._tag, "ClickUpError");
     assert.equal(failure.message, "Provider rejected estimate");
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("starts only the authenticated thread's task and rejects missing capability", () =>
+  Effect.gen(function* () {
+    const harness = yield* makeHarness();
+    yield* harness.call("start_linked_clickup_implementation", {});
+    assert.deepEqual(harness.calls.starts, [{ workspaceId: "42", taskId: "own-task", userId: 73 }]);
+    assert.equal(
+      (yield* Effect.result(harness.call("start_linked_clickup_implementation", {}, [])))._tag,
+      "Failure",
+    );
+    assert.equal(harness.calls.starts.length, 1);
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );

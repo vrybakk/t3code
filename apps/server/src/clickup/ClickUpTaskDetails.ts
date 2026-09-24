@@ -14,7 +14,6 @@ export const ApiTaskDetails = Schema.Struct({
   date_created: OptionalText,
   date_updated: OptionalText,
   date_closed: OptionalText,
-  time_estimate: OptionalNumber,
   time_spent: OptionalNumber,
   tags: Schema.optional(Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String })))),
   checklists: Schema.optional(

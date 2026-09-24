@@ -1082,6 +1082,20 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.clickUpThreads,
       staleTimeMs: 30_000,
     }),
+    clickUpWorkflow: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpWorkflow",
+      tag: WS_METHODS.clickUpWorkflow,
+      staleTimeMs: 5_000,
+      refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
+    }),
+    clickUpSubmitWorkflow: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSubmitWorkflow",
+      tag: WS_METHODS.clickUpSubmitWorkflow,
+      onSettled: ({ environmentId }, registry) =>
+        Effect.sync(() => {
+          registry.update(clickUpRevisionAtom(environmentId), (revision) => revision + 1);
+        }),
+    }),
     clickUpTaskOptions: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:clickup:clickUpTaskOptions",
       tag: WS_METHODS.clickUpTaskOptions,

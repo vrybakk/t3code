@@ -31,3 +31,15 @@ personal environment for this pilot, as agreed for the first release.
 Before company rollout, verify actual OAuth sign-in, revocation/reconnection, the registered
 callback, representative task payloads and attachments, and ClickUp workspace permissions.
 Fixture tests are not evidence that a registered app or a live account connection works.
+
+## Studio workflow releases
+
+The CTO-owned workflow source is
+[`studio-task-workflow`](../../apps/server/src/studio/skills/studio-task-workflow/SKILL.md).
+The server bundles these instructions so every supported provider receives the same version
+through Nerd's native task tools, including packaged desktop installs without source files.
+After editing the skill, run `bun scripts/generate-studio-workflow.ts` from `apps/server` and
+commit the generated bundle with the source. Use `--check` to detect stale output. Server
+development and release builds regenerate it automatically. Active conversations load the
+installed version on their next turn; an app update must interrupt and resume running work
+before new instructions take effect.

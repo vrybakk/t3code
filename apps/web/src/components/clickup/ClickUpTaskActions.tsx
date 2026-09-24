@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
+import type { ClickUpTask, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { CalculatorIcon, ListChecksIcon, PlayIcon } from "lucide-react";
@@ -23,13 +23,13 @@ const actions = {
     label: "Check requirements",
     icon: ListChecksIcon,
     description:
-      "Review the task and code, identify missing requirements, and prepare questions. No implementation or ClickUp changes.",
+      "Review requirements without implementation. Post only actionable findings to the task.",
   },
   estimate: {
     label: "Estimate task",
     icon: CalculatorIcon,
     description:
-      "Research the time to reach a review-ready result with AI. Save the estimate if estimation is needed; otherwise propose it in the thread.",
+      "Research the time to reach a review-ready result with AI and save the estimate. No implementation or comments.",
   },
   implement: {
     label: "Implement",
@@ -43,20 +43,24 @@ const actions = {
 >;
 
 export function ClickUpTaskActionButtons({
-  taskName,
+  task,
   compact = false,
   onSelect,
 }: {
-  taskName: string;
+  task: Pick<ClickUpTask, "name" | "timeEstimate" | "tags">;
   compact?: boolean;
   onSelect: (action: ClickUpTaskAction) => void;
 }) {
   return (
     <div
       className={compact ? "flex w-max items-center gap-1" : "flex flex-wrap items-center gap-1"}
-      aria-label={`Actions for ${taskName}`}
+      aria-label={`Actions for ${task.name}`}
     >
       {(Object.keys(actions) as ClickUpTaskAction[]).map((action) => {
+        if (action === "estimate" && task.timeEstimate != null) return null;
+        const blocked =
+          action === "implement" &&
+          task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
         const { label, icon: Icon } = actions[action];
         return (
           <Tooltip key={action}>
@@ -65,15 +69,21 @@ export function ClickUpTaskActionButtons({
                 <Button
                   size={compact ? "icon-sm" : "sm"}
                   variant={action === "implement" ? "outline" : "ghost"}
-                  aria-label={`${label}: ${taskName}`}
-                  onClick={() => onSelect(action)}
+                  aria-label={`${label}: ${task.name}`}
+                  aria-disabled={blocked || undefined}
+                  className={blocked ? "cursor-not-allowed opacity-50" : undefined}
+                  onClick={() => {
+                    if (!blocked) onSelect(action);
+                  }}
                 />
               }
             >
               <Icon className="size-3.5" />
               {!compact && label}
             </TooltipTrigger>
-            <TooltipPopup>{label}</TooltipPopup>
+            <TooltipPopup>
+              {blocked ? "Remove the no agent tag to allow implementation." : label}
+            </TooltipPopup>
           </Tooltip>
         );
       })}

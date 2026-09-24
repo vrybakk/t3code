@@ -30,6 +30,7 @@ export const ApiTask = Schema.Struct({
   status: Schema.Struct({ status: Schema.String, color: OptionalText }),
   priority: Schema.optional(Schema.NullOr(Schema.Struct({ priority: Schema.String }))),
   due_date: OptionalText,
+  time_estimate: Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number]))),
   ...ApiTaskSourceFields,
   description: Schema.optional(Schema.NullOr(Schema.String)),
   markdown_description: Schema.optional(Schema.NullOr(Schema.String)),
@@ -96,6 +97,7 @@ export const normalizeTask = (task: typeof ApiTask.Type) => ({
   tags: (task.tags ?? []).map((tag) => tag.name),
   listName: task.list.name,
   sources: normalizeTaskSources(task),
+  timeEstimate: nullableNumber(task.time_estimate),
   description: task.markdown_description ?? task.description ?? "",
 });
 

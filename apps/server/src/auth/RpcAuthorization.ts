@@ -61,6 +61,8 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.clickUpThreads]: AuthOrchestrationReadScope,
   [WS_METHODS.clickUpSprints]: AuthOrchestrationReadScope,
   [WS_METHODS.clickUpTaskOptions]: AuthOrchestrationReadScope,
+  [WS_METHODS.clickUpWorkflow]: AuthOrchestrationReadScope,
+  [WS_METHODS.clickUpSubmitWorkflow]: AuthOrchestrationOperateScope,
   [WS_METHODS.clickUpSetStatus]: AuthOrchestrationOperateScope,
   [WS_METHODS.clickUpSetTag]: AuthOrchestrationOperateScope,
   [WS_METHODS.clickUpComments]: AuthOrchestrationReadScope,

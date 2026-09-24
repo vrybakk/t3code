@@ -30,6 +30,7 @@ import { resolveProviderInstanceTerminalEnvironment } from "./terminal/Manager.t
 
 const decodeSettingsPatch = Schema.decodeUnknownEffect(ServerSettingsPatch);
 const decodeServerSettings = Schema.decodeUnknownEffect(ServerSettings);
+const decodeServerSettingsJson = Schema.decodeUnknownEffect(Schema.fromJsonString(ServerSettings));
 
 const makeServerSettingsLayer = () =>
   ServerSettingsModule.layer.pipe(
@@ -78,6 +79,33 @@ const recordProviderUsage = (provider: string, instanceId: string | null = provi
   });
 
 it.layer(NodeServices.layer)("server settings", (it) => {
+  it.effect(
+    "persists a workflow role selection while other roles inherit and restores defaults",
+    () =>
+      Effect.gen(function* () {
+        const service = yield* ServerSettingsModule.ServerSettingsService;
+        const config = yield* ServerConfig.ServerConfig;
+        const fs = yield* FileSystem.FileSystem;
+        const models = {
+          ...DEFAULT_SERVER_SETTINGS.clickUpWorkflowModels,
+          review: createModelSelection(ProviderInstanceId.make("codex"), "gpt-6-sol"),
+        };
+        yield* service.updateSettings({ clickUpWorkflowModels: models });
+        const raw = yield* fs.readFileString(config.settingsPath);
+        const decoded = yield* decodeServerSettingsJson(raw);
+        assert.deepEqual(decoded.clickUpWorkflowModels, models);
+        yield* service.updateSettings({
+          clickUpWorkflowModels: DEFAULT_SERVER_SETTINGS.clickUpWorkflowModels,
+        });
+        const resetRaw = yield* fs.readFileString(config.settingsPath);
+        const reset = yield* decodeServerSettingsJson(resetRaw);
+        assert.deepEqual(
+          reset.clickUpWorkflowModels,
+          DEFAULT_SERVER_SETTINGS.clickUpWorkflowModels,
+        );
+      }).pipe(Effect.provide(makeServerSettingsLayer())),
+  );
+
   it.effect("preserves context when reading a provider environment secret fails", () => {
     const platformCause = PlatformError.systemError({
       _tag: "PermissionDenied",

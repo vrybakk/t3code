@@ -1,5 +1,10 @@
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import type { ClickUpTaskDetails, EnvironmentId, ProjectId } from "@t3tools/contracts";
+import type {
+  ClickUpTaskDetails,
+  ClickUpWorkflowModels,
+  EnvironmentId,
+  ProjectId,
+} from "@t3tools/contracts";
 import { useRef, useState } from "react";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
@@ -8,6 +13,7 @@ import { useProjects } from "../../state/entities";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { buildClickUpTaskPrompt, type ClickUpTaskAction } from "./taskPrompt";
+import { ClickUpWorkflowModelPicker } from "./ClickUpWorkflowModels";
 import { resolveClickUpMapping } from "./projectMappings";
 
 export function ClickUpTaskLauncher({
@@ -24,6 +30,15 @@ export function ClickUpTaskLauncher({
     environmentId,
     (settings) => settings.clickUpProjectMappings,
   );
+  const defaults = useEnvironmentSettings(
+    environmentId,
+    (settings) => settings.clickUpWorkflowModels,
+  );
+  const [models, setModels] = useState<ClickUpWorkflowModels | null>(null);
+  const blocked =
+    action === "implement" &&
+    details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
+  const alreadyEstimated = action === "estimate" && details.task.timeEstimate != null;
   const mapping = resolveClickUpMapping(details.task, mappings);
   const mappedProjects = projects.filter((project) => mapping?.projectIds.includes(project.id));
   const [showAllRepositories, setShowAllRepositories] = useState(false);
@@ -38,7 +53,7 @@ export function ClickUpTaskLauncher({
   );
   const launching = useRef(false);
   async function prepareThread() {
-    if (!selectedProject || launching.current) return;
+    if (!selectedProject || launching.current || blocked || alreadyEstimated) return;
     launching.current = true;
     setBusy(true);
     setError(null);
@@ -48,7 +63,7 @@ export function ClickUpTaskLauncher({
       });
       if (!draft) return;
       const store = useComposerDraftStore.getState();
-      const interactionMode = action === "requirements" ? "plan" : "default";
+      const interactionMode = "default";
       store.setInteractionMode(draft.draftId, interactionMode);
       store.setDraftThreadContext(draft.draftId, {
         clickUpTask: {
@@ -59,7 +74,21 @@ export function ClickUpTaskLauncher({
         environmentSelection: "manual",
         interactionMode,
       });
-      store.setPrompt(draft.draftId, buildClickUpTaskPrompt(details, action));
+      store.setPrompt(
+        draft.draftId,
+        buildClickUpTaskPrompt(details, action, {
+          models: models ?? defaults,
+          repositories: [
+            ...new Map(
+              [...mappedProjects, selectedProject].map((project) => [project.id, project]),
+            ).values(),
+          ].map((project) => ({
+            id: project.id,
+            title: project.title,
+            cwd: project.workspaceRoot,
+          })),
+        }),
+      );
     } catch {
       setError("Could not prepare the coding thread. Try again.");
     } finally {
@@ -91,7 +120,11 @@ export function ClickUpTaskLauncher({
           </SelectPopup>
         </Select>
       </div>
-      <Button size="sm" disabled={!selectedProject || busy} onClick={() => void prepareThread()}>
+      <Button
+        size="sm"
+        disabled={!selectedProject || busy || blocked || alreadyEstimated}
+        onClick={() => void prepareThread()}
+      >
         {busy ? "Preparing…" : "Prepare thread"}
       </Button>
       {mapping && (
@@ -109,13 +142,36 @@ export function ClickUpTaskLauncher({
           </Button>
         </div>
       )}
+      <details className="w-full space-y-3">
+        <summary className="cursor-pointer text-xs text-muted-foreground">Workflow models</summary>
+        <ClickUpWorkflowModelPicker
+          environmentId={environmentId}
+          value={models ?? defaults}
+          onChange={setModels}
+          disabled={busy}
+        />
+        {models && (
+          <Button size="sm" variant="ghost" onClick={() => setModels(null)}>
+            Use environment defaults
+          </Button>
+        )}
+      </details>
+      {blocked && (
+        <p role="alert" className="w-full text-sm text-muted-foreground">
+          Remove the no agent tag to allow implementation.
+        </p>
+      )}
+      {alreadyEstimated && (
+        <p role="status" className="w-full text-sm text-muted-foreground">
+          This task already has an estimate.
+        </p>
+      )}
       <p className="w-full text-xs text-muted-foreground">
         Review the task request, model and permissions in the thread, then send it to start.
       </p>
       {action === "requirements" && (
         <p className="w-full text-xs text-muted-foreground">
-          Requests requirements review only. Plan mode is used when enabled and supported by your
-          provider.
+          Reviews requirements only. Only actionable findings are posted to ClickUp.
         </p>
       )}
       {!projects.length && (

@@ -184,8 +184,23 @@ it.effect("saves milliseconds and confirms them before removing the estimation t
   }).pipe(Effect.provide(test.layer));
 });
 
-it.effect("does not estimate a task whose marker was removed", () => {
+it.effect("saves a missing estimate without requiring an estimation marker", () => {
   const test = setup({ task: { tags: [] } });
+  return Effect.gen(function* () {
+    const service = yield* ClickUpTaskEditing;
+    assert.deepEqual(yield* service.completeEstimation({ ...input, estimateMinutes: 90 }), {
+      estimateMinutes: 90,
+      tagRemoved: true,
+    });
+    assert.equal(
+      test.calls.some((call) => call.options?.method === "DELETE"),
+      false,
+    );
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("preserves an existing estimate even if a different estimate is requested", () => {
+  const test = setup({ task: { time_estimate: 1_800_000 } });
   return Effect.gen(function* () {
     const service = yield* ClickUpTaskEditing;
     assert.equal(
@@ -193,6 +208,7 @@ it.effect("does not estimate a task whose marker was removed", () => {
       "Failure",
     );
     assert.equal(test.calls.length, 1);
+    assert.equal(test.task().time_estimate, 1_800_000);
   }).pipe(Effect.provide(test.layer));
 });
 
@@ -218,17 +234,20 @@ for (const failure of ["failPut", "ignoreEstimate"] as const) {
   );
 }
 
-it.effect("reports partial success and avoids repeating the same estimate write on retry", () => {
+it.effect("reports partial success and never alters the saved estimate on a retry", () => {
   const test = setup({ failDelete: true });
   return Effect.gen(function* () {
     const service = yield* ClickUpTaskEditing;
-    for (let index = 0; index < 2; index++)
-      assert.deepEqual(yield* service.completeEstimation({ ...input, estimateMinutes: 90 }), {
-        estimateMinutes: 90,
-        tagRemoved: false,
-      });
-    assert.equal(test.task().time_estimate, 5_400_000);
+    assert.deepEqual(yield* service.completeEstimation({ ...input, estimateMinutes: 90 }), {
+      estimateMinutes: 90,
+      tagRemoved: false,
+    });
+    assert.equal(
+      (yield* Effect.result(service.completeEstimation({ ...input, estimateMinutes: 90 })))._tag,
+      "Failure",
+    );
     assert.equal(test.calls.filter((call) => call.options?.method === "PUT").length, 1);
+    assert.equal(test.calls.filter((call) => call.options?.method === "DELETE").length, 1);
   }).pipe(Effect.provide(test.layer));
 });
 

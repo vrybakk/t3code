@@ -11,6 +11,7 @@ import { serverEnvironment } from "../../state/server";
 import { Badge } from "../ui/badge";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { safeClickUpAttachmentUrl } from "./taskPrompt";
+import { ClickUpTaskHandoffs } from "./ClickUpTaskHandoffs";
 import { ClickUpRepositoryMappings } from "./ClickUpRepositoryMappings";
 
 export function ClickUpTaskWork({
@@ -106,6 +107,7 @@ export function ClickUpTaskWork({
           </div>
         </dl>
       )}
+      <ClickUpTaskHandoffs environmentId={environmentId} input={input} />
       <ClickUpRepositoryMappings task={details.task} environmentId={environmentId} />
     </section>
   );

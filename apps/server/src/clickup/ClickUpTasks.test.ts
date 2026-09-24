@@ -13,6 +13,7 @@ const task = {
   status: { status: "open" },
   list: { name: "Sprint 1" },
   description: "Plain description",
+  time_estimate: "1800000",
   markdown_description: "**Requirements**",
 };
 
@@ -55,6 +56,7 @@ it.effect("filters by the authenticated user, includes subtasks, and preserves p
     assert.equal(page.hasMore, true);
     assert.equal(page.tasks[0]?.description, "");
     assert.equal(page.tasks[0]?.dueDate, null);
+    assert.equal(page.tasks[0]?.timeEstimate, 1_800_000);
     const query = new URL(`https://example.test/${test.paths[0]}`).searchParams;
     assert.equal(query.get("assignees[]"), "17");
     assert.equal(query.get("page"), "2");

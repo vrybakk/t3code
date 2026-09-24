@@ -1,3 +1,4 @@
+import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
 import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
 import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
@@ -658,6 +659,7 @@ const makeWsRpcLayer = (
       const clickUpTasks = yield* ClickUpTasks.ClickUpTasks;
       const clickUpSprints = yield* ClickUpSprints.ClickUpSprints;
       const clickUpInteractions = yield* ClickUpInteractions.ClickUpInteractions;
+      const clickUpWorkflow = yield* ClickUpWorkflow.ClickUpWorkflow;
       const clickUpTaskEditing = yield* ClickUpTaskEditing.ClickUpTaskEditing;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
@@ -2598,6 +2600,8 @@ const makeWsRpcLayer = (
         [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
         [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
         [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
+        [WS_METHODS.clickUpWorkflow]: (input) => clickUpWorkflow.read(input),
+        [WS_METHODS.clickUpSubmitWorkflow]: (input) => clickUpWorkflow.submit(input),
         [WS_METHODS.clickUpTaskOptions]: (input) => clickUpTaskEditing.options(input),
         [WS_METHODS.clickUpSetStatus]: (input) => clickUpTaskEditing.setStatus(input),
         [WS_METHODS.clickUpSetTag]: (input) => clickUpTaskEditing.setTag(input),
@@ -3912,6 +3916,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const clickUpTasksService = yield* ClickUpTasks.ClickUpTasks;
     const clickUpSprintsService = yield* ClickUpSprints.ClickUpSprints;
     const clickUpInteractionsService = yield* ClickUpInteractions.ClickUpInteractions;
+    const clickUpWorkflowService = yield* ClickUpWorkflow.ClickUpWorkflow;
     const clickUpTaskEditingService = yield* ClickUpTaskEditing.ClickUpTaskEditing;
     const sql = yield* SqlClient.SqlClient;
     const storageUsage = yield* StorageUsage.make;
@@ -3968,6 +3973,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
                 Layer.succeed(ClickUpConnection.ClickUpConnection, clickUpConnectionService),
               ),
               Layer.provide(Layer.succeed(ClickUpTasks.ClickUpTasks, clickUpTasksService)),
+              Layer.provide(Layer.succeed(ClickUpWorkflow.ClickUpWorkflow, clickUpWorkflowService)),
               Layer.provide(
                 Layer.succeed(ClickUpTaskEditing.ClickUpTaskEditing, clickUpTaskEditingService),
               ),

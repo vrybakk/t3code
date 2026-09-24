@@ -1,3 +1,4 @@
+import { ClickUpWorkflowSettings } from "./ClickUpWorkflowSettings";
 import { ClickUpConnectionCard } from "../clickup/ClickUpConnectionCard";
 import { SettingsSection } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
@@ -19,10 +20,16 @@ export function ClickUpIntegrationSettings() {
           Update this environment to use ClickUp tasks.
         </p>
       ) : (
-        <ClickUpConnectionCard
-          key={environment.environmentId}
-          environmentId={environment.environmentId}
-        />
+        <div className="space-y-4">
+          <ClickUpConnectionCard
+            key={environment.environmentId}
+            environmentId={environment.environmentId}
+          />
+          <ClickUpWorkflowSettings
+            key={`models-${environment.environmentId}`}
+            environmentId={environment.environmentId}
+          />
+        </div>
       )}
     </SettingsSection>
   );

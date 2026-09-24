@@ -73,7 +73,7 @@ export function ClickUpTaskPanel({
               <h2 className="text-2xl font-semibold leading-snug tracking-tight">
                 {details.task.name}
               </h2>
-              <ClickUpTaskActionButtons taskName={details.task.name} onSelect={setAction} />
+              <ClickUpTaskActionButtons task={details.task} onSelect={setAction} />
               <ClickUpTaskFields details={details} environmentId={environmentId} input={input} />
               <section aria-label="Description" className="space-y-4 border-t border-border pt-6">
                 <h3 className="text-sm font-medium">Description</h3>
