@@ -4,12 +4,15 @@ import {
   ClickUpError,
   type ClickUpConnection as Connection,
 } from "@t3tools/contracts";
+import * as Cache from "effect/Cache";
 import * as Clock from "effect/Clock";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
@@ -93,18 +96,22 @@ export const layer = Layer.effect(
       };
     });
 
+    const accounts = yield* Cache.makeWith(readAccount, {
+      capacity: 1,
+      timeToLive: (exit) => (Exit.isSuccess(exit) ? Duration.seconds(5) : Duration.zero),
+    });
     const status = readToken.pipe(
       Effect.flatMap(
         Option.match({
           onNone: () => Effect.succeed<Connection>({ configured, user: null, workspaces: [] }),
-          onSome: readAccount,
+          onSome: (token) => Cache.get(accounts, token),
         }),
       ),
     );
 
     const account = token.pipe(
       Effect.flatMap((token) =>
-        readAccount(token).pipe(Effect.map((connection) => ({ token, connection }))),
+        Cache.get(accounts, token).pipe(Effect.map((connection) => ({ token, connection }))),
       ),
     );
     const verifyInitiator = Effect.fn("ClickUpConnection.verifyInitiator")(function* (
@@ -169,11 +176,13 @@ export const layer = Layer.effect(
       yield* secrets
         .set(SECRET_NAME, new TextEncoder().encode(result.access_token))
         .pipe(Effect.mapError(() => failure("Could not save the ClickUp connection.")));
+      yield* Cache.invalidateAll(accounts);
       return { returnToApp: flow.returnToApp };
     });
 
     const disconnect = Effect.gen(function* () {
       pending = null;
+      yield* Cache.invalidateAll(accounts);
       yield* secrets
         .remove(SECRET_NAME)
         .pipe(Effect.mapError(() => failure("Could not remove the ClickUp connection.")));

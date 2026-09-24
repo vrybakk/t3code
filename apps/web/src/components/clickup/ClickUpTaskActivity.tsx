@@ -1,12 +1,13 @@
 import { useAtomValue } from "@effect/atom-react";
 import type {
   ClickUpCommentCursor,
+  ClickUpCommentsPage,
   ClickUpTaskDetails,
   ClickUpTaskInput,
   EnvironmentId,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { MessageSquareIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
@@ -16,6 +17,8 @@ import { ScrollArea } from "../ui/scroll-area";
 import { ClickUpCommentThread } from "./ClickUpCommentThread";
 import { ClickUpCommentComposer } from "./ClickUpCommentComposer";
 import { taskDate } from "./taskFormatting";
+
+const inactiveComments = Atom.make(AsyncResult.initial<ClickUpCommentsPage>());
 
 export function ClickUpTaskActivity({
   details,
@@ -27,13 +30,31 @@ export function ClickUpTaskActivity({
   input: ClickUpTaskInput;
 }) {
   const [cursors, setCursors] = useState<ClickUpCommentCursor[]>([]);
+  const [fetchComments, setFetchComments] = useState(false);
   const cursor = cursors.at(-1);
-  const query = serverEnvironment.clickUpComments({
-    environmentId,
-    input: { ...input, ...(cursor ? { cursor } : {}) },
-  });
+  const query = fetchComments
+    ? serverEnvironment.clickUpComments({
+        environmentId,
+        input: { ...input, ...(cursor ? { cursor } : {}) },
+      })
+    : inactiveComments;
   const result = useAtomValue(query);
-  const page = Option.getOrNull(AsyncResult.value(result));
+  const lastComment = details.comments.at(-1);
+  const nextCursor =
+    details.commentsMayHaveMore &&
+    lastComment?.createdAt &&
+    /^\d{1,20}$/.test(lastComment.createdAt)
+      ? { id: lastComment.id, date: lastComment.createdAt }
+      : null;
+  const page =
+    Option.getOrNull(AsyncResult.value(result)) ??
+    (cursor ? null : { comments: details.comments, hasMore: nextCursor !== null, nextCursor });
+  function refreshComments() {
+    appAtomRegistry.refresh(
+      fetchComments ? query : serverEnvironment.clickUpComments({ environmentId, input }),
+    );
+    setFetchComments(true);
+  }
   return (
     <aside
       aria-label="Activity and comments"
@@ -48,7 +69,7 @@ export function ClickUpTaskActivity({
           variant="ghost"
           aria-label="Refresh comments"
           disabled={result.waiting}
-          onClick={() => appAtomRegistry.refresh(query)}
+          onClick={refreshComments}
         >
           <RefreshCwIcon className="size-4" />
         </Button>
@@ -90,7 +111,7 @@ export function ClickUpTaskActivity({
                   input={input}
                   cursor={cursor}
                   refreshing={result.waiting}
-                  onRefresh={() => appAtomRegistry.refresh(query)}
+                  onRefresh={refreshComments}
                 />
               ))}
             </>
@@ -112,7 +133,10 @@ export function ClickUpTaskActivity({
                 disabled={!page?.nextCursor || result.waiting || AsyncResult.isFailure(result)}
                 onClick={() => {
                   const nextCursor = page?.nextCursor;
-                  if (nextCursor) setCursors((current) => [...current, nextCursor]);
+                  if (nextCursor) {
+                    setFetchComments(true);
+                    setCursors((current) => [...current, nextCursor]);
+                  }
                 }}
               >
                 Older
@@ -128,6 +152,7 @@ export function ClickUpTaskActivity({
           onSent={() => {
             setCursors([]);
             appAtomRegistry.refresh(serverEnvironment.clickUpComments({ environmentId, input }));
+            setFetchComments(true);
             appAtomRegistry.refresh(serverEnvironment.clickUpTask({ environmentId, input }));
           }}
         />

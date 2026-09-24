@@ -1,11 +1,19 @@
 import { ClickUpError } from "@t3tools/contracts";
+import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { nativeTaskType } from "./ClickUpTaskTypes.ts";
 import { ApiTaskSourceFields, normalizeTaskSources } from "./ClickUpTaskSources.ts";
+
+class PendingRead extends Data.Class<{
+  readonly path: string;
+  readonly token: string | undefined;
+}> {}
 
 export const ApiUser = Schema.Struct({
   id: Schema.Int,
@@ -168,7 +176,22 @@ export const layer = Layer.effect(
           Effect.fail(new ClickUpError({ message: "ClickUp did not respond in time. Try again." })),
         ),
       );
-    return ClickUpApi.of({ request });
+    const reads = yield* Cache.makeWith(
+      ({ path, token }: PendingRead) => request(path, token === undefined ? undefined : { token }),
+      { capacity: 128, timeToLive: () => Duration.zero },
+    );
+    return ClickUpApi.of({
+      request: (path, options) => {
+        const method = options?.method ?? (options?.body ? "POST" : "GET");
+        if (method === "GET" && !options?.body)
+          return Cache.get(reads, new PendingRead({ path, token: options?.token }));
+        // A read started before or during a write must not serve a later confirmation read.
+        return Cache.invalidateAll(reads).pipe(
+          Effect.andThen(request(path, options)),
+          Effect.ensuring(Cache.invalidateAll(reads)),
+        );
+      },
+    });
   }),
 );
 

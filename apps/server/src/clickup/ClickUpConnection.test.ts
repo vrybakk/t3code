@@ -1,6 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import { AuthAccessWriteScope, AuthSessionId } from "@t3tools/contracts";
+import { AuthAccessWriteScope, AuthSessionId, ClickUpError } from "@t3tools/contracts";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -17,6 +17,7 @@ const sessionId = AuthSessionId.make("clickup-test-session");
 function setup(configured = true, revokeDuringExchange = false, profilePicture?: string | null) {
   let stored: Uint8Array | undefined;
   let active = true;
+  let failUser = false;
   let expiresAt = DateTime.makeUnsafe("2099-01-01T00:00:00.000Z");
   const calls: string[] = [];
   const testLayer = layer.pipe(
@@ -61,8 +62,12 @@ function setup(configured = true, revokeDuringExchange = false, profilePicture?:
     Layer.provide(
       Layer.succeed(ClickUpApi, {
         request: (path) =>
-          Effect.sync(() => {
+          Effect.gen(function* () {
             calls.push(path);
+            if (path === "user" && failUser) {
+              failUser = false;
+              return yield* new ClickUpError({ message: "Fixture account read failed." });
+            }
             if (path === "oauth/token") {
               if (revokeDuringExchange) active = false;
               return { access_token: "fixture-token" };
@@ -98,8 +103,55 @@ function setup(configured = true, revokeDuringExchange = false, profilePicture?:
       expiresAt = DateTime.makeUnsafe(-1);
     },
     stored: () => stored,
+    setToken: (token: string) => {
+      stored = new TextEncoder().encode(token);
+    },
+    failNextUser: () => {
+      failUser = true;
+    },
   };
 }
+
+it.effect(
+  "reuses account reads briefly, isolates tokens and clears them on disconnect and reconnect",
+  () => {
+    const test = setup();
+    test.setToken("fixture-token");
+    return Effect.gen(function* () {
+      const connection = yield* ClickUpConnection;
+      yield* connection.status;
+      yield* connection.account;
+      assert.deepEqual(test.calls, ["user", "team"]);
+      yield* TestClock.adjust("5 seconds");
+      yield* connection.account;
+      assert.equal(test.calls.length, 4);
+      test.setToken("different-token");
+      yield* connection.account;
+      assert.equal(test.calls.length, 6);
+      yield* connection.disconnect;
+      assert.equal((yield* connection.status).user, null);
+      test.setToken("different-token");
+      yield* connection.account;
+      assert.equal(test.calls.length, 8);
+      const state = new URL((yield* connection.begin(sessionId)).url).searchParams.get("state")!;
+      yield* connection.complete(state, "code");
+      yield* connection.account;
+      assert.equal(test.calls.length, 13);
+    }).pipe(Effect.provide(test.layer));
+  },
+);
+
+it.effect("does not cache failed account reads", () => {
+  const test = setup();
+  test.setToken("fixture-token");
+  test.failNextUser();
+  return Effect.gen(function* () {
+    const connection = yield* ClickUpConnection;
+    assert.equal((yield* Effect.result(connection.account))._tag, "Failure");
+    assert.equal((yield* connection.account).connection.user?.id, 17);
+    assert.deepEqual(test.calls, ["user", "user", "team"]);
+  }).pipe(Effect.provide(test.layer));
+});
 
 it.effect("reports missing configuration without making network requests", () => {
   const test = setup(false);
