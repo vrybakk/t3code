@@ -18,6 +18,7 @@ import { ClickUpCommentComposer } from "./ClickUpCommentComposer";
 
 export function ClickUpCommentThread({
   comment,
+  username,
   environmentId,
   input,
   cursor,
@@ -25,6 +26,7 @@ export function ClickUpCommentThread({
   onRefresh,
 }: {
   comment: ClickUpComment;
+  username: string | undefined;
   environmentId: EnvironmentId;
   input: ClickUpTaskInput;
   cursor: ClickUpCommentCursor | undefined;
@@ -60,6 +62,7 @@ export function ClickUpCommentThread({
     <ClickUpCommentCard
       comment={comment}
       userId={input.userId}
+      username={username}
       resolution={{ busy, refreshing, error, toggle: () => void toggle() }}
     >
       <div className="border-t border-border pt-2">
@@ -82,6 +85,7 @@ export function ClickUpCommentThread({
           <Replies
             environmentId={environmentId}
             input={replyInput}
+            username={username}
             onSent={() => {
               onRefresh();
               appAtomRegistry.refresh(serverEnvironment.clickUpTask({ environmentId, input }));
@@ -96,10 +100,12 @@ export function ClickUpCommentThread({
 function Replies({
   environmentId,
   input,
+  username,
   onSent,
 }: {
   environmentId: EnvironmentId;
   input: ClickUpCommentRepliesInput;
+  username: string | undefined;
   onSent: () => void;
 }) {
   const query = serverEnvironment.clickUpCommentReplies({ environmentId, input });
@@ -128,7 +134,12 @@ function Replies({
         </p>
       ) : (
         data.comments.map((reply) => (
-          <ClickUpCommentCard key={reply.id} comment={reply} userId={input.userId} />
+          <ClickUpCommentCard
+            key={reply.id}
+            comment={reply}
+            userId={input.userId}
+            username={username}
+          />
         ))
       )}
       <ClickUpCommentComposer
