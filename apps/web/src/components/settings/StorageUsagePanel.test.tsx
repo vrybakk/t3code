@@ -24,7 +24,7 @@ vi.mock("./SettingsScopeContext", () => ({ useSettingsScope: () => fixtures }));
 vi.mock("./settingsLayout", () => ({
   SettingsSection: ({ children }: { children: ReactNode }) => <section>{children}</section>,
 }));
-vi.mock("../ui/button", () => ({ Button: "button" }));
+vi.mock("../ui/button", () => ({ Button: "button", InlineButton: "button" }));
 vi.mock("../ui/input", () => ({ Input: "input" }));
 vi.mock("../ui/tooltip", () => ({
   Tooltip: "div",
