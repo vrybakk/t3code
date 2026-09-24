@@ -29,7 +29,9 @@ export function ClickUpStatusPicker(
         <TooltipTrigger render={<span className="min-w-0 truncate uppercase" />}>
           {props.status}
         </TooltipTrigger>
-        <TooltipPopup className="uppercase">{props.status}</TooltipPopup>
+        <TooltipPopup>
+          <span className="uppercase">{props.status}</span>
+        </TooltipPopup>
       </Tooltip>
       <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
     </TaskEditor>
@@ -42,7 +44,7 @@ export function ClickUpTagsPicker(props: Props & { tags: ReadonlyArray<string> }
       <span className="flex min-w-0 flex-wrap gap-1.5">
         {props.tags.length ? (
           props.tags.map((tag) => (
-            <Badge key={tag} variant="outline" size="control" className="gap-1.5 rounded-md px-2">
+            <Badge key={tag} variant="outline" size="control">
               <TagIcon className="size-3" />
               {tag}
             </Badge>
@@ -71,15 +73,15 @@ function TaskEditor({
         render={
           <Button
             variant="ghost"
-            size="sm"
-            className={`h-auto min-h-7 max-w-full justify-start px-2 py-1 text-xs ${kind === "tags" ? "items-center" : "whitespace-nowrap"}`}
+            size={kind === "tags" ? "sm-multiline" : "xs"}
+            className="max-w-full justify-start"
           />
         }
         aria-label={`Change ${kind} for ${props.taskName}`}
       >
         {children}
       </PopoverTrigger>
-      <PopoverPopup align="start" className="w-72" viewportClassName="p-0">
+      <PopoverPopup align="start" className="w-72" padding="none">
         {open && <EditorOptions {...props} kind={kind} onDone={() => setOpen(false)} />}
       </PopoverPopup>
     </Popover>
@@ -153,7 +155,7 @@ function EditorOptions({
           Loading…
         </p>
       ) : (
-        <CommandList className="max-h-80 overflow-y-auto p-1">
+        <CommandList className="max-h-80 overflow-y-auto">
           {groups.map((group) => (
             <div key={group}>
               {group && <p className="px-2 pt-3 pb-1 text-xs text-muted-foreground">{group}</p>}
@@ -163,7 +165,6 @@ function EditorOptions({
                   <CommandItem
                     key={item.name}
                     value={item.name}
-                    className="gap-2"
                     disabled={busy || result.waiting || (kind === "status" && item.selected)}
                     onClick={() => void select(item.name, item.selected)}
                   >

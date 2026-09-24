@@ -103,18 +103,20 @@ export function SprintTasks({
               </p>
             )}
             {groups.deliveryCount > 0 && (
-              <Collapsible key={showAll ? "all" : "mine"} className="border-t border-border">
-                <CollapsibleTrigger className="group flex w-full items-center gap-2 px-5 py-4 text-left text-sm font-medium hover:bg-muted/30">
-                  <ChevronRightIcon className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-90" />
-                  <span>QA Testing, Staging &amp; In Production</span>
-                  <Badge variant="secondary" className="ml-auto">
-                    {groups.deliveryCount}
-                  </Badge>
-                </CollapsibleTrigger>
-                <CollapsiblePanel>
-                  <ClickUpSprintTable {...tableProps} groups={groups.delivery} />
-                </CollapsiblePanel>
-              </Collapsible>
+              <div className="border-t border-border">
+                <Collapsible key={showAll ? "all" : "mine"}>
+                  <CollapsibleTrigger className="group flex w-full items-center gap-2 px-5 py-4 text-left text-sm font-medium hover:bg-muted/30">
+                    <ChevronRightIcon className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-90" />
+                    <span>QA Testing, Staging &amp; In Production</span>
+                    <Badge variant="secondary" className="ml-auto">
+                      {groups.deliveryCount}
+                    </Badge>
+                  </CollapsibleTrigger>
+                  <CollapsiblePanel>
+                    <ClickUpSprintTable {...tableProps} groups={groups.delivery} />
+                  </CollapsiblePanel>
+                </Collapsible>
+              </div>
             )}
           </div>
         )}

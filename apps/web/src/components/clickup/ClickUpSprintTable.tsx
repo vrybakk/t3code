@@ -36,11 +36,15 @@ export function ClickUpSprintTable({
       <Table className="min-w-2xl table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead className="pl-5">Task</TableHead>
+            <TableHead>
+              <span className="ml-3">Task</span>
+            </TableHead>
             <TableHead className="w-24">Priority</TableHead>
             <TableHead className="w-40">Status</TableHead>
             <TableHead className="w-36">Project</TableHead>
-            <TableHead className="w-32 pr-5 text-right">Actions</TableHead>
+            <TableHead className="w-32 text-right">
+              <span className="mr-3">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -49,46 +53,50 @@ export function ClickUpSprintTable({
             .map((group) => (
               <Fragment key={group.label ?? "working"}>
                 {group.label && (
-                  <TableRow className="border-0 hover:bg-transparent">
-                    <TableCell colSpan={5} className="p-0 pt-4">
-                      <div className="flex items-center gap-3 border-y border-border bg-muted px-5 py-3">
-                        <span className="text-sm font-semibold">{group.label}</span>
-                        <Badge variant="outline" className="tabular-nums">
-                          {group.tasks.length}
-                        </Badge>
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <div className="pt-2">
+                        <div className="flex items-center gap-3 border-y border-border bg-muted px-5 py-3">
+                          <span className="text-sm font-semibold">{group.label}</span>
+                          <Badge variant="outline">
+                            <span className="tabular-nums">{group.tasks.length}</span>
+                          </Badge>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
                 )}
                 {group.tasks.map((task) => (
                   <TableRow key={task.taskId}>
-                    <TableCell className="min-w-64 max-w-lg whitespace-normal pl-5 py-3">
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Link
-                              to="/tasks"
-                              search={{
-                                environmentId,
-                                workspaceId,
-                                sprintId,
-                                showAll,
-                                taskId: task.taskId,
-                              }}
-                              className="flex min-w-0 items-start gap-3 text-sm font-medium hover:text-primary"
+                    <TableCell className="min-w-64 max-w-lg whitespace-normal">
+                      <div className="ml-3 py-1">
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Link
+                                to="/tasks"
+                                search={{
+                                  environmentId,
+                                  workspaceId,
+                                  sprintId,
+                                  showAll,
+                                  taskId: task.taskId,
+                                }}
+                                className="flex min-w-0 items-start gap-3 text-sm font-medium hover:text-primary"
+                              />
+                            }
+                          >
+                            <ClickUpTaskTypeIcon
+                              name={task.taskType?.name ?? "Task"}
+                              className="mt-0.5"
                             />
-                          }
-                        >
-                          <ClickUpTaskTypeIcon
-                            name={task.taskType?.name ?? "Task"}
-                            className="mt-0.5"
-                          />
-                          <span className="min-w-0 truncate">{task.name}</span>
-                        </TooltipTrigger>
-                        <TooltipPopup className="max-w-96 whitespace-normal break-words text-left">
-                          {task.taskType?.name ?? "Task"}: {task.name}
-                        </TooltipPopup>
-                      </Tooltip>
+                            <span className="min-w-0 truncate">{task.name}</span>
+                          </TooltipTrigger>
+                          <TooltipPopup className="max-w-96 whitespace-normal break-words text-left">
+                            {task.taskType?.name ?? "Task"}: {task.name}
+                          </TooltipPopup>
+                        </Tooltip>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <TaskPriority priority={task.priority} />
@@ -102,23 +110,29 @@ export function ClickUpSprintTable({
                         color={task.statusColor}
                       />
                     </TableCell>
-                    <TableCell className="max-w-56 truncate text-muted-foreground">
-                      <ClickUpProjectBadge task={task} />
-                      {task.sources?.some((source) => source.kind === "project") && (
-                        <Tooltip>
-                          <TooltipTrigger render={<span className="mt-1 block truncate text-xs" />}>
-                            {task.listName}
-                          </TooltipTrigger>
-                          <TooltipPopup>{task.listName}</TooltipPopup>
-                        </Tooltip>
-                      )}
+                    <TableCell className="max-w-56">
+                      <div className="truncate text-muted-foreground">
+                        <ClickUpProjectBadge task={task} />
+                        {task.sources?.some((source) => source.kind === "project") && (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={<span className="mt-1 block truncate text-xs" />}
+                            >
+                              {task.listName}
+                            </TooltipTrigger>
+                            <TooltipPopup>{task.listName}</TooltipPopup>
+                          </Tooltip>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell className="pr-5">
-                      <ClickUpTaskActionButtons
-                        compact
-                        task={task}
-                        onSelect={(action) => setSelection({ task, action })}
-                      />
+                    <TableCell>
+                      <div className="mr-3">
+                        <ClickUpTaskActionButtons
+                          compact
+                          task={task}
+                          onSelect={(action) => setSelection({ task, action })}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -144,7 +158,7 @@ function TaskPriority({ priority }: { priority: string | null | undefined }) {
   const label = ["Urgent", "High", "Normal", "Low", "No priority"][rank];
   const variant = rank === 0 ? "error" : rank === 1 ? "warning" : rank === 2 ? "info" : "secondary";
   return (
-    <Badge variant={variant} className="gap-1.5 px-2">
+    <Badge variant={variant}>
       <FlagIcon className="size-3" />
       {label}
     </Badge>

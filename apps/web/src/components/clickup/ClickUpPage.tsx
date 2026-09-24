@@ -23,7 +23,7 @@ export function ClickUpPage() {
   const environmentId = search.environmentId ?? primaryId;
   const environment = environments.find((candidate) => candidate.environmentId === environmentId);
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden bg-background text-foreground">
+    <SidebarInset className="h-dvh min-h-0 overflow-hidden">
       <WorkspacePageHeader electron={isElectron} className="border-b border-border">
         {search.taskId ? (
           <Link

@@ -57,7 +57,6 @@ export function ClickUpWorkflowModelPicker({
                   lockedProvider={null}
                   instanceEntries={entries}
                   modelOptionsByInstance={options}
-                  triggerVariant="outline"
                   triggerAriaLabel={`${role} model`}
                   {...(!selected ? { triggerLabel: "Use lead model" } : {})}
                   disabled={disabled}
@@ -78,7 +77,6 @@ export function ClickUpWorkflowModelPicker({
                   modelOptions={selected.options ?? []}
                   allowPromptInjectedEffort={false}
                   planModeEnabled={settings.planModeEnabled}
-                  triggerVariant="outline"
                   onModelOptionsChange={(modelOptions) => {
                     if (!disabled)
                       onChange({

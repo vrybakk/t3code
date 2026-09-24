@@ -29,7 +29,7 @@ export function ClickUpProjectBadge({ task }: { task: ClickUpTask }) {
               render={
                 <Badge
                   variant="outline"
-                  className="max-w-full gap-1.5 px-2"
+                  className="max-w-full"
                   style={
                     color
                       ? {

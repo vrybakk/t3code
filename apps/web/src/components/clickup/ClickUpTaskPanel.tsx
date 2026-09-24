@@ -73,7 +73,7 @@ export function ClickUpTaskPanel({
           <ScrollArea className="min-h-0 min-w-0 flex-1">
             <div className="mx-auto max-w-4xl space-y-7 px-6 py-8 xl:px-10">
               <div className="space-y-3">
-                <Badge variant="outline" className="gap-1.5">
+                <Badge variant="outline">
                   <ClickUpTaskTypeIcon name={details.task.taskType?.name ?? "Task"} />
                   {details.task.taskType?.name ?? "Task"}
                 </Badge>

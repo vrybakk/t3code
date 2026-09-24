@@ -73,7 +73,6 @@ export function ClickUpTaskActionButtons({
                   variant={action === "implement" ? "outline" : "ghost"}
                   aria-label={`${label}: ${task.name}`}
                   aria-disabled={blocked || undefined}
-                  className={blocked ? "cursor-not-allowed opacity-50" : undefined}
                   onClick={() => {
                     if (!blocked) onSelect(action);
                   }}
@@ -121,7 +120,7 @@ export function ClickUpTaskActionDialog({
           <DialogTitle>{actions[action].label}</DialogTitle>
           <DialogDescription>{actions[action].description}</DialogDescription>
         </DialogHeader>
-        <DialogPanel className="space-y-4">
+        <DialogPanel>
           <p className="text-sm font-medium">{taskName}</p>
           {AsyncResult.isFailure(result) ? (
             <div className="space-y-2">

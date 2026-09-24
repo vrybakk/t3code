@@ -88,7 +88,7 @@ export function ClickUpRepositoryMappings({
               repository can belong to several mappings.
             </DialogDescription>
           </DialogHeader>
-          <DialogPanel className="space-y-4">
+          <DialogPanel>
             <Select
               value={sourceKey}
               items={items}
