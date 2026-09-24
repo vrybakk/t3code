@@ -609,7 +609,7 @@ export const PreviewToolkitRegistrationLive = Layer.mergeAll(
   PreviewSnapshotRegistrationLive,
 );
 
-export const ClickUpToolkitRegistrationLive = McpServer.toolkit(ClickUpToolkit).pipe(
+const ClickUpToolkitRegistrationLive = McpServer.toolkit(ClickUpToolkit).pipe(
   Layer.provide(ClickUpToolkitHandlersLive),
 );
 

@@ -12,7 +12,7 @@ import { ClickUpApi, decodeResponse } from "./ClickUpApi.ts";
 import { ClickUpConnection } from "./ClickUpConnection.ts";
 import { selectSprintWindow } from "./sprintWindow.ts";
 
-export const STUDIO_CLICKUP_WORKSPACE_ID = "2179724";
+const STUDIO_CLICKUP_WORKSPACE_ID = "2179724";
 export const STUDIO_CLICKUP_SPRINT_FOLDER_ID = "90122725830";
 
 const ApiNumber = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number])));
