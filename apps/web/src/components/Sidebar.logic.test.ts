@@ -1929,6 +1929,18 @@ describe("resolveWorkingStartedAt", () => {
     ).toBe("2026-03-09T10:02:00.000Z");
   });
 
+  it("keeps the original start when a running turn carries a checkpoint timestamp", () => {
+    expect(
+      resolveWorkingStartedAt({
+        latestTurn: {
+          ...makeLatestTurn({ completedAt: "2026-03-09T10:01:00.000Z" }),
+          state: "running",
+        },
+        session,
+      }),
+    ).toBe("2026-03-09T10:00:00.000Z");
+  });
+
   it("skips a malformed startedAt instead of returning it", () => {
     expect(
       resolveWorkingStartedAt({

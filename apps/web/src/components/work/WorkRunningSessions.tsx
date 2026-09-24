@@ -17,7 +17,9 @@ export function WorkRunningSessions({
 }) {
   const running = threads.filter(
     (thread) =>
-      (thread.latestTurn === null || thread.latestTurn.completedAt === null) &&
+      (thread.latestTurn === null ||
+        thread.latestTurn.state === "running" ||
+        thread.latestTurn.completedAt === null) &&
       (thread.session?.status === "running" || thread.session?.status === "starting"),
   );
   const [now, setNow] = useState(Date.now);
