@@ -16,7 +16,7 @@ const task = {
   markdown_description: "**Requirements**",
 };
 
-function setup(response: (path: string) => unknown) {
+function setup(response: (path: string) => unknown, workspaceId = "42") {
   const paths: string[] = [];
   return {
     paths,
@@ -28,7 +28,7 @@ function setup(response: (path: string) => unknown) {
             connection: {
               configured: true,
               user: { id: 17, username: "Developer" },
-              workspaces: [{ id: "42", name: "Studio" }],
+              workspaces: [{ id: workspaceId, name: "Studio" }],
             },
           }),
         }),
@@ -74,6 +74,52 @@ it.effect("does not fetch tasks for an unauthorized workspace", () => {
   }).pipe(Effect.provide(test.layer));
 });
 
+it.effect(
+  "loads the validated sprint including closed and multi-list tasks for every assignee",
+  () => {
+    const test = setup(
+      (path) =>
+        path === "list/sprint-1"
+          ? { folder: { id: "90122725830" } }
+          : { tasks: [{ ...task, team_id: "2179724" }], last_page: true },
+      "2179724",
+    );
+    return Effect.gen(function* () {
+      const tasks = yield* ClickUpTasks;
+      const page = yield* tasks.list({
+        workspaceId: "2179724",
+        listId: "sprint-1",
+        page: 1,
+        userId: 17,
+      });
+      assert.equal(page.hasMore, false);
+      assert.equal(page.tasks.length, 1);
+      assert.equal(test.paths[0], "list/sprint-1");
+      const url = new URL(`https://example.test/${test.paths[1]}`);
+      assert.equal(url.pathname, "/list/sprint-1/task");
+      assert.equal(url.searchParams.get("page"), "1");
+      assert.equal(url.searchParams.get("include_timl"), "true");
+      assert.equal(url.searchParams.get("include_closed"), "true");
+      assert.equal(url.searchParams.get("subtasks"), "true");
+      assert.equal(url.searchParams.has("assignees[]"), false);
+    }).pipe(Effect.provide(test.layer));
+  },
+);
+
+it.effect("does not fetch sprint tasks outside the configured folder", () => {
+  const test = setup(() => ({ folder: { id: "other" } }), "2179724");
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    assert.equal(
+      (yield* Effect.result(
+        tasks.list({ workspaceId: "2179724", listId: "other-list", page: 0, userId: 17 }),
+      ))._tag,
+      "Failure",
+    );
+    assert.deepEqual(test.paths, ["list/other-list"]);
+  }).pipe(Effect.provide(test.layer));
+});
+
 it.effect("loads bounded comment context and rejects tasks from another workspace", () => {
   const test = setup((path) =>
     path.endsWith("/comment")
@@ -81,8 +127,14 @@ it.effect("loads bounded comment context and rejects tasks from another workspac
           comments: [
             {
               id: "comment-1",
-              user: { id: 17, username: "Developer" },
+              user: {
+                id: 17,
+                username: "Developer",
+                profilePicture: "https://example.test/avatar.png",
+              },
               comment_text: "Please verify on mobile.",
+              date: "1700000000000",
+              reply_count: "2",
             },
           ],
         }
@@ -92,6 +144,14 @@ it.effect("loads bounded comment context and rejects tasks from another workspac
     const tasks = yield* ClickUpTasks;
     const details = yield* tasks.detail({ workspaceId: "42", taskId: "abc", userId: 17 });
     assert.equal(details.comments[0]?.text, "Please verify on mobile.");
+    assert.equal(details.comments[0]?.createdAt, "1700000000000");
+    assert.equal(details.comments[0]?.avatarUrl, "https://example.test/avatar.png");
+    assert.equal(details.comments[0]?.replyCount, 2);
+    assert.deepEqual(details.metadata?.assignees, []);
+    assert.equal(
+      new URL(`https://example.test/${test.paths[0]}`).searchParams.get("include_subtasks"),
+      "true",
+    );
     assert.deepEqual(details.attachments, []);
     assert.equal(
       (yield* Effect.result(tasks.detail({ workspaceId: "other", taskId: "abc", userId: 17 })))

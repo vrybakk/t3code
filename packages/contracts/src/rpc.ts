@@ -1,3 +1,4 @@
+import { ClickUpSprintsInput, ClickUpSprintWindow } from "./clickupSprints.ts";
 import {
   ClickUpConnection,
   ClickUpError,
@@ -376,6 +377,7 @@ export const WS_METHODS = {
   clickUpConnect: "clickup.connect",
   clickUpDisconnect: "clickup.disconnect",
   clickUpTasks: "clickup.tasks",
+  clickUpSprints: "clickup.sprints",
   clickUpTask: "clickup.task",
   clickUpThreads: "clickup.threads",
 
@@ -681,6 +683,11 @@ const WsClickUpDisconnectRpc = Rpc.make(WS_METHODS.clickUpDisconnect, {
 const WsClickUpTasksRpc = Rpc.make(WS_METHODS.clickUpTasks, {
   payload: ClickUpTasksInput,
   success: ClickUpTaskPage,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSprintsRpc = Rpc.make(WS_METHODS.clickUpSprints, {
+  payload: ClickUpSprintsInput,
+  success: ClickUpSprintWindow,
   error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 const WsClickUpTaskRpc = Rpc.make(WS_METHODS.clickUpTask, {
@@ -1623,6 +1630,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsClickUpConnectRpc,
   WsClickUpDisconnectRpc,
   WsClickUpTasksRpc,
+  WsClickUpSprintsRpc,
   WsClickUpTaskRpc,
   WsClickUpThreadsRpc,
 

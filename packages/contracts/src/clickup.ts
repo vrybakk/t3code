@@ -42,6 +42,7 @@ export const ClickUpTaskInput = Schema.Struct({
 export type ClickUpTaskInput = typeof ClickUpTaskInput.Type;
 export const ClickUpTasksInput = Schema.Struct({
   workspaceId: ClickUpId,
+  listId: Schema.optional(ClickUpId),
   page: NonNegativeInt,
   userId: Schema.Int,
 });
@@ -53,8 +54,52 @@ export const ClickUpTaskPage = Schema.Struct({
 
 export const ClickUpTaskDetails = Schema.Struct({
   task: ClickUpTask,
+  metadata: Schema.optional(
+    Schema.Struct({
+      assignees: Schema.Array(ClickUpUser),
+      creator: Schema.NullOr(ClickUpUser),
+      watchers: Schema.Array(ClickUpUser),
+      priority: Schema.NullOr(Schema.String),
+      startDate: Schema.NullOr(Schema.String),
+      dueDate: Schema.NullOr(Schema.String),
+      createdAt: Schema.NullOr(Schema.String),
+      updatedAt: Schema.NullOr(Schema.String),
+      closedAt: Schema.NullOr(Schema.String),
+      timeEstimate: Schema.NullOr(Schema.Number),
+      timeSpent: Schema.NullOr(Schema.Number),
+      tags: Schema.Array(Schema.String),
+      customFields: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          name: Schema.String,
+          type: Schema.String,
+          valueText: Schema.NullOr(Schema.String),
+        }),
+      ),
+      checklists: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          name: Schema.String,
+          items: Schema.Array(
+            Schema.Struct({ id: Schema.String, name: Schema.String, resolved: Schema.Boolean }),
+          ),
+        }),
+      ),
+      subtasks: Schema.Array(
+        Schema.Struct({ id: Schema.String, name: Schema.String, status: Schema.String }),
+      ),
+      relatedTasks: Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String })),
+    }),
+  ),
   comments: Schema.Array(
-    Schema.Struct({ id: Schema.String, author: Schema.String, text: Schema.String }),
+    Schema.Struct({
+      id: Schema.String,
+      author: Schema.String,
+      text: Schema.String,
+      createdAt: Schema.optional(Schema.NullOr(Schema.String)),
+      avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
+      replyCount: Schema.optional(Schema.NullOr(Schema.Number)),
+    }),
   ),
   commentsMayHaveMore: Schema.Boolean,
   attachments: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.String })),

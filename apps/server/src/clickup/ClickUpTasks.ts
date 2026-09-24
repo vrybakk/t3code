@@ -12,6 +12,8 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { ApiTask, ApiComment, ClickUpApi, decodeResponse, normalizeTask } from "./ClickUpApi.ts";
 import { ClickUpConnection } from "./ClickUpConnection.ts";
+import { ApiTaskDetails, normalizeTaskMetadata, nullableNumber } from "./ClickUpTaskDetails.ts";
+import { validateSprintList } from "./ClickUpSprints.ts";
 
 const decodeThreadLinks = Schema.decodeUnknownEffect(Schema.Array(ClickUpThreadLink));
 
@@ -51,24 +53,30 @@ export const layer = Layer.effect(
       }
       const query = new URLSearchParams({
         page: String(input.page),
-        "assignees[]": String(account.user.id),
         subtasks: "true",
-        include_closed: "false",
+        include_closed: input.listId ? "true" : "false",
         order_by: "updated",
         reverse: "true",
       });
-      const response = yield* api
-        .request(`team/${encodeURIComponent(input.workspaceId)}/task?${query}`, { token })
-        .pipe(
-          Effect.flatMap(
-            decodeResponse(
-              Schema.Struct({
-                tasks: Schema.Array(ApiTask),
-                last_page: Schema.optional(Schema.Boolean),
-              }),
-            ),
+      if (input.listId) {
+        yield* validateSprintList(api, token, input.workspaceId, input.listId);
+        query.set("include_timl", "true");
+      } else {
+        query.set("assignees[]", String(account.user.id));
+      }
+      const scope = input.listId
+        ? `list/${encodeURIComponent(input.listId)}`
+        : `team/${encodeURIComponent(input.workspaceId)}`;
+      const response = yield* api.request(`${scope}/task?${query}`, { token }).pipe(
+        Effect.flatMap(
+          decodeResponse(
+            Schema.Struct({
+              tasks: Schema.Array(ApiTask),
+              last_page: Schema.optional(Schema.Boolean),
+            }),
           ),
-        );
+        ),
+      );
       return {
         tasks: response.tasks.map((task) => ({ ...normalizeTask(task), description: "" })),
         hasMore:
@@ -84,8 +92,8 @@ export const layer = Layer.effect(
         });
       const path = `task/${encodeURIComponent(input.taskId)}`;
       const task = yield* api
-        .request(`${path}?include_markdown_description=true`, { token })
-        .pipe(Effect.flatMap(decodeResponse(ApiTask)));
+        .request(`${path}?include_markdown_description=true&include_subtasks=true`, { token })
+        .pipe(Effect.flatMap(decodeResponse(ApiTaskDetails)));
       if (task.team_id !== input.workspaceId)
         return yield* new ClickUpError({
           message: "This task belongs to a different ClickUp workspace.",
@@ -97,10 +105,14 @@ export const layer = Layer.effect(
         );
       return {
         task: normalizeTask(task),
+        metadata: normalizeTaskMetadata(task),
         comments: comments.map((comment) => ({
           id: String(comment.id),
           author: comment.user.username ?? String(comment.user.id),
           text: comment.comment_text,
+          createdAt: comment.date ?? null,
+          avatarUrl: comment.user.profilePicture ?? null,
+          replyCount: nullableNumber(comment.reply_count),
         })),
         commentsMayHaveMore: comments.length === 25,
         attachments: (task.attachments ?? []).map((attachment) => ({

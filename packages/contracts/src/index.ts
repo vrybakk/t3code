@@ -57,3 +57,4 @@ export {
 } from "./video.ts";
 
 export * from "./clickup.ts";
+export * from "./clickupSprints.ts";

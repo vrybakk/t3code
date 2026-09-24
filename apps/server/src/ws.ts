@@ -1,5 +1,6 @@
 import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
 import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
+import * as ClickUpSprints from "./clickup/ClickUpSprints.ts";
 import {
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
@@ -653,6 +654,7 @@ const makeWsRpcLayer = (
       const gitButlerWorkspace = yield* GitButlerWorkspace.GitButlerWorkspace;
       const clickUpConnection = yield* ClickUpConnection.ClickUpConnection;
       const clickUpTasks = yield* ClickUpTasks.ClickUpTasks;
+      const clickUpSprints = yield* ClickUpSprints.ClickUpSprints;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -2591,6 +2593,7 @@ const makeWsRpcLayer = (
           clickUpConnection.begin(currentSession.sessionId, returnToApp),
         [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
         [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
+        [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
         [WS_METHODS.clickUpTask]: (input) => clickUpTasks.detail(input),
         [WS_METHODS.clickUpThreads]: (input) => clickUpTasks.threads(input),
         [WS_METHODS.gitButlerWorkspaceStatus]: ({ projectId }) =>
@@ -3892,6 +3895,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const pullRequests = yield* PullRequestService.PullRequestService;
     const clickUpConnectionService = yield* ClickUpConnection.ClickUpConnection;
     const clickUpTasksService = yield* ClickUpTasks.ClickUpTasks;
+    const clickUpSprintsService = yield* ClickUpSprints.ClickUpSprints;
     const sql = yield* SqlClient.SqlClient;
     const storageUsage = yield* StorageUsage.make;
     return HttpRouter.add(
@@ -3947,6 +3951,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
                 Layer.succeed(ClickUpConnection.ClickUpConnection, clickUpConnectionService),
               ),
               Layer.provide(Layer.succeed(ClickUpTasks.ClickUpTasks, clickUpTasksService)),
+              Layer.provide(Layer.succeed(ClickUpSprints.ClickUpSprints, clickUpSprintsService)),
               Layer.provide(
                 SourceControlDiscovery.layer.pipe(
                   Layer.provide(

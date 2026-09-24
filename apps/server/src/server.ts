@@ -4,6 +4,7 @@ import * as NodeHttp from "node:http";
 import * as ClickUpApi from "./clickup/ClickUpApi.ts";
 import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
 import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
+import * as ClickUpSprints from "./clickup/ClickUpSprints.ts";
 import { callbackLayer as clickUpCallbackLayer } from "./clickup/http.ts";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
@@ -598,6 +599,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
   Layer.provide(PullRequestServiceLive),
   Layer.provide(ClickUpTasks.layer),
+  Layer.provide(ClickUpSprints.layer),
   Layer.provide(ClickUpConnection.layer),
   Layer.provide(ClickUpApi.layer),
   Layer.provide(PreviewAutomationBroker.layer),

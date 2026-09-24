@@ -33,6 +33,8 @@ export const ApiComment = Schema.Struct({
   id: Schema.Union([Schema.String, Schema.Int]),
   user: ApiUser,
   comment_text: Schema.String,
+  date: Schema.optional(Schema.NullOr(Schema.String)),
+  reply_count: Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number]))),
 });
 
 export const normalizeTask = (task: typeof ApiTask.Type) => ({

@@ -1057,6 +1057,11 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.clickUpConnection,
       staleTimeMs: 30_000,
     }),
+    clickUpSprints: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpSprints",
+      tag: WS_METHODS.clickUpSprints,
+      staleTimeMs: 30_000,
+    }),
     clickUpTasks: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:clickup:clickUpTasks",
       tag: WS_METHODS.clickUpTasks,

@@ -1,19 +1,17 @@
 import { useAtomValue } from "@effect/atom-react";
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import type { ClickUpTaskInput, EnvironmentId, ProjectId } from "@t3tools/contracts";
-import { Link } from "@tanstack/react-router";
+import type { ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { useState } from "react";
-import { useComposerDraftStore } from "../../composerDraftStore";
-import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
-import { useProjects } from "../../state/entities";
+import { ExternalLinkIcon, PaperclipIcon, RefreshCwIcon } from "lucide-react";
 import { serverEnvironment } from "../../state/server";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import ChatMarkdown from "../ChatMarkdown";
 import { Button } from "../ui/button";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { buildClickUpTaskPrompt, safeClickUpAttachmentUrl } from "./taskPrompt";
+import { ScrollArea } from "../ui/scroll-area";
+import { ClickUpTaskActivity } from "./ClickUpTaskActivity";
+import { ClickUpCustomFields, ClickUpTaskFields } from "./ClickUpTaskFields";
+import { ClickUpTaskWork } from "./ClickUpTaskWork";
+import { safeClickUpAttachmentUrl } from "./taskPrompt";
 
 export function ClickUpTaskPanel({
   environmentId,
@@ -26,186 +24,143 @@ export function ClickUpTaskPanel({
   const result = useAtomValue(query);
   const details = Option.getOrNull(AsyncResult.value(result));
   const linksQuery = serverEnvironment.clickUpThreads({ environmentId, input });
-  const linksResult = useAtomValue(linksQuery);
-  const links = Option.getOrNull(AsyncResult.value(linksResult)) ?? [];
-  const projects = useProjects().filter((project) => project.environmentId === environmentId);
-  const [projectId, setProjectId] = useState<ProjectId | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const newThread = useNewThreadHandler();
-  const selectedProject = projects.find((project) => project.id === projectId);
-
-  async function prepareThread() {
-    if (!details || !selectedProject) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const draft = await newThread(scopeProjectRef(environmentId, selectedProject.id), {
-        envMode: "worktree",
-      });
-      if (!draft) return;
-      const store = useComposerDraftStore.getState();
-      store.setDraftThreadContext(draft.draftId, {
-        clickUpTask: {
-          taskId: details.task.taskId,
-          workspaceId: details.task.workspaceId,
-          name: details.task.name,
-        },
-        environmentSelection: "manual",
-      });
-      store.setPrompt(draft.draftId, buildClickUpTaskPrompt(details));
-    } catch {
-      setError("Could not prepare the coding thread. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <section
-      aria-label="Task details"
-      className="min-w-0 space-y-5 rounded-lg border border-border p-5"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <a
-          href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm text-primary underline"
-        >
-          Open in ClickUp
-        </a>
+    <section aria-label="Task details" className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
+        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {details?.task.listName ?? "Task details"}
+        </p>
         <Button
           size="sm"
-          variant="outline"
+          variant="ghost"
           disabled={result.waiting}
           onClick={() => {
             appAtomRegistry.refresh(query);
             appAtomRegistry.refresh(linksQuery);
           }}
         >
-          Refresh task
+          <RefreshCwIcon className="size-4" /> Refresh task
         </Button>
+        <a
+          href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Open in ClickUp <ExternalLinkIcon className="size-3.5" />
+        </a>
       </div>
       {AsyncResult.isFailure(result) ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="p-8 text-sm text-destructive">
           Could not load this task. Check your connection and ClickUp access, then refresh.
         </p>
       ) : !details ? (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p role="status" className="p-8 text-sm text-muted-foreground">
           Loading task…
         </p>
       ) : (
-        <>
-          <div>
-            <h2 className="text-lg font-medium">{details.task.name}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {details.task.listName} · {details.task.status}
-            </p>
-          </div>
-          <div className="space-y-3 rounded-lg bg-muted/40 p-3">
-            <Select
-              value={projectId}
-              onValueChange={(value) => setProjectId(value as ProjectId | null)}
-              items={projects.map((project) => ({ value: project.id, label: project.title }))}
-            >
-              <SelectTrigger aria-label="Repository project">
-                <SelectValue placeholder="Choose a project" />
-              </SelectTrigger>
-              <SelectPopup>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.title}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-            <Button
-              disabled={!selectedProject || busy || result.waiting}
-              onClick={() => void prepareThread()}
-            >
-              Open in coding thread
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Prepares a task-linked draft with an isolated worktree. Review its model and
-              permissions, then send to begin.
-            </p>
-            {projects.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Add a project in this environment before starting work.
-              </p>
-            )}
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
-          </div>
-          {AsyncResult.isFailure(linksResult) && (
-            <p role="alert" className="text-sm text-destructive">
-              Could not load linked coding threads. Refresh the task to retry.
-            </p>
-          )}
-          {links.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">Coding threads</h3>
-              {links.map((link) => (
-                <Link
-                  key={link.threadId}
-                  to="/$environmentId/$threadId"
-                  params={{ environmentId, threadId: link.threadId }}
-                  className="block truncate text-sm text-primary underline"
-                >
-                  {link.title}
-                </Link>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+          <ScrollArea className="min-h-0 min-w-0 flex-1">
+            <div className="mx-auto max-w-4xl space-y-7 px-6 py-8 xl:px-10">
+              <h2 className="text-2xl font-semibold leading-snug tracking-tight">
+                {details.task.name}
+              </h2>
+              <ClickUpTaskFields details={details} />
+              <section aria-label="Description" className="space-y-4 border-t border-border pt-6">
+                <h3 className="text-sm font-medium">Description</h3>
+                <ChatMarkdown
+                  text={details.task.description || "No description provided."}
+                  cwd={undefined}
+                  environmentId={environmentId}
+                />
+              </section>
+              <ClickUpCustomFields details={details} />
+              <ClickUpTaskWork environmentId={environmentId} input={input} details={details} />
+              <section className="space-y-3 border-t border-border pt-6" aria-label="Attachments">
+                <h3 className="flex items-center gap-2 text-sm font-medium">
+                  <PaperclipIcon className="size-4" /> Attachments{" "}
+                  <span className="text-muted-foreground">{details.attachments.length}</span>
+                </h3>
+                {!details.attachments.length && (
+                  <p className="text-sm text-muted-foreground">No attachments.</p>
+                )}
+                {details.attachments.map((attachment) => {
+                  const url = safeClickUpAttachmentUrl(attachment.url);
+                  return url ? (
+                    <a
+                      key={attachment.url}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-md border border-border p-3 text-sm text-primary hover:bg-muted/40"
+                    >
+                      {attachment.name}
+                    </a>
+                  ) : (
+                    <p key={attachment.url} className="text-sm text-muted-foreground">
+                      {attachment.name} — open in ClickUp
+                    </p>
+                  );
+                })}
+              </section>
+              {details.metadata?.checklists.map((checklist) => (
+                <section key={checklist.id} className="space-y-3 border-t border-border pt-6">
+                  <h3 className="text-sm font-medium">{checklist.name}</h3>
+                  <ul className="space-y-2">
+                    {checklist.items.map((item) => (
+                      <li key={item.id} className="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={item.resolved}
+                          readOnly
+                          aria-label={item.name}
+                          className="mt-1"
+                        />
+                        <span className={item.resolved ? "text-muted-foreground line-through" : ""}>
+                          {item.name}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
+              {Boolean(details.metadata?.subtasks.length) && (
+                <section className="space-y-3 border-t border-border pt-6">
+                  <h3 className="text-sm font-medium">Subtasks</h3>
+                  {details.metadata?.subtasks.map((task) => (
+                    <a
+                      key={task.id}
+                      href={`https://app.clickup.com/t/${encodeURIComponent(task.id)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 text-sm text-primary hover:underline"
+                    >
+                      {task.name}
+                      <span className="text-xs text-muted-foreground">{task.status}</span>
+                    </a>
+                  ))}
+                </section>
+              )}
+              {Boolean(details.metadata?.relatedTasks.length) && (
+                <section className="space-y-3 border-t border-border pt-6">
+                  <h3 className="text-sm font-medium">Related tasks</h3>
+                  {details.metadata?.relatedTasks.map((task) => (
+                    <a
+                      key={`${task.id}:${task.label}`}
+                      href={`https://app.clickup.com/t/${encodeURIComponent(task.id)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-sm text-primary hover:underline"
+                    >
+                      {task.label} · {task.id}
+                    </a>
+                  ))}
+                </section>
+              )}
             </div>
-          )}
-          <ChatMarkdown
-            text={details.task.description || "No description provided."}
-            cwd={undefined}
-            environmentId={environmentId}
-          />
-          {details.attachments.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">Attachments</h3>
-              {details.attachments.map((attachment) => {
-                const url = safeClickUpAttachmentUrl(attachment.url);
-                return url ? (
-                  <a
-                    key={attachment.url}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block break-words text-sm text-primary underline"
-                  >
-                    {attachment.name}
-                  </a>
-                ) : (
-                  <p key={attachment.url} className="text-sm text-muted-foreground">
-                    {attachment.name} — open in ClickUp
-                  </p>
-                );
-              })}
-            </div>
-          )}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium">Recent comments</h3>
-            <p className="text-xs text-muted-foreground">
-              Newest comments first. Open ClickUp for replies
-              {details.commentsMayHaveMore ? " and older comments" : ""}.
-            </p>
-            {details.comments.length === 0 && (
-              <p className="text-sm text-muted-foreground">No comments yet.</p>
-            )}
-            {details.comments.map((comment) => (
-              <article key={comment.id} className="rounded-md border border-border p-3">
-                <p className="mb-2 text-xs font-medium">{comment.author}</p>
-                <p className="whitespace-pre-wrap break-words text-sm">{comment.text}</p>
-              </article>
-            ))}
-          </div>
-        </>
+          </ScrollArea>
+          <ClickUpTaskActivity details={details} />
+        </div>
       )}
     </section>
   );
