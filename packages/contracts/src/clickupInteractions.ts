@@ -18,6 +18,28 @@ export const ClickUpCommentsPage = Schema.Struct({
   nextCursor: Schema.NullOr(ClickUpCommentCursor),
 });
 export type ClickUpCommentsPage = typeof ClickUpCommentsPage.Type;
+const CommentText = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(10_000),
+  Schema.isPattern(/\S/),
+);
+export const ClickUpCreateCommentInput = Schema.Struct({
+  ...ClickUpTaskInput.fields,
+  text: CommentText,
+});
+export type ClickUpCreateCommentInput = typeof ClickUpCreateCommentInput.Type;
+export const ClickUpCommentRepliesInput = Schema.Struct({
+  ...ClickUpCommentsInput.fields,
+  commentId: ClickUpTaskInput.fields.taskId,
+});
+export type ClickUpCommentRepliesInput = typeof ClickUpCommentRepliesInput.Type;
+export const ClickUpCommentReplies = Schema.Struct({ comments: Schema.Array(ClickUpComment) });
+export type ClickUpCommentReplies = typeof ClickUpCommentReplies.Type;
+export const ClickUpCreateReplyInput = Schema.Struct({
+  ...ClickUpCommentRepliesInput.fields,
+  text: CommentText,
+});
+export type ClickUpCreateReplyInput = typeof ClickUpCreateReplyInput.Type;
 export const ClickUpSetCommentResolutionInput = Schema.Struct({
   ...ClickUpCommentsInput.fields,
   commentId: ClickUpTaskInput.fields.taskId,

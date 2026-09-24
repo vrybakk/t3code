@@ -2,6 +2,10 @@ import {
   ClickUpError,
   type ClickUpCommentsInput,
   type ClickUpCommentsPage,
+  type ClickUpCreateCommentInput,
+  type ClickUpCommentRepliesInput,
+  type ClickUpCommentReplies,
+  type ClickUpCreateReplyInput,
   type ClickUpSetCommentResolutionInput,
   type ClickUpSetChecklistItemResolutionInput,
   type ClickUpTaskInput,
@@ -13,13 +17,18 @@ import * as Schema from "effect/Schema";
 import { ApiComment, ClickUpApi, decodeResponse } from "./ClickUpApi.ts";
 import { ApiTaskDetails } from "./ClickUpTaskDetails.ts";
 import { ClickUpConnection } from "./ClickUpConnection.ts";
-import { normalizeCommentsPage } from "./ClickUpCommentData.ts";
+import { normalizeComment, normalizeCommentsPage } from "./ClickUpCommentData.ts";
 
 const CommentResponse = Schema.Struct({ comments: Schema.Array(ApiComment) });
 
 export class ClickUpInteractions extends Context.Service<
   ClickUpInteractions,
   {
+    readonly createComment: (input: ClickUpCreateCommentInput) => Effect.Effect<void, ClickUpError>;
+    readonly replies: (
+      input: ClickUpCommentRepliesInput,
+    ) => Effect.Effect<ClickUpCommentReplies, ClickUpError>;
+    readonly createReply: (input: ClickUpCreateReplyInput) => Effect.Effect<void, ClickUpError>;
     readonly comments: (
       input: ClickUpCommentsInput,
     ) => Effect.Effect<ClickUpCommentsPage, ClickUpError>;
@@ -77,8 +86,8 @@ export const layer = Layer.effect(
       const page = yield* commentPage(input, token);
       return normalizeCommentsPage(page.comments);
     });
-    const setCommentResolution = Effect.fn("ClickUpInteractions.setCommentResolution")(function* (
-      input: ClickUpSetCommentResolutionInput,
+    const authorizedComment = Effect.fn("ClickUpInteractions.authorizedComment")(function* (
+      input: ClickUpCommentRepliesInput,
     ) {
       const { token } = yield* authorizedTask(input);
       const page = yield* commentPage(input, token);
@@ -88,6 +97,45 @@ export const layer = Layer.effect(
             "This comment is no longer on the selected task page. Refresh comments before trying again.",
         });
       }
+      return token;
+    });
+    const createComment = Effect.fn("ClickUpInteractions.createComment")(function* (
+      input: ClickUpCreateCommentInput,
+    ) {
+      const { token } = yield* authorizedTask(input);
+      yield* api.request(`task/${encodeURIComponent(input.taskId)}/comment`, {
+        token,
+        method: "POST",
+        body: { comment_text: input.text, notify_all: false },
+      });
+    });
+    const replies = Effect.fn("ClickUpInteractions.replies")(function* (
+      input: ClickUpCommentRepliesInput,
+    ) {
+      const token = yield* authorizedComment(input);
+      const response = yield* api
+        .request(`comment/${encodeURIComponent(input.commentId)}/reply`, { token })
+        .pipe(Effect.flatMap(decodeResponse(CommentResponse)));
+      return {
+        comments: response.comments
+          .map(normalizeComment)
+          .toSorted((a, b) => Number(a.createdAt ?? 0) - Number(b.createdAt ?? 0)),
+      };
+    });
+    const createReply = Effect.fn("ClickUpInteractions.createReply")(function* (
+      input: ClickUpCreateReplyInput,
+    ) {
+      const token = yield* authorizedComment(input);
+      yield* api.request(`comment/${encodeURIComponent(input.commentId)}/reply`, {
+        token,
+        method: "POST",
+        body: { comment_text: input.text, notify_all: false },
+      });
+    });
+    const setCommentResolution = Effect.fn("ClickUpInteractions.setCommentResolution")(function* (
+      input: ClickUpSetCommentResolutionInput,
+    ) {
+      const token = yield* authorizedComment(input);
       // Do not replay comment_text: its plain-text projection loses rich formatting and media.
       yield* api.request(`comment/${encodeURIComponent(input.commentId)}`, {
         token,
@@ -111,6 +159,13 @@ export const layer = Layer.effect(
         );
       },
     );
-    return ClickUpInteractions.of({ comments, setCommentResolution, setChecklistItemResolution });
+    return ClickUpInteractions.of({
+      comments,
+      createComment,
+      replies,
+      createReply,
+      setCommentResolution,
+      setChecklistItemResolution,
+    });
   }),
 );

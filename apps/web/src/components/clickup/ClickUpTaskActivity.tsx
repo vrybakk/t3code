@@ -1,6 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
 import type {
-  ClickUpComment,
   ClickUpCommentCursor,
   ClickUpTaskDetails,
   ClickUpTaskInput,
@@ -8,15 +7,14 @@ import type {
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { CheckIcon, MessageSquareIcon, RefreshCwIcon } from "lucide-react";
+import { MessageSquareIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
-import { cn } from "../../lib/utils";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
-import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
-import { ClickUpAttachments } from "./ClickUpAttachments";
+import { ClickUpCommentThread } from "./ClickUpCommentThread";
+import { ClickUpCommentComposer } from "./ClickUpCommentComposer";
 import { taskDate } from "./taskFormatting";
 
 export function ClickUpTaskActivity({
@@ -58,7 +56,7 @@ export function ClickUpTaskActivity({
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-5">
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Full change history and comment replies are available in ClickUp.
+            Full change history is available in ClickUp.
           </p>
           {!cursor && details.metadata?.createdAt && (
             <p className="text-xs leading-relaxed text-muted-foreground">
@@ -66,14 +64,17 @@ export function ClickUpTaskActivity({
               {taskDate(details.metadata.createdAt)}
             </p>
           )}
-          {AsyncResult.isFailure(result) ? (
+          {AsyncResult.isFailure(result) && (
             <p role="alert" className="text-sm text-destructive">
               Could not load comments. Refresh to try again.
             </p>
-          ) : !page ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading comments…
-            </p>
+          )}
+          {!page ? (
+            !AsyncResult.isFailure(result) && (
+              <p role="status" className="text-sm text-muted-foreground">
+                Loading comments…
+              </p>
+            )
           ) : (
             <>
               {!page.comments.length && (
@@ -82,7 +83,7 @@ export function ClickUpTaskActivity({
                 </div>
               )}
               {page.comments.map((comment) => (
-                <CommentCard
+                <ClickUpCommentThread
                   key={comment.id}
                   comment={comment}
                   environmentId={environmentId}
@@ -120,126 +121,17 @@ export function ClickUpTaskActivity({
           )}
         </div>
       </ScrollArea>
-    </aside>
-  );
-}
-
-function CommentCard({
-  comment,
-  environmentId,
-  input,
-  cursor,
-  refreshing,
-  onRefresh,
-}: {
-  comment: ClickUpComment;
-  environmentId: EnvironmentId;
-  input: ClickUpTaskInput;
-  cursor: ClickUpCommentCursor | undefined;
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const update = useAtomCommand(serverEnvironment.clickUpSetCommentResolution);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const assignedToMe = comment.assignee?.id === input.userId;
-  const mentionsMe = comment.mentionedUserIds?.includes(input.userId) === true;
-  async function toggle() {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await update({
-        environmentId,
-        input: {
-          ...input,
-          commentId: comment.id,
-          resolved: !comment.resolved,
-          ...(cursor ? { cursor } : {}),
-        },
-      });
-      if (result._tag === "Success") {
-        onRefresh();
-        appAtomRegistry.refresh(serverEnvironment.clickUpTask({ environmentId, input }));
-      } else
-        setError(
-          "Could not update this comment. Refresh comments to check its state, then try again.",
-        );
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <article
-      className={cn(
-        "space-y-3 rounded-lg border border-border bg-background p-3",
-        (assignedToMe || mentionsMe) &&
-          "border-primary/30 bg-linear-to-br from-primary/10 to-background",
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <span
-          aria-hidden
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium"
-        >
-          {comment.author.slice(0, 1).toUpperCase()}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-xs font-medium">{comment.author}</p>
-          {comment.createdAt && (
-            <p className="text-xs text-muted-foreground">{taskDate(comment.createdAt)}</p>
-          )}
-        </div>
+      <div className="shrink-0 border-t border-border p-4">
+        <ClickUpCommentComposer
+          environmentId={environmentId}
+          input={input}
+          onSent={() => {
+            setCursors([]);
+            appAtomRegistry.refresh(serverEnvironment.clickUpComments({ environmentId, input }));
+            appAtomRegistry.refresh(serverEnvironment.clickUpTask({ environmentId, input }));
+          }}
+        />
       </div>
-      {(assignedToMe || mentionsMe) && (
-        <p className="text-xs font-medium text-primary">
-          {assignedToMe ? "Assigned to you" : "Mentions you"}
-        </p>
-      )}
-      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{comment.text}</p>
-      {!!comment.attachments?.length && <ClickUpAttachments attachments={comment.attachments} />}
-      {comment.assignee && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-          <p className="min-w-0 text-xs text-muted-foreground">
-            Assigned to{" "}
-            <span className="text-foreground">
-              {comment.assignee.username}
-              {comment.assignee.id === input.userId ? " (you)" : ""}
-            </span>
-          </p>
-          <Button
-            size="sm"
-            variant={comment.resolved ? "ghost" : "outline"}
-            disabled={busy || refreshing}
-            onClick={() => void toggle()}
-          >
-            {busy ? (
-              "Saving…"
-            ) : comment.resolved ? (
-              <>
-                <CheckIcon className="size-3.5" /> Reopen
-              </>
-            ) : (
-              "Resolve"
-            )}
-          </Button>
-        </div>
-      )}
-      {comment.resolved && <p className="text-xs text-success">Resolved</p>}
-      {error && (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      )}
-      {Boolean(comment.replyCount) && (
-        <a
-          href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="block border-t border-border pt-2 text-xs text-primary hover:underline"
-        >
-          {comment.replyCount} replies · Open in ClickUp
-        </a>
-      )}
-    </article>
+    </aside>
   );
 }

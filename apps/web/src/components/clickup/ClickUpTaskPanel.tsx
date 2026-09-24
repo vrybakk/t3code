@@ -51,14 +51,17 @@ export function ClickUpTaskPanel({
           Open in ClickUp <ExternalLinkIcon className="size-3.5" />
         </a>
       </div>
-      {AsyncResult.isFailure(result) ? (
+      {AsyncResult.isFailure(result) && (
         <p role="alert" className="p-8 text-sm text-destructive">
           Could not load this task. Check your connection and ClickUp access, then refresh.
         </p>
-      ) : !details ? (
-        <p role="status" className="p-8 text-sm text-muted-foreground">
-          Loading task…
-        </p>
+      )}
+      {!details ? (
+        !AsyncResult.isFailure(result) && (
+          <p role="status" className="p-8 text-sm text-muted-foreground">
+            Loading task…
+          </p>
+        )
       ) : (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
           <ScrollArea className="min-h-0 min-w-0 flex-1">

@@ -7,6 +7,10 @@ import { ClickUpSprintsInput, ClickUpSprintWindow } from "./clickupSprints.ts";
 import {
   ClickUpCommentsInput,
   ClickUpCommentsPage,
+  ClickUpCreateCommentInput,
+  ClickUpCommentRepliesInput,
+  ClickUpCommentReplies,
+  ClickUpCreateReplyInput,
   ClickUpSetCommentResolutionInput,
   ClickUpSetChecklistItemResolutionInput,
 } from "./clickupInteractions.ts";
@@ -393,6 +397,9 @@ export const WS_METHODS = {
   clickUpSetStatus: "clickup.setStatus",
   clickUpSetTag: "clickup.setTag",
   clickUpComments: "clickup.comments",
+  clickUpCreateComment: "clickup.createComment",
+  clickUpCommentReplies: "clickup.commentReplies",
+  clickUpCreateReply: "clickup.createReply",
   clickUpSetCommentResolution: "clickup.setCommentResolution",
   clickUpSetChecklistItemResolution: "clickup.setChecklistItemResolution",
   clickUpTask: "clickup.task",
@@ -725,6 +732,21 @@ const WsClickUpSetTagRpc = Rpc.make(WS_METHODS.clickUpSetTag, {
 const WsClickUpCommentsRpc = Rpc.make(WS_METHODS.clickUpComments, {
   payload: ClickUpCommentsInput,
   success: ClickUpCommentsPage,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpCreateCommentRpc = Rpc.make(WS_METHODS.clickUpCreateComment, {
+  payload: ClickUpCreateCommentInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpCommentRepliesRpc = Rpc.make(WS_METHODS.clickUpCommentReplies, {
+  payload: ClickUpCommentRepliesInput,
+  success: ClickUpCommentReplies,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpCreateReplyRpc = Rpc.make(WS_METHODS.clickUpCreateReply, {
+  payload: ClickUpCreateReplyInput,
+  success: Schema.Void,
   error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 const WsClickUpSetCommentResolutionRpc = Rpc.make(WS_METHODS.clickUpSetCommentResolution, {
@@ -1685,6 +1707,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsClickUpSetStatusRpc,
   WsClickUpSetTagRpc,
   WsClickUpCommentsRpc,
+  WsClickUpCreateCommentRpc,
+  WsClickUpCommentRepliesRpc,
+  WsClickUpCreateReplyRpc,
   WsClickUpSetCommentResolutionRpc,
   WsClickUpSetChecklistItemResolutionRpc,
   WsClickUpTaskRpc,

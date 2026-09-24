@@ -1,5 +1,10 @@
 import { assert, it } from "@effect/vitest";
-import { ClickUpError } from "@t3tools/contracts";
+import {
+  ClickUpError,
+  ClickUpCreateCommentInput,
+  ClickUpCreateReplyInput,
+} from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { ClickUpApi } from "./ClickUpApi.ts";
@@ -27,7 +32,13 @@ const comment = {
 type RequestOptions = Parameters<ClickUpApi["Service"]["request"]>[1];
 
 function setup(
-  options: { task?: unknown; comments?: ReadonlyArray<unknown>; failPut?: boolean } = {},
+  options: {
+    task?: unknown;
+    comments?: ReadonlyArray<unknown>;
+    replies?: ReadonlyArray<unknown>;
+    failPut?: boolean;
+    failPost?: boolean;
+  } = {},
 ) {
   const calls: Array<{ path: string; options: RequestOptions }> = [];
   return {
@@ -49,6 +60,11 @@ function setup(
         Layer.succeed(ClickUpApi, {
           request: (path, requestOptions) => {
             calls.push({ path, options: requestOptions });
+            if (requestOptions?.method === "POST")
+              return options.failPost
+                ? Effect.fail(new ClickUpError({ message: "Connection lost" }))
+                : Effect.succeed({ id: "created" });
+            if (path.endsWith("/reply")) return Effect.succeed({ comments: options.replies ?? [] });
             if (requestOptions?.method === "PUT")
               return options.failPut
                 ? Effect.fail(
@@ -66,6 +82,126 @@ function setup(
     ),
   };
 }
+
+const decodeCreateComment = Schema.decodeUnknownSync(ClickUpCreateCommentInput);
+const decodeCreateReply = Schema.decodeUnknownSync(ClickUpCreateReplyInput);
+it("rejects blank and oversized comments while preserving multiline text", () => {
+  for (const text of ["", " \n ", "x".repeat(10_001)]) {
+    assert.throws(() => decodeCreateComment({ ...input, text }));
+    assert.throws(() => decodeCreateReply({ ...input, commentId: "comment-1", text }));
+  }
+  assert.equal(
+    decodeCreateComment({ ...input, text: "First\n  code\nLast" }).text,
+    "First\n  code\nLast",
+  );
+});
+
+it.effect(
+  "creates comments and replies with exact text after validating task and parent membership",
+  () => {
+    const test = setup();
+    return Effect.gen(function* () {
+      const service = yield* ClickUpInteractions;
+      yield* service.createComment({ ...input, text: "First\nSecond" });
+      yield* service.createReply({
+        ...input,
+        commentId: "comment-1",
+        text: "Reply",
+        cursor: { id: "newer", date: "1700100000000" },
+      });
+      assert.deepEqual(
+        test.calls.filter((call) => call.options?.method === "POST"),
+        [
+          {
+            path: "task/task-1/comment",
+            options: {
+              token: "fixture-token",
+              method: "POST",
+              body: { comment_text: "First\nSecond", notify_all: false },
+            },
+          },
+          {
+            path: "comment/comment-1/reply",
+            options: {
+              token: "fixture-token",
+              method: "POST",
+              body: { comment_text: "Reply", notify_all: false },
+            },
+          },
+        ],
+      );
+      assert.isTrue(
+        test.calls.some(
+          (call) =>
+            call.path.includes("start_id=newer") && call.path.includes("start=1700100000000"),
+        ),
+      );
+    }).pipe(Effect.provide(test.layer));
+  },
+);
+
+it.effect(
+  "rejects comments for a changed account or workspace and replies to unrelated parents",
+  () => {
+    const test = setup({ comments: [] });
+    return Effect.gen(function* () {
+      const service = yield* ClickUpInteractions;
+      for (const operation of [
+        service.createComment({ ...input, userId: 99, text: "No" }),
+        service.createComment({ ...input, workspaceId: "other", text: "No" }),
+        service.createReply({ ...input, commentId: "other-comment", text: "No" }),
+        service.replies({ ...input, commentId: "other-comment" }),
+      ])
+        assert.equal((yield* Effect.result(operation))._tag, "Failure");
+      assert.isFalse(
+        test.calls.some((call) => call.options?.method === "POST" || call.path.endsWith("/reply")),
+      );
+    }).pipe(Effect.provide(test.layer));
+  },
+);
+
+it.effect("returns replies chronologically with mention and assignment context", () => {
+  const test = setup({
+    replies: [
+      {
+        ...comment,
+        id: "later",
+        date: "1700100000000",
+        assignee: { id: 17, username: "Developer" },
+        comment: [{ type: "tag", user: { id: 17 } }],
+      },
+      { ...comment, id: "earlier", date: "1700000000000" },
+    ],
+  });
+  return Effect.gen(function* () {
+    const service = yield* ClickUpInteractions;
+    const result = yield* service.replies({ ...input, commentId: "comment-1" });
+    assert.deepEqual(
+      result.comments.map((reply) => reply.id),
+      ["earlier", "later"],
+    );
+    assert.deepEqual(result.comments[1]?.mentionedUserIds, [17]);
+    assert.equal(result.comments[1]?.assignee?.id, 17);
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("does not retry a failed comment or reply POST", () => {
+  const test = setup({ failPost: true });
+  return Effect.gen(function* () {
+    const service = yield* ClickUpInteractions;
+    assert.equal(
+      (yield* Effect.result(service.createComment({ ...input, text: "Once" })))._tag,
+      "Failure",
+    );
+    assert.equal(
+      (yield* Effect.result(
+        service.createReply({ ...input, commentId: "comment-1", text: "Once" }),
+      ))._tag,
+      "Failure",
+    );
+    assert.equal(test.calls.filter((call) => call.options?.method === "POST").length, 2);
+  }).pipe(Effect.provide(test.layer));
+});
 
 it.effect("resolves and reopens comments using only the resolved field", () => {
   const test = setup();

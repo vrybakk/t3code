@@ -12,6 +12,15 @@ import { RPC_REQUIRED_SCOPES, requiredScopeForRpcMethod } from "./RpcAuthorizati
 
 describe("RPC authorization scopes", () => {
   it("requires operate permission for ClickUp resolution changes", () => {
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpCommentReplies)).toBe(
+      AuthOrchestrationReadScope,
+    );
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpCreateComment)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpCreateReply)).toBe(
+      AuthOrchestrationOperateScope,
+    );
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpComments)).toBe(AuthOrchestrationReadScope);
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpSetCommentResolution)).toBe(
       AuthOrchestrationOperateScope,

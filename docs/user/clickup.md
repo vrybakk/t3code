@@ -22,7 +22,10 @@ planned in a shared company sprint.
 Select a task to open its full detail screen: description, task properties, custom fields,
 attachments, checklists, subtasks, and recent comments. Empty custom fields can be expanded.
 Use **Tasks** to return to the selected sprint, or **Open in ClickUp** for the full change
-history and comment replies. Use **Older** and **Newer** to browse comments. Refresh to retrieve changes.
+history. Use **Older** and **Newer** to browse comments. Refresh to retrieve changes.
+Write a comment in the activity panel and select **Post comment**. Select **Reply** under a
+comment to read its conversation and send a reply without leaving the task. Drafts remain
+if sending fails; refresh before retrying an unconfirmed send to avoid duplicates.
 
 Open image and video attachments from the task or its comments in the media viewer.
 Assigned comments show their owner and can be resolved or reopened. Checklist items show

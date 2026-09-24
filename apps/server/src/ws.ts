@@ -2602,6 +2602,9 @@ const makeWsRpcLayer = (
         [WS_METHODS.clickUpSetStatus]: (input) => clickUpTaskEditing.setStatus(input),
         [WS_METHODS.clickUpSetTag]: (input) => clickUpTaskEditing.setTag(input),
         [WS_METHODS.clickUpComments]: (input) => clickUpInteractions.comments(input),
+        [WS_METHODS.clickUpCommentReplies]: (input) => clickUpInteractions.replies(input),
+        [WS_METHODS.clickUpCreateComment]: (input) => clickUpInteractions.createComment(input),
+        [WS_METHODS.clickUpCreateReply]: (input) => clickUpInteractions.createReply(input),
         [WS_METHODS.clickUpSetCommentResolution]: (input) =>
           clickUpInteractions.setCommentResolution(input),
         [WS_METHODS.clickUpSetChecklistItemResolution]: (input) =>
