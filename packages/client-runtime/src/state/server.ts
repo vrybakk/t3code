@@ -933,6 +933,9 @@ export function createServerEnvironmentAtoms<R, E>(
       );
     }).pipe(Atom.withLabel(`environment-data:server:usage-prices:${environmentId}`)),
   );
+  const clickUpRevisionAtom = Atom.family((environmentId: EnvironmentId) =>
+    Atom.make(0).pipe(Atom.withLabel(`environment-data:clickup:revision:${environmentId}`)),
+  );
   const workRevisionAtom = Atom.family((environmentId: EnvironmentId) =>
     Atom.make(0).pipe(Atom.withLabel(`environment-data:work:revision:${environmentId}`)),
   );
@@ -1055,6 +1058,103 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverGetUsageSummary,
       staleTimeMs: 60_000,
       refreshTrigger: ({ environmentId }) => usagePricesAtom(environmentId),
+    }),
+    clickUpConnection: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpConnection",
+      tag: WS_METHODS.clickUpConnection,
+      staleTimeMs: 30_000,
+    }),
+    clickUpSprints: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpSprints",
+      tag: WS_METHODS.clickUpSprints,
+      staleTimeMs: 30_000,
+    }),
+    clickUpTasks: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpTasks",
+      tag: WS_METHODS.clickUpTasks,
+      staleTimeMs: 30_000,
+      refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
+    }),
+    clickUpTask: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpTask",
+      tag: WS_METHODS.clickUpTask,
+      staleTimeMs: 30_000,
+      refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
+    }),
+    clickUpThreads: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpThreads",
+      tag: WS_METHODS.clickUpThreads,
+      staleTimeMs: 30_000,
+    }),
+    clickUpWorkflow: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpWorkflow",
+      tag: WS_METHODS.clickUpWorkflow,
+      staleTimeMs: 5_000,
+      refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
+    }),
+    clickUpSubmitWorkflow: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSubmitWorkflow",
+      tag: WS_METHODS.clickUpSubmitWorkflow,
+      onSettled: ({ environmentId }, registry) =>
+        Effect.sync(() => {
+          registry.update(clickUpRevisionAtom(environmentId), (revision) => revision + 1);
+        }),
+    }),
+    clickUpTaskOptions: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpTaskOptions",
+      tag: WS_METHODS.clickUpTaskOptions,
+      staleTimeMs: 30_000,
+      refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
+    }),
+    clickUpSetStatus: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSetStatus",
+      tag: WS_METHODS.clickUpSetStatus,
+      onSettled: ({ environmentId }, registry) =>
+        Effect.sync(() => {
+          registry.update(clickUpRevisionAtom(environmentId), (revision) => revision + 1);
+        }),
+    }),
+    clickUpSetTag: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSetTag",
+      tag: WS_METHODS.clickUpSetTag,
+      onSettled: ({ environmentId }, registry) =>
+        Effect.sync(() => {
+          registry.update(clickUpRevisionAtom(environmentId), (revision) => revision + 1);
+        }),
+    }),
+    clickUpComments: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpComments",
+      tag: WS_METHODS.clickUpComments,
+      staleTimeMs: 30_000,
+    }),
+    clickUpSetCommentResolution: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSetCommentResolution",
+      tag: WS_METHODS.clickUpSetCommentResolution,
+    }),
+    clickUpCommentReplies: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpCommentReplies",
+      tag: WS_METHODS.clickUpCommentReplies,
+      staleTimeMs: 30_000,
+    }),
+    clickUpCreateComment: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpCreateComment",
+      tag: WS_METHODS.clickUpCreateComment,
+    }),
+    clickUpCreateReply: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpCreateReply",
+      tag: WS_METHODS.clickUpCreateReply,
+    }),
+    clickUpSetChecklistItemResolution: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSetChecklistItemResolution",
+      tag: WS_METHODS.clickUpSetChecklistItemResolution,
+    }),
+    clickUpConnect: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpConnect",
+      tag: WS_METHODS.clickUpConnect,
+    }),
+    clickUpDisconnect: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpDisconnect",
+      tag: WS_METHODS.clickUpDisconnect,
     }),
     workOverview: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:work:overview",

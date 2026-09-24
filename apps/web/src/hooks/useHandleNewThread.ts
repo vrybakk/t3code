@@ -190,6 +190,7 @@ export function useNewThreadHandler() {
       // drafts rather than deleting them.
       const emptyStoredDraftThread =
         reusableStoredDraftThread &&
+        !reusableStoredDraftThread.clickUpTask &&
         !composerDraftHasUserContent(getComposerDraft(reusableStoredDraftThread.draftId))
           ? reusableStoredDraftThread
           : null;
@@ -328,6 +329,7 @@ export function useNewThreadHandler() {
 
       if (
         latestActiveDraftThread &&
+        !latestActiveDraftThread.clickUpTask &&
         currentRouteTarget?.kind === "draft" &&
         latestActiveDraftThread.logicalProjectKey === logicalProjectKey &&
         latestActiveDraftThread.promotedTo == null &&
@@ -371,6 +373,7 @@ export function useNewThreadHandler() {
         const racedDraft = getDraftSessionByLogicalProjectKey(logicalProjectKey);
         if (
           racedDraft &&
+          !racedDraft.clickUpTask &&
           // Only a draft REGISTERED during the await counts as a raced
           // winner. An invested draft this invocation deliberately declined
           // to reuse is still mapped at this point — reusing it here would

@@ -1,4 +1,10 @@
-import { ArrowLeftIcon, TimerIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import {
+  ListTodoIcon,
+  ArrowLeftIcon,
+  TimerIcon,
+  ChartNoAxesColumnIcon,
+  SettingsIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
 import { Link, useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
@@ -144,7 +150,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         ? "settings"
         : /^\/projects\/[^/]+\/?$/.test(location.pathname)
           ? "project-settings"
-          : location.pathname === "/usage" || location.pathname === "/work"
+          : location.pathname === "/usage" ||
+              location.pathname === "/work" ||
+              location.pathname === "/tasks"
             ? "usage"
             : location.pathname === "/pull-requests"
               ? "pull-requests"
@@ -222,6 +230,14 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             onClick={handleUsageClick}
           />
           <SidebarUtilityItem icon={<TimerIcon />} label="Work" onClick={handleWorkClick} />
+          <SidebarUtilityItem
+            icon={<ListTodoIcon />}
+            label="Tasks"
+            onClick={() => {
+              closeMobileSidebar();
+              void navigate({ to: "/tasks" });
+            }}
+          />
         </>
       )}
       <SidebarUpdatePill />

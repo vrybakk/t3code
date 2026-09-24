@@ -1,6 +1,7 @@
 import { elementContextToPreviewAnnotation } from "./lib/elementContext";
 import {
   ElementContextDetails,
+  ClickUpTaskReference,
   DEFAULT_MODEL,
   DEFAULT_MODEL_BY_PROVIDER,
   defaultInstanceIdForDriver,
@@ -318,7 +319,10 @@ type LegacyPersistedComposerDraftStoreState = PersistedComposerDraftStoreState &
   LegacyStickyModelFields &
   LegacyV2StoreFields;
 
+const isClickUpTaskReference = Schema.is(ClickUpTaskReference);
+
 const PersistedDraftThreadState = Schema.Struct({
+  clickUpTask: Schema.optionalKey(ClickUpTaskReference),
   threadId: ThreadId,
   environmentId: Schema.String,
   projectId: ProjectId,
@@ -446,6 +450,7 @@ export function composerDraftHasUserContent(
  * environment/worktree configuration before the first send.
  */
 export interface DraftSessionState {
+  clickUpTask?: ClickUpTaskReference;
   threadId: ThreadId;
   environmentId: EnvironmentId;
   projectId: ProjectId;
@@ -556,6 +561,7 @@ interface ComposerDraftStoreState {
   setDraftThreadContext: (
     threadRef: ComposerThreadTarget,
     options: {
+      clickUpTask?: ClickUpTaskReference | null;
       branch?: string | null;
       worktreePath?: string | null;
       projectRef?: ScopedProjectRef;
@@ -1569,6 +1575,7 @@ function createDraftThreadState(
     envMode:
       options?.envMode ?? (nextWorktreePath ? "worktree" : (existingThread?.envMode ?? "local")),
     startFromOrigin: nextStartFromOrigin,
+    ...(existingThread?.clickUpTask ? { clickUpTask: existingThread.clickUpTask } : {}),
     promotedTo: null,
   };
 }
@@ -1751,6 +1758,9 @@ function normalizePersistedDraftThreads(
         worktreePath: normalizedWorktreePath,
         envMode: normalizeDraftThreadEnvMode(candidateDraftThread.envMode, normalizedWorktreePath),
         startFromOrigin,
+        ...(isClickUpTaskReference(candidateDraftThread.clickUpTask)
+          ? { clickUpTask: candidateDraftThread.clickUpTask }
+          : {}),
         ...(candidateDraftThread.environmentSelection === "manual" ||
         candidateDraftThread.environmentSelection === "auto"
           ? { environmentSelection: candidateDraftThread.environmentSelection }
@@ -2478,6 +2488,7 @@ function toHydratedDraftThreadState(
   persistedDraftThread: PersistedDraftThreadState,
 ): DraftThreadState {
   return {
+    ...(persistedDraftThread.clickUpTask ? { clickUpTask: persistedDraftThread.clickUpTask } : {}),
     threadId: persistedDraftThread.threadId,
     environmentId: persistedDraftThread.environmentId as EnvironmentId,
     projectId: persistedDraftThread.projectId,
@@ -2776,6 +2787,8 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               (options.branch != null || options.worktreePath != null
                 ? "manual"
                 : existing.environmentSelection);
+            const clickUpTask =
+              options.clickUpTask === undefined ? existing.clickUpTask : options.clickUpTask;
             const nextDraftThread: DraftThreadState = {
               threadId: existing.threadId,
               environmentId: nextProjectRef.environmentId,
@@ -2799,6 +2812,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               envMode:
                 options.envMode ?? (nextWorktreePath ? "worktree" : (existing.envMode ?? "local")),
               startFromOrigin: nextStartFromOrigin,
+              ...(clickUpTask ? { clickUpTask } : {}),
               promotedTo: existing.promotedTo ?? null,
             };
             const isUnchanged =
@@ -2814,6 +2828,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               nextDraftThread.worktreePath === existing.worktreePath &&
               nextDraftThread.envMode === existing.envMode &&
               nextDraftThread.startFromOrigin === existing.startFromOrigin &&
+              nextDraftThread.clickUpTask === existing.clickUpTask &&
               scopedThreadRefsEqual(nextDraftThread.promotedTo, existing.promotedTo);
             if (isUnchanged) {
               return state;

@@ -15,7 +15,10 @@ const testState = vi.hoisted(() => {
     readonly environmentId: string;
     readonly promotedTo: null;
     readonly threadId: string;
+    readonly logicalProjectKey?: string;
+    readonly clickUpTask?: { workspaceId: string; taskId: string; name: string };
   } | null = null;
+  let activeDraft = false;
   const router = {
     state: {
       location: { href: "/" },
@@ -28,7 +31,7 @@ const testState = vi.hoisted(() => {
   const draftStore = {
     getComposerDraft: vi.fn(() => ({})),
     getDraftSessionByLogicalProjectKey: vi.fn(() => storedDraft),
-    getDraftSession: vi.fn(() => null),
+    getDraftSession: vi.fn(() => (activeDraft ? storedDraft : null)),
     getDraftThread: vi.fn(() => null),
     applyStickyState: vi.fn(),
     setDraftThreadContext: vi.fn(),
@@ -37,6 +40,12 @@ const testState = vi.hoisted(() => {
   };
 
   return {
+    setActiveDraft: () => {
+      activeDraft = true;
+    },
+    get activeDraft() {
+      return activeDraft;
+    },
     completeProjectFileRead: (value: null) => completeProjectFileRead(value),
     draftStore,
     get projectFileRead() {
@@ -53,6 +62,7 @@ const testState = vi.hoisted(() => {
       },
     ) {
       storedDraft = nextStoredDraft;
+      activeDraft = false;
       targetSettings = {
         defaultThreadEnvMode: workspaceDefaults.envMode,
         newWorktreesStartFromOrigin: workspaceDefaults.startFromOrigin,
@@ -173,7 +183,10 @@ vi.mock("../state/server", () => ({
   environmentServerConfigsAtom: {},
   primaryServerSettingsAtom: "primary-settings",
 }));
-vi.mock("../threadRoutes", () => ({ resolveThreadRouteTarget: () => null }));
+vi.mock("../threadRoutes", () => ({
+  resolveThreadRouteTarget: () =>
+    testState.activeDraft ? { kind: "draft", draftId: "draft-task" } : null,
+}));
 vi.mock("../uiStateStore", () => ({
   legacyProjectCwdPreferenceKey: () => "remote-project",
   useUiStateStore: () => [],
@@ -287,3 +300,26 @@ describe.each([
     },
   );
 });
+
+it.each([false, true])(
+  "keeps an empty task-linked draft separate from ordinary new work (active: %s)",
+  async (active) => {
+    testState.reset({
+      logicalProjectKey: "remote-project",
+      draftId: "draft-task",
+      environmentId: "environment-ssh",
+      promotedTo: null,
+      threadId: "thread-task",
+      clickUpTask: { workspaceId: "42", taskId: "abc", name: "Fix checkout" },
+    });
+    if (active) testState.setActiveDraft();
+    const pending = useNewThreadHandler()({
+      environmentId: "environment-ssh",
+      projectId: "project-remote",
+    } as never);
+    testState.completeProjectFileRead(null);
+    const opened = await pending;
+    expect(opened?.draftId).not.toBe("draft-task");
+    expect(testState.draftStore.setDraftThreadContext).not.toHaveBeenCalled();
+  },
+);

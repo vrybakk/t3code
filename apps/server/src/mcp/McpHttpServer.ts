@@ -1,3 +1,5 @@
+import { ClickUpToolkit } from "./toolkits/clickup/tools.ts";
+import { ClickUpToolkitHandlersLive } from "./toolkits/clickup/handlers.ts";
 import * as NodeCrypto from "node:crypto";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -607,6 +609,10 @@ export const PreviewToolkitRegistrationLive = Layer.mergeAll(
   PreviewSnapshotRegistrationLive,
 );
 
+const ClickUpToolkitRegistrationLive = McpServer.toolkit(ClickUpToolkit).pipe(
+  Layer.provide(ClickUpToolkitHandlersLive),
+);
+
 export const PullRequestsToolkitRegistrationLive = McpServer.toolkit(PullRequestsToolkit).pipe(
   Layer.provide(PullRequestsToolkitHandlersLive),
 );
@@ -634,6 +640,7 @@ const McpTransportLive = McpServer.layerHttp({
 export const layer = Layer.mergeAll(
   PreviewToolkitRegistrationLive,
   PullRequestsToolkitRegistrationLive,
+  ClickUpToolkitRegistrationLive,
   DeviceToolkitRegistrationLive,
   VideoToolkitRegistrationLive.pipe(
     Layer.provide(VideoInspection.layer.pipe(Layer.provide(ProcessRunner.layer))),
