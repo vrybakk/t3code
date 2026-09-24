@@ -1,4 +1,5 @@
 import { ClickUpWorkflowSettings } from "./ClickUpWorkflowSettings";
+import { ClickUpOAuthSettings } from "./ClickUpOAuthSettings";
 import { ClickUpConnectionCard } from "../clickup/ClickUpConnectionCard";
 import { SettingsSection } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
@@ -21,6 +22,17 @@ export function ClickUpIntegrationSettings() {
         </p>
       ) : (
         <div className="space-y-4">
+          {environment.serverConfig.environment.capabilities.clickUpOAuthConfiguration === true ? (
+            <ClickUpOAuthSettings
+              key={`oauth-${environment.environmentId}`}
+              environmentId={environment.environmentId}
+              isPrimary={environment.entry.target._tag === "PrimaryConnectionTarget"}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Update this environment to configure its ClickUp OAuth app in Nerd.
+            </p>
+          )}
           <ClickUpConnectionCard
             key={environment.environmentId}
             environmentId={environment.environmentId}

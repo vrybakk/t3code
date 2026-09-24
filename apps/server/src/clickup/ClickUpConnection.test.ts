@@ -8,29 +8,40 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as TestClock from "effect/testing/TestClock";
 import { SessionStore } from "../auth/SessionStore.ts";
-import { ServerSecretStore } from "../auth/ServerSecretStore.ts";
+import { SecretStorePersistError, ServerSecretStore } from "../auth/ServerSecretStore.ts";
+import { ClickUpCallbackListener } from "./ClickUpCallbackListener.ts";
 import { ClickUpApi } from "./ClickUpApi.ts";
 import { ClickUpConnection, layer } from "./ClickUpConnection.ts";
 
 const sessionId = AuthSessionId.make("clickup-test-session");
 
 function setup(configured = true, revokeDuringExchange = false, profilePicture?: string | null) {
-  let stored: Uint8Array | undefined;
+  const values = new Map<string, Uint8Array>();
   let active = true;
   let failUser = false;
+  let failSave = false;
   let expiresAt = DateTime.makeUnsafe("2099-01-01T00:00:00.000Z");
   const calls: string[] = [];
   const testLayer = layer.pipe(
     Layer.provide(
+      Layer.succeed(ClickUpCallbackListener, { start: () => Effect.void, stop: Effect.void }),
+    ),
+    Layer.provide(
       Layer.mock(ServerSecretStore)({
-        get: () => Effect.sync(() => Option.fromUndefinedOr(stored)),
-        set: (_name, value) =>
+        get: (name) => Effect.sync(() => Option.fromUndefinedOr(values.get(name))),
+        set: (name, value) =>
+          Effect.suspend(() =>
+            failSave
+              ? Effect.fail(
+                  new SecretStorePersistError({ resource: "fixture", cause: "fixture failure" }),
+                )
+              : Effect.sync(() => {
+                  values.set(name, value);
+                }),
+          ),
+        remove: (name) =>
           Effect.sync(() => {
-            stored = value;
-          }),
-        remove: () =>
-          Effect.sync(() => {
-            stored = undefined;
+            values.delete(name);
           }),
       }),
     ),
@@ -96,15 +107,19 @@ function setup(configured = true, revokeDuringExchange = false, profilePicture?:
   return {
     layer: testLayer,
     calls,
+    failSave: () => {
+      failSave = true;
+    },
+    savedConfig: () => values.get("clickup-oauth-config"),
     revoke: () => {
       active = false;
     },
     expire: () => {
       expiresAt = DateTime.makeUnsafe(-1);
     },
-    stored: () => stored,
+    stored: () => values.get("clickup-access-token"),
     setToken: (token: string) => {
-      stored = new TextEncoder().encode(token);
+      values.set("clickup-access-token", new TextEncoder().encode(token));
     },
     failNextUser: () => {
       failUser = true;
@@ -251,4 +266,118 @@ it.effect("rejects an expired connected session and rechecks revocation after ex
     assert.equal(revoked.calls.includes("oauth/token"), true);
     assert.equal(revoked.stored(), undefined);
   });
+});
+
+const localRedirect = "http://localhost:6326/api/integrations/clickup/callback";
+const savedInput = {
+  clientId: "saved-client",
+  clientSecret: "saved-secret",
+  redirectUri: localRedirect,
+};
+
+it.effect("persists OAuth settings across service restarts without returning the secret", () => {
+  const test = setup(false);
+  return Effect.gen(function* () {
+    const metadata = yield* Effect.gen(function* () {
+      const connection = yield* ClickUpConnection;
+      assert.equal((yield* connection.status).configured, false);
+      const saved = yield* connection.saveOAuthConfig(savedInput);
+      assert.deepEqual(saved, {
+        clientId: "saved-client",
+        redirectUri: localRedirect,
+        hasClientSecret: true,
+        source: "saved",
+      });
+      assert.equal((yield* connection.status).configured, true);
+      return saved;
+    }).pipe(Effect.provide(test.layer));
+    assert.notProperty(metadata, "clientSecret");
+    yield* Effect.gen(function* () {
+      const connection = yield* ClickUpConnection;
+      assert.deepEqual(yield* connection.oauthConfig, metadata);
+      const authorization = new URL((yield* connection.begin(sessionId)).url);
+      assert.equal(authorization.searchParams.get("client_id"), "saved-client");
+      assert.equal(authorization.searchParams.get("redirect_uri"), localRedirect);
+      yield* connection.complete(authorization.searchParams.get("state")!, "code");
+      yield* connection.disconnect;
+      assert.deepEqual(yield* connection.oauthConfig, metadata);
+    }).pipe(Effect.provide(test.layer));
+  });
+});
+
+it.effect(
+  "preserves a secret only for the same client and cancels pending sign-in when settings change",
+  () => {
+    const test = setup();
+    return Effect.gen(function* () {
+      const connection = yield* ClickUpConnection;
+      yield* connection.saveOAuthConfig(savedInput);
+      const state = new URL((yield* connection.begin(sessionId)).url).searchParams.get("state")!;
+      yield* connection.saveOAuthConfig({ ...savedInput, clientSecret: "" });
+      assert.include(new TextDecoder().decode(test.savedConfig()), "saved-secret");
+      const changedClient = yield* connection
+        .saveOAuthConfig({ clientId: "other", redirectUri: localRedirect })
+        .pipe(Effect.flip);
+      assert.include(changedClient.message, "requires its secret");
+      const expired = yield* connection.complete(state, "code").pipe(Effect.flip);
+      assert.include(expired.message, "expired");
+      assert.deepEqual(test.calls, []);
+      const fallback = yield* connection.clearOAuthConfig;
+      assert.equal(fallback.source, "environment");
+      assert.equal(fallback.clientId, "fixture-client");
+    }).pipe(Effect.provide(test.layer));
+  },
+);
+
+it.effect("clear cancels pending sign-in and preserves a connected account", () => {
+  const test = setup(false);
+  test.setToken("already-connected");
+  return Effect.gen(function* () {
+    const connection = yield* ClickUpConnection;
+    yield* connection.saveOAuthConfig(savedInput);
+    const state = new URL((yield* connection.begin(sessionId)).url).searchParams.get("state")!;
+    assert.equal((yield* connection.status).configured, true);
+    const metadata = yield* connection.clearOAuthConfig;
+    assert.equal(metadata.source, "none");
+    const status = yield* connection.status;
+    assert.equal(status.configured, false);
+    assert.equal(status.user?.id, 17);
+    const error = yield* connection.complete(state, "code").pipe(Effect.flip);
+    assert.include(error.message, "expired");
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("failed configuration writes retain the previous settings and pending sign-in", () => {
+  const test = setup();
+  return Effect.gen(function* () {
+    const connection = yield* ClickUpConnection;
+    const state = new URL((yield* connection.begin(sessionId)).url).searchParams.get("state")!;
+    test.failSave();
+    const error = yield* connection.saveOAuthConfig(savedInput).pipe(Effect.flip);
+    assert.equal(error.message, "Could not save the ClickUp OAuth configuration.");
+    assert.equal((yield* connection.oauthConfig).source, "environment");
+    yield* connection.complete(state, "code").pipe(Effect.flip);
+    assert.include(test.calls, "oauth/token");
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("rejects unsafe or malformed callback addresses before storing credentials", () => {
+  const test = setup(false);
+  return Effect.gen(function* () {
+    const connection = yield* ClickUpConnection;
+    for (const redirectUri of [
+      "http://example.com/api/integrations/clickup/callback",
+      "https://user:password@example.com/api/integrations/clickup/callback",
+      localRedirect + "?token=value",
+      localRedirect + "#fragment",
+      "https://example.com/wrong",
+      "invalid",
+    ]) {
+      const error = yield* connection
+        .saveOAuthConfig({ ...savedInput, redirectUri })
+        .pipe(Effect.flip);
+      assert.include(error.message, "URL");
+    }
+    assert.isUndefined(test.savedConfig());
+  }).pipe(Effect.provide(test.layer));
 });
