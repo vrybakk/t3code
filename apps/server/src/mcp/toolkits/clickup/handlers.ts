@@ -4,6 +4,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { ClickUpConnection } from "../../../clickup/ClickUpConnection.ts";
 import { ClickUpTasks } from "../../../clickup/ClickUpTasks.ts";
+import { ClickUpInteractions } from "../../../clickup/ClickUpInteractions.ts";
 import { ClickUpTaskEditing } from "../../../clickup/ClickUpTaskEditing.ts";
 import { requireMcpCapability } from "../../McpInvocationContext.ts";
 import { ClickUpWorkflow } from "../../../clickup/ClickUpWorkflow.ts";
@@ -16,6 +17,7 @@ const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const connection = yield* ClickUpConnection;
   const tasks = yield* ClickUpTasks;
+  const interactions = yield* ClickUpInteractions;
   const editing = yield* ClickUpTaskEditing;
   const workflow = yield* ClickUpWorkflow;
   const linkedTask = Effect.fn("ClickUpToolkit.linkedTask")(function* () {
@@ -60,6 +62,10 @@ const make = Effect.gen(function* () {
         return yield* workflow.prepare(task, scope.threadId, input);
       }),
     get_linked_clickup_task: () => linkedTask().pipe(Effect.flatMap(tasks.detail)),
+    get_linked_clickup_comments: (input) =>
+      linkedTask().pipe(Effect.flatMap((task) => interactions.comments({ ...input, ...task }))),
+    get_linked_clickup_comment_replies: (input) =>
+      linkedTask().pipe(Effect.flatMap((task) => interactions.replies({ ...input, ...task }))),
     complete_clickup_estimation: (input) =>
       linkedTask().pipe(
         Effect.flatMap((task) => editing.completeEstimation({ ...task, ...input })),

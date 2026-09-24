@@ -17,6 +17,8 @@ import { ClickUpConnection } from "../../../clickup/ClickUpConnection.ts";
 import { ClickUpTaskEditing } from "../../../clickup/ClickUpTaskEditing.ts";
 import { ClickUpWorkflow } from "../../../clickup/ClickUpWorkflow.ts";
 import { ClickUpTasks } from "../../../clickup/ClickUpTasks.ts";
+import { ClickUpApi } from "../../../clickup/ClickUpApi.ts";
+import { layer as ClickUpInteractionsLive } from "../../../clickup/ClickUpInteractions.ts";
 import { McpInvocationContext, type McpCapability } from "../../McpInvocationContext.ts";
 import { ClickUpToolkitHandlersLive } from "./handlers.ts";
 import { ClickUpToolkit } from "./tools.ts";
@@ -42,9 +44,36 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
     reads: [] as ClickUpTaskInput[],
     estimates: [] as ClickUpCompleteEstimationInput[],
     starts: [] as ClickUpTaskInput[],
+    requests: [] as string[],
   };
   const userId = options.userId === undefined ? 73 : options.userId;
-  const dependencies = Layer.mergeAll(
+  const baseDependencies = Layer.mergeAll(
+    Layer.succeed(ClickUpApi, {
+      request: (path) =>
+        Effect.sync(() => {
+          calls.requests.push(path);
+          const comment = (id: string) => ({
+            id,
+            date: "1700000000000",
+            user: { id: 73, username: "Developer" },
+            comment_text: id,
+          });
+          if (path === "comment/older-comment/reply") return { comments: [comment("reply")] };
+          if (path.includes("/comment"))
+            return {
+              comments: path.includes("start_id=recent-24")
+                ? [comment("older-comment")]
+                : Array.from({ length: 25 }, (_, index) => comment(`recent-${index}`)),
+            };
+          return {
+            id: "own-task",
+            team_id: "42",
+            name: "Task",
+            status: { status: "open" },
+            list: { name: "Sprint" },
+          };
+        }),
+    }),
     Layer.mock(ClickUpWorkflow)({
       start: (task) =>
         Effect.sync(() => {
@@ -93,6 +122,10 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
           return { estimateMinutes: input.estimateMinutes, tagRemoved: options.tagRemoved ?? true };
         }),
     }),
+  );
+  const dependencies = Layer.merge(
+    baseDependencies,
+    ClickUpInteractionsLive.pipe(Layer.provide(baseDependencies)),
   );
   const toolkit = yield* ClickUpToolkit.pipe(
     Effect.provide(ClickUpToolkitHandlersLive.pipe(Layer.provide(dependencies))),
@@ -219,3 +252,71 @@ it.effect("starts only the authenticated thread's task and rejects missing capab
     assert.equal(harness.calls.starts.length, 1);
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );
+
+it.effect(
+  "reads older linked-task comments and their replies without accepting forged task identity",
+  () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness();
+      const first = yield* harness.call("get_linked_clickup_comments", {});
+      assert.isTrue(first.hasMore);
+      assert.deepEqual(first.nextCursor, { id: "recent-24", date: "1700000000000" });
+      const cursor = first.nextCursor!;
+      const older = yield* harness.call("get_linked_clickup_comments", { cursor });
+      assert.deepEqual(
+        older.comments.map((comment) => comment.id),
+        ["older-comment"],
+      );
+      assert.isFalse(older.hasMore);
+      const forged = {
+        commentId: "older-comment",
+        cursor,
+        taskId: "other-task",
+        workspaceId: "other-workspace",
+        userId: 999,
+      };
+      const replies = yield* harness.call("get_linked_clickup_comment_replies", forged);
+      assert.deepEqual(
+        replies.comments.map((comment) => comment.text),
+        ["reply"],
+      );
+      assert.deepEqual(harness.calls.requests.slice(-3), [
+        "task/own-task",
+        "task/own-task/comment?start_id=recent-24&start=1700000000000",
+        "comment/older-comment/reply",
+      ]);
+    }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("rejects a foreign parent comment before reading its replies", () =>
+  Effect.gen(function* () {
+    const harness = yield* makeHarness();
+    const failure = yield* harness
+      .call("get_linked_clickup_comment_replies", { commentId: "foreign-comment" })
+      .pipe(Effect.flip);
+    assert.equal(failure._tag, "ClickUpError");
+    assert.deepEqual(harness.calls.requests, ["task/own-task", "task/own-task/comment"]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+for (const options of [{ linked: false }, { deleted: true }]) {
+  it.effect(
+    `rejects comment reads for ${options.linked === false ? "unlinked" : "deleted"} threads`,
+    () =>
+      Effect.gen(function* () {
+        const harness = yield* makeHarness(options);
+        assert.equal(
+          (yield* Effect.result(harness.call("get_linked_clickup_comments", {})))._tag,
+          "Failure",
+        );
+        assert.equal(
+          (yield* Effect.result(
+            harness.call("get_linked_clickup_comment_replies", { commentId: "older-comment" }),
+          ))._tag,
+          "Failure",
+        );
+        assert.deepEqual(harness.calls.requests, []);
+        assert.equal(harness.calls.accountReads, 0);
+      }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+  );
+}

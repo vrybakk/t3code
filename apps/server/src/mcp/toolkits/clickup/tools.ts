@@ -6,6 +6,10 @@ import {
   ClickUpTaskDetails,
   ClickUpCompleteEstimationInput,
   ClickUpCompleteEstimationResult,
+  ClickUpCommentsInput,
+  ClickUpCommentsPage,
+  ClickUpCommentRepliesInput,
+  ClickUpCommentReplies,
   McpCapabilityUnavailableError,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -16,6 +20,7 @@ import { ClickUpConnection } from "../../../clickup/ClickUpConnection.ts";
 import { ClickUpTasks } from "../../../clickup/ClickUpTasks.ts";
 import { ClickUpTaskEditing } from "../../../clickup/ClickUpTaskEditing.ts";
 import { ClickUpWorkflow } from "../../../clickup/ClickUpWorkflow.ts";
+import { ClickUpInteractions } from "../../../clickup/ClickUpInteractions.ts";
 import { McpInvocationContext } from "../../McpInvocationContext.ts";
 
 const dependencies = [
@@ -25,6 +30,7 @@ const dependencies = [
   ClickUpTasks,
   ClickUpTaskEditing,
   ClickUpWorkflow,
+  ClickUpInteractions,
 ];
 const failure = Schema.Union([ClickUpError, McpCapabilityUnavailableError]);
 
@@ -32,6 +38,33 @@ const GetLinkedTask = Tool.make("get_linked_clickup_task", {
   description:
     "Read current ClickUp context for the task linked to this coding thread, including tags and time estimate. Use before estimating or checking changed requirements. Returns an error if this thread has no linked task. Task identity and credentials are supplied by Nerd, never by the agent.",
   success: ClickUpTaskDetails,
+  failure,
+  dependencies,
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true);
+
+const GetLinkedComments = Tool.make("get_linked_clickup_comments", {
+  description:
+    "Read comments on this thread's linked ClickUp task, newest first. Omit cursor for the first page; pass the returned nextCursor to read older pages while hasMore is true. Keep the cursor used to load each page when reading replies to its comments. Task identity and credentials are supplied by Nerd.",
+  parameters: Schema.Struct({ cursor: ClickUpCommentsInput.fields.cursor }),
+  success: ClickUpCommentsPage,
+  failure,
+  dependencies,
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true);
+
+const GetLinkedCommentReplies = Tool.make("get_linked_clickup_comment_replies", {
+  description:
+    "Read replies to a comment on this thread's linked ClickUp task. Pass commentId and the cursor used to load the parent comment's page, not that page's nextCursor; omit cursor for a parent on the first page. Nerd verifies the parent belongs to that task page before reading replies.",
+  parameters: Schema.Struct({
+    commentId: ClickUpCommentRepliesInput.fields.commentId,
+    cursor: ClickUpCommentRepliesInput.fields.cursor,
+  }),
+  success: ClickUpCommentReplies,
   failure,
   dependencies,
 })
@@ -91,7 +124,7 @@ const PostFindings = Tool.make("post_linked_clickup_findings", {
 
 const PrepareHandoff = Tool.make("prepare_linked_clickup_handoff", {
   description:
-    "Prepare a durable developer review handoff for the linked task after independent review and verification. Include evidence (or the developer's explicit waiver) and every relevant registered PR URL with the exact headSha that was reviewed, across repositories. Supply a brief waiverSummary if evidence contains any explicit developer waiver. Summary is a final plain English comment, at most four lines without we/us/our or long dashes. Does not submit, request reviewers or move to Code Review. The developer must review and press Submit in the app.",
+    "Prepare a durable developer review handoff for the linked task after independent review and verification. Pass reviewedTaskScope from the scopeFingerprint returned by get_linked_clickup_task for the requirements you reviewed. Include evidence (or the developer's explicit waiver) and every relevant registered PR URL with the exact headSha that was reviewed, across repositories. Supply a brief waiverSummary if evidence contains any explicit developer waiver. Summary is a final plain English comment, at most four lines without we/us/our or long dashes. Does not submit, request reviewers or move to Code Review. The developer must review and press Submit in the app.",
   parameters: ClickUpPrepareHandoffInput,
   success: ClickUpHandoff,
   failure,
@@ -102,6 +135,8 @@ const PrepareHandoff = Tool.make("prepare_linked_clickup_handoff", {
 
 export const ClickUpToolkit = Toolkit.make(
   GetLinkedTask,
+  GetLinkedComments,
+  GetLinkedCommentReplies,
   CompleteEstimation,
   StudioWorkflow,
   StartImplementation,
