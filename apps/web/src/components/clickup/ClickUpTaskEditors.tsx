@@ -11,6 +11,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Command, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 interface Props {
   environmentId: EnvironmentId;
@@ -24,8 +25,13 @@ export function ClickUpStatusPicker(
   return (
     <TaskEditor {...props} kind="status">
       <ColorDot color={props.color} />
-      <span className="uppercase">{props.status}</span>
-      <ChevronDownIcon className="size-3 text-muted-foreground" />
+      <Tooltip>
+        <TooltipTrigger render={<span className="min-w-0 truncate uppercase" />}>
+          {props.status}
+        </TooltipTrigger>
+        <TooltipPopup className="uppercase">{props.status}</TooltipPopup>
+      </Tooltip>
+      <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
     </TaskEditor>
   );
 }
