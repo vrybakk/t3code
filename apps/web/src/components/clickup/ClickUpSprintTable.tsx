@@ -1,6 +1,6 @@
 import type { ClickUpTask, EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
-import { FlagIcon } from "lucide-react";
+import { FlagIcon, TagIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -53,23 +53,21 @@ export function ClickUpSprintTable({
             .map((group) => (
               <Fragment key={group.label ?? "working"}>
                 {group.label && (
-                  <TableRow>
-                    <TableCell colSpan={5}>
-                      <div className="pt-2">
-                        <div className="flex items-center gap-3 border-y border-border bg-muted px-5 py-3">
-                          <span className="text-sm font-semibold">{group.label}</span>
-                          <Badge variant="outline">
-                            <span className="tabular-nums">{group.tasks.length}</span>
-                          </Badge>
-                        </div>
+                  <tr>
+                    <td colSpan={5} className="p-0 pt-4">
+                      <div className="flex items-center gap-3 border-y border-border bg-muted px-5 py-3">
+                        <span className="text-sm font-semibold">{group.label}</span>
+                        <Badge variant="outline">
+                          <span className="tabular-nums">{group.tasks.length}</span>
+                        </Badge>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 )}
                 {group.tasks.map((task) => (
                   <TableRow key={task.taskId}>
                     <TableCell className="min-w-64 max-w-lg whitespace-normal">
-                      <div className="ml-3 py-1">
+                      <div className="ml-3 flex min-w-0 items-center gap-2 py-1">
                         <Tooltip>
                           <TooltipTrigger
                             render={
@@ -96,6 +94,26 @@ export function ClickUpSprintTable({
                             {task.taskType?.name ?? "Task"}: {task.name}
                           </TooltipPopup>
                         </Tooltip>
+                        {!!task.tags?.length && (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <span className="flex max-w-1/2 shrink-0 items-center gap-1" />
+                              }
+                            >
+                              <Badge variant="outline" size="sm" className="min-w-0 shrink">
+                                <TagIcon className="size-3" />
+                                <span className="min-w-0 max-w-28 truncate">{task.tags[0]}</span>
+                              </Badge>
+                              {task.tags.length > 1 && (
+                                <Badge variant="secondary" size="sm">
+                                  +{task.tags.length - 1}
+                                </Badge>
+                              )}
+                            </TooltipTrigger>
+                            <TooltipPopup>{task.tags.join(", ")}</TooltipPopup>
+                          </Tooltip>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
