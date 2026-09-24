@@ -30,7 +30,7 @@ export function WorkMonthlyChart({
           {scale.ticks.map((tick) => (
             <span
               key={tick}
-              className="absolute right-0 -translate-y-1/2 text-[10px] text-muted-foreground tabular-nums"
+              className="absolute right-0 -translate-y-1/2 text-3xs text-muted-foreground tabular-nums"
               style={{ top: `${(toY(tick) / HEIGHT) * 100}%` }}
             >
               {formatWorkDuration(tick)}
@@ -99,7 +99,7 @@ export function WorkMonthlyChart({
           })}
         </svg>
       </div>
-      <div className="mt-2 pl-14 text-[10px] text-muted-foreground" aria-hidden>
+      <div className="mt-2 pl-14 text-3xs text-muted-foreground" aria-hidden>
         <div
           className="grid"
           style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}

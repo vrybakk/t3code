@@ -94,23 +94,25 @@ export function WhatsNewDialog({ release }: { release: NerdReleaseNotes }) {
             {release.version} · Build {release.commit.slice(0, 7)}
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            {release.comparedToPreviousRelease
-              ? "Highlights since the previous release."
-              : "Highlights included in this build."}{" "}
-            You can reopen this summary in Settings → General → About.
-          </p>
-          <ReleaseSection
-            title="Nerd improvements"
-            section={release.nerd}
-            comparedToPreviousRelease={release.comparedToPreviousRelease}
-          />
-          <ReleaseSection
-            title="T3 Code updates"
-            section={release.upstream}
-            comparedToPreviousRelease={release.comparedToPreviousRelease}
-          />
+        <DialogPanel>
+          <div className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              {release.comparedToPreviousRelease
+                ? "Highlights since the previous release."
+                : "Highlights included in this build."}{" "}
+              You can reopen this summary in Settings → General → About.
+            </p>
+            <ReleaseSection
+              title="Nerd improvements"
+              section={release.nerd}
+              comparedToPreviousRelease={release.comparedToPreviousRelease}
+            />
+            <ReleaseSection
+              title="T3 Code updates"
+              section={release.upstream}
+              comparedToPreviousRelease={release.comparedToPreviousRelease}
+            />
+          </div>
         </DialogPanel>
         <DialogFooter>
           <Button

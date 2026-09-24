@@ -57,7 +57,7 @@ vi.mock("./useWorkData", () => ({
 }));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
 vi.mock("../ui/sidebar", () => ({ SidebarInset: "main" }));
-vi.mock("../ui/toggle", () => ({ toggleVariants: () => "" }));
+vi.mock("../ui/toggle", () => ({ Toggle: "button" }));
 vi.mock("../ui/input", () => ({ Input: "input" }));
 vi.mock("../ui/label", () => ({ Label: "label" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));

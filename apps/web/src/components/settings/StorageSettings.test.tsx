@@ -47,7 +47,7 @@ vi.mock("./settingsLayout", () => ({
     </div>
   ),
 }));
-vi.mock("../ui/button", () => ({ Button: "button" }));
+vi.mock("../ui/button", () => ({ Button: "button", InlineButton: "button" }));
 vi.mock("../ui/input", () => ({ Input: "input" }));
 vi.mock("../ui/switch", () => ({ Switch: "input" }));
 vi.mock("../ui/number-field", () => ({

@@ -184,7 +184,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
           <span className="min-w-0 flex-1 truncate font-medium text-sidebar-foreground/90">
             {label}
           </span>
-          <span className="flex shrink-0 items-center gap-1.5 text-[10px] leading-none">
+          <span className="flex shrink-0 items-center gap-1.5 text-3xs leading-none">
             {props.statusCounts.idle > 0 ? (
               <StatusCount
                 count={props.statusCounts.idle}
@@ -195,11 +195,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
               </StatusCount>
             ) : null}
             {props.statusCounts.running > 0 ? (
-              <StatusCount
-                count={props.statusCounts.running}
-                label="running"
-                className="text-sky-600 dark:text-sky-400"
-              >
+              <StatusCount count={props.statusCounts.running} label="running" className="text-info">
                 <CircleDashedIcon aria-hidden className="size-3" />
               </StatusCount>
             ) : null}
@@ -207,7 +203,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
               <StatusCount
                 count={props.statusCounts.pending}
                 label="pending"
-                className="text-amber-700 dark:text-amber-300"
+                className="text-warning"
               >
                 <MessageCircleQuestionIcon aria-hidden className="size-3" />
               </StatusCount>

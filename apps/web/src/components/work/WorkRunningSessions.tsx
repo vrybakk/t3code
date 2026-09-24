@@ -33,7 +33,7 @@ export function WorkRunningSessions({
   return (
     <section aria-label="Running agent sessions" className="mb-6 rounded-lg border p-4">
       <div className="flex items-center gap-2 text-sm font-medium">
-        <Clock3Icon className="size-4 text-sky-500" />
+        <Clock3Icon className="size-4 text-info" />
         Running agent sessions <span className="text-muted-foreground">{running.length}</span>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">

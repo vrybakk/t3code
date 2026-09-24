@@ -35,8 +35,8 @@ export function WorkReportSnapshotPrint({
   }, [onPrinted, reportId, snapshot]);
   if (!snapshot) return null;
   return (
-    <section className="work-print-snapshot hidden print:block">
-      <style>{`@media print { body * { visibility: hidden; } .work-print-snapshot, .work-print-snapshot * { visibility: visible; } .work-print-snapshot { position: absolute; inset: 0; padding: 24px; } }`}</style>
+    <section data-work-print-snapshot className="hidden print:block">
+      <style>{`@media print { body * { visibility: hidden; } [data-work-print-snapshot], [data-work-print-snapshot] * { visibility: visible; } [data-work-print-snapshot] { position: absolute; inset: 0; padding: 24px; } }`}</style>
       <h1>Work report · {snapshot.report.month}</h1>
       <p>
         {snapshot.projectName} · {snapshot.report.status} · Generated {snapshot.report.generatedAt}

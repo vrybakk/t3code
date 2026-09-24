@@ -32,7 +32,7 @@ export function GitButlerPanelView({
         <div className="min-w-0">
           <h2 className="truncate text-xs font-medium">GitButler workspace</h2>
           {query.data?.status === "ready" ? (
-            <p className="text-[10px] text-muted-foreground" aria-live="polite">
+            <p className="text-3xs text-muted-foreground" aria-live="polite">
               {query.error
                 ? "Refresh failed · Showing cached data · "
                 : query.isPending
@@ -55,7 +55,7 @@ export function GitButlerPanelView({
         </Button>
       </div>
       {query.error && query.data ? (
-        <p className="border-b border-warning/30 bg-warning/8 px-3 py-2 text-[10px] text-warning-foreground">
+        <p className="border-b border-warning/30 bg-warning/8 px-3 py-2 text-3xs text-warning-foreground">
           Refresh failed. Showing the last available workspace state.
         </p>
       ) : null}

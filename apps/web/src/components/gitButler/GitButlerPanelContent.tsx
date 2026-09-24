@@ -85,7 +85,7 @@ export function GitButlerPanelContent({
   return (
     <ScrollArea className="min-h-0 flex-1" scrollFade>
       <div className="space-y-4 p-4">
-        <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+        <div className="flex flex-wrap gap-2 text-3xs text-muted-foreground">
           <Badge variant={status.upstreamBehind > 0 ? "warning" : "success"} size="sm">
             {status.upstreamBehind > 0
               ? `${status.upstreamBehind} behind upstream`
@@ -106,7 +106,7 @@ export function GitButlerPanelContent({
           <section className="space-y-2">
             <div>
               <h3 className="text-xs font-medium">Unassigned changes</h3>
-              <p className="text-[10px] text-muted-foreground">Ownership is shown per file.</p>
+              <p className="text-3xs text-muted-foreground">Ownership is shown per file.</p>
             </div>
             <FileChanges changes={status.unassignedChanges} onOpenFile={onOpenFile} />
           </section>
@@ -129,13 +129,13 @@ export function GitButlerPanelContent({
                       className="size-3.5 shrink-0 text-warning-foreground"
                       aria-hidden
                     />
-                    <code className="min-w-0 flex-1 truncate text-[11px]">{filePath}</code>
+                    <code className="min-w-0 flex-1 truncate text-2xs">{filePath}</code>
                   </button>
                 </li>
               ))}
             </ul>
             {status.conflictedFiles.length > visibleConflicts.length ? (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-3xs text-muted-foreground">
                 {status.conflictedFiles.length - visibleConflicts.length} more conflicts not shown.
               </p>
             ) : null}
@@ -156,7 +156,7 @@ export function GitButlerPanelContent({
           />
         ))}
         {status.stacks.length > visibleStacks.length ? (
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-3xs text-muted-foreground">
             {status.stacks.length - visibleStacks.length} more stacks not shown.
           </p>
         ) : null}

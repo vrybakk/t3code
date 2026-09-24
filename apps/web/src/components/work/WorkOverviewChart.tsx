@@ -68,7 +68,7 @@ export function WorkOverviewChart({
           {scale.ticks.map((tick) => (
             <span
               key={tick}
-              className="absolute right-0 -translate-y-1/2 text-[10px] text-muted-foreground tabular-nums"
+              className="absolute right-0 -translate-y-1/2 text-3xs text-muted-foreground tabular-nums"
               style={{ top: `${(toY(tick) / HEIGHT) * 100}%` }}
             >
               {formatWorkDuration(tick)}
@@ -165,7 +165,7 @@ export function WorkOverviewChart({
         </svg>
       </div>
       <div className="mt-2 pl-14" aria-hidden>
-        <div className="relative h-4 text-[10px] text-muted-foreground uppercase">
+        <div className="relative h-4 text-3xs text-muted-foreground uppercase">
           {axisIndices.map((index) => (
             <span
               key={index}

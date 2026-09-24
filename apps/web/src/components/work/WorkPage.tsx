@@ -12,7 +12,7 @@ import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useWorkMutations } from "../../state/workTracking";
 import { ScrollArea } from "../ui/scroll-area";
 import { SidebarInset } from "../ui/sidebar";
-import { toggleVariants } from "../ui/toggle";
+import { Toggle } from "../ui/toggle";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { WorkEntryDialog } from "./WorkEntryDialog";
@@ -35,7 +35,7 @@ function WorkEnvironmentPage({ environmentId }: { environmentId: EnvironmentId }
   const [entryOpen, setEntryOpen] = useState(false);
   const [editing, setEditing] = useState<WorkRecord | null>(null);
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground isolate">
+    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none isolate">
       <Tabs.Root
         value={section}
         onValueChange={(value) => {
@@ -60,7 +60,14 @@ function WorkEnvironmentPage({ environmentId }: { environmentId: EnvironmentId }
                   key={value}
                   value={value}
                   data-pressed={section === value ? "" : undefined}
-                  className={toggleVariants({ variant: "segmented", size: "segmented" })}
+                  render={
+                    <Toggle
+                      aria-pressed={undefined}
+                      variant="segmented"
+                      size="segmented"
+                      pressed={section === value}
+                    />
+                  }
                 >
                   {label}
                 </Tabs.Tab>

@@ -7,7 +7,7 @@ import type {
 import { ChevronRight, GitBranch, GitCommitHorizontal } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { InlineButton } from "~/components/ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
 import { cn } from "~/lib/utils";
 import { formatRelativeTimeLabel } from "~/timestampFormat";
@@ -31,7 +31,7 @@ function humanize(value: string): string {
 
 function HiddenCount({ count, noun }: { readonly count: number; readonly noun: string }) {
   return count > 0 ? (
-    <p className="text-[10px] text-muted-foreground">
+    <p className="text-3xs text-muted-foreground">
       {`${count} more ${noun}${count === 1 ? "" : "s"} not shown.`}
     </p>
   ) : null;
@@ -63,8 +63,8 @@ export function FileChanges({
               disabled={!onOpenFile}
             >
               <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
-              <code className="min-w-0 flex-1 truncate text-[11px]">{change.filePath}</code>
-              <span className="shrink-0 text-[10px] text-muted-foreground">
+              <code className="min-w-0 flex-1 truncate text-2xs">{change.filePath}</code>
+              <span className="shrink-0 text-3xs text-muted-foreground">
                 {humanize(change.changeType)}
               </span>
             </button>
@@ -96,7 +96,7 @@ function CommitRow({ commit }: { readonly commit: GitButlerCommit }) {
             </Badge>
           ) : null}
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-muted-foreground">
+        <div className="mt-0.5 flex flex-wrap gap-x-2 text-3xs text-muted-foreground">
           <code>{shortCommitId(commit.commitId)}</code>
           <span>{commit.authorName}</span>
           {relativeTime ? <span>{relativeTime}</span> : null}
@@ -138,19 +138,14 @@ function BranchDetails({
   return (
     <>
       {branch.reviewId || reviewStatus ? (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 text-3xs">
           {branch.reviewId ? (
             reviewNumber && onOpenReview ? (
-              <Button
-                variant="link"
-                size="micro"
-                className="h-auto px-0 text-[10px] text-muted-foreground"
-                onClick={() => onOpenReview(reviewNumber)}
-              >
+              <InlineButton tone="muted" onClick={() => onOpenReview(reviewNumber)}>
                 Review {branch.reviewId}
-              </Button>
+              </InlineButton>
             ) : (
-              <span className="text-[10px] text-muted-foreground">Review {branch.reviewId}</span>
+              <span className="text-3xs text-muted-foreground">Review {branch.reviewId}</span>
             )
           ) : null}
           {reviewStatus ? (
@@ -173,7 +168,7 @@ function BranchDetails({
         <p className="mt-2 text-xs text-muted-foreground">No local commits on this branch.</p>
       )}
       {branch.upstreamCommits.length > 0 ? (
-        <p className="mt-1 text-[10px] text-muted-foreground">
+        <p className="mt-1 text-3xs text-muted-foreground">
           {branch.upstreamCommits.length} upstream commit
           {branch.upstreamCommits.length === 1 ? "" : "s"}
         </p>
@@ -198,7 +193,7 @@ function BranchCard({
           {humanize(branch.branchStatus)}
         </Badge>
       </div>
-      <div className="pl-[22px]">
+      <div className="pl-5.5">
         <BranchDetails branch={branch} onOpenReview={onOpenReview} />
       </div>
     </section>
@@ -231,7 +226,7 @@ export function GitButlerStackSection({
             aria-hidden
           />
           <h3 className="min-w-0 flex-1 truncate text-xs font-medium">{stackTitle}</h3>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
+          <span className="shrink-0 text-3xs text-muted-foreground">
             {stack.branches.length} branch{stack.branches.length === 1 ? "" : "es"}
           </span>
         </CollapsibleTrigger>
@@ -239,7 +234,7 @@ export function GitButlerStackSection({
           <div className="space-y-3">
             {stack.assignedChanges.length > 0 ? (
               <div className="space-y-1.5">
-                <p className="text-[10px] text-muted-foreground">Assigned files</p>
+                <p className="text-3xs text-muted-foreground">Assigned files</p>
                 <FileChanges changes={stack.assignedChanges} onOpenFile={onOpenFile} />
               </div>
             ) : null}

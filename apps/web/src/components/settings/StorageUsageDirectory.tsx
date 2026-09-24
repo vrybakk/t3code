@@ -1,5 +1,5 @@
 import type { StorageUsageResult } from "@t3tools/contracts";
-import { Button } from "../ui/button";
+import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { formatStorageBytes } from "./StorageUsage.logic";
 import { StorageUsageList } from "./StorageUsageList";
@@ -39,13 +39,13 @@ export function StorageUsageDirectory({
                   <Button
                     size="xs"
                     variant="ghost"
-                    className="max-w-48 truncate"
+                    className="max-w-48"
                     disabled={loading || entry.id === directory.current?.id}
                     onClick={() => onOpen(entry.id)}
                   />
                 }
               >
-                {entry.name}
+                <span className="truncate">{entry.name}</span>
               </TooltipTrigger>
               <TooltipPopup className="max-w-sm break-all">{entry.path}</TooltipPopup>
             </Tooltip>
@@ -77,15 +77,13 @@ export function StorageUsageDirectory({
                 key={entry.id}
                 className="flex min-w-0 items-start justify-between gap-3 rounded-md px-3 py-3 hover:bg-muted/30"
               >
-                <div className="min-w-0 space-y-1">
+                <div className="min-w-0 space-y-1 text-xs">
                   <Tooltip>
                     <TooltipTrigger
                       render={
                         entry.kind === "directory" && entry.status !== "skipped" ? (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            className="h-auto max-w-full justify-start whitespace-normal px-0 text-left"
+                          <InlineButton
+                            className="max-w-full justify-start whitespace-normal text-left"
                             disabled={loading}
                             onClick={() => onOpen(entry.id)}
                           />

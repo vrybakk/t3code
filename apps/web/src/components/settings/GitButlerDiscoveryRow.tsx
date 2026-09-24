@@ -40,9 +40,7 @@ export function GitButlerDiscoveryRow({ item }: { readonly item: GitButlerDiscov
                 aria-hidden
               />
             </span>
-            <span className="truncate text-sm font-medium tracking-[-0.005em] text-foreground">
-              {item.label}
-            </span>
+            <span className="truncate text-sm font-medium text-foreground">{item.label}</span>
             {version ? <code className="text-xs text-muted-foreground">{version}</code> : null}
             {badge ? (
               <Badge variant="warning" size="sm">
@@ -50,7 +48,7 @@ export function GitButlerDiscoveryRow({ item }: { readonly item: GitButlerDiscov
               </Badge>
             ) : null}
           </div>
-          <p className="text-[13px] leading-[1.45] text-muted-foreground/80">{summary}</p>
+          <p className="text-sm leading-snug text-muted-foreground/80">{summary}</p>
         </div>
         <Switch checked={isAvailable} disabled aria-label="GitButler availability" />
       </div>

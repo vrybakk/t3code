@@ -1,5 +1,5 @@
 import type { StorageHistoryGroup } from "@t3tools/contracts";
-import { Button } from "../ui/button";
+import { InlineButton } from "../ui/button";
 import { formatStorageBytes } from "./StorageUsage.logic";
 import { StorageUsageList } from "./StorageUsageList";
 import { Checkbox } from "../ui/checkbox";
@@ -58,17 +58,15 @@ export function StorageUsageGroups({
                 onCheckedChange={() => selection.toggle(group.id)}
               />
             )}
-            <div className="min-w-0 flex-1 space-y-1">
-              <Button
-                size="xs"
-                variant="ghost"
-                className="h-auto max-w-full justify-start whitespace-normal px-0 text-left"
+            <div className="min-w-0 flex-1 space-y-1 text-xs">
+              <InlineButton
+                className="max-w-full justify-start whitespace-normal text-left"
                 disabled={loading}
                 onClick={() => onExpand(group)}
                 aria-label={`View histories for ${group.label}`}
               >
                 {group.label}
-              </Button>
+              </InlineButton>
               <p className="text-xs text-muted-foreground">
                 {group.fileCount.toLocaleString()} histories ·{" "}
                 {group.subagentCount.toLocaleString()} subagents

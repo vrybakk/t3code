@@ -131,115 +131,118 @@ export function StorageCleanupDialog({
               : `${preview.eligibleCount} eligible files · ${preview.blockedCount} blocked`}
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel className="space-y-4">
-          <p className="text-sm">
-            {outcome ? "Processed file sizes" : "Eligible file sizes"}:{" "}
-            {formatStorageBytes(totals.logicalBytes)} · Allocated:{" "}
-            {formatStorageBytes(totals.allocatedBytes)}. This is not a promise of freed space.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Removing provider history can prevent Codex or Claude Code from resuming those sessions.
-            T3 chats and project files remain. Native app indexes may still show removed sessions.
-          </p>
-          {[...new Set(preview.warnings)].map((warning) => (
-            <p key={warning} className="text-xs text-warning">
-              {warning}
+        <DialogPanel>
+          <div className="space-y-4">
+            <p className="text-sm">
+              {outcome ? "Processed file sizes" : "Eligible file sizes"}:{" "}
+              {formatStorageBytes(totals.logicalBytes)} · Allocated:{" "}
+              {formatStorageBytes(totals.allocatedBytes)}. This is not a promise of freed space.
             </p>
-          ))}
-          <StorageCleanupItems preview={preview} outcome={outcome} />
-          {outcome ? (
-            <p role="status" className="text-sm">
-              {processedCount === 0 ? "No files were removed." : "Cleanup finished."} Review each
-              file's outcome above.{" "}
-              {processedCount === 0
-                ? "All selected files were kept."
-                : outcome.mode === "trash"
-                  ? "Files in Trash still occupy disk space until you empty it."
-                  : "Permanently deleted files cannot be restored from Trash."}
+            <p className="text-xs text-muted-foreground">
+              Removing provider history can prevent Codex or Claude Code from resuming those
+              sessions. T3 chats and project files remain. Native app indexes may still show removed
+              sessions.
             </p>
-          ) : (
-            <>
-              <div role="group" aria-label="Cleanup action" className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant={mode === "trash" ? "default" : "outline"}
-                  aria-pressed={mode === "trash"}
-                  disabled={pending}
-                  onClick={() => {
-                    setMode("trash");
-                    setConfirmation("");
-                  }}
-                >
-                  Move to Trash
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  aria-pressed={mode === "delete"}
-                  disabled={pending}
-                  onClick={() => {
-                    setMode("delete");
-                    setConfirmation("");
-                  }}
-                >
-                  Permanently delete instead
-                </Button>
-              </div>
-              {!preview.trashSupported && (
-                <p role="status" className="text-sm text-warning">
-                  Trash is unavailable on this machine. Nothing will be permanently deleted unless
-                  you explicitly choose that action and confirm it.
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {mode === "trash"
-                  ? "Trash is recoverable until emptied and does not free disk space immediately."
-                  : "Permanent deletion bypasses Trash and cannot be undone."}
+            {[...new Set(preview.warnings)].map((warning) => (
+              <p key={warning} className="text-xs text-warning">
+                {warning}
               </p>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  aria-label="I stopped other agent activity on this machine"
-                  checked={externalStopped}
-                  disabled={pending}
-                  onCheckedChange={setExternalStopped}
-                />
-                <span>
-                  I stopped other agent activity on this machine. Sessions in other apps, other T3
-                  servers and background provider helpers cannot be fully verified.
-                </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  aria-label="I understand native history and resume may be lost"
-                  checked={historyLoss}
-                  disabled={pending}
-                  onCheckedChange={setHistoryLoss}
-                />
-                <span>I understand that native session history and resume may be lost.</span>
-              </label>
-              {mode === "delete" && (
-                <label className="block space-y-2 text-sm">
-                  <span>Type DELETE to confirm permanent deletion.</span>
-                  <Input
-                    aria-label="Permanent deletion confirmation"
-                    value={confirmation}
-                    onChange={(event) => setConfirmation(event.target.value)}
+            ))}
+            <StorageCleanupItems preview={preview} outcome={outcome} />
+            {outcome ? (
+              <p role="status" className="text-sm">
+                {processedCount === 0 ? "No files were removed." : "Cleanup finished."} Review each
+                file's outcome above.{" "}
+                {processedCount === 0
+                  ? "All selected files were kept."
+                  : outcome.mode === "trash"
+                    ? "Files in Trash still occupy disk space until you empty it."
+                    : "Permanently deleted files cannot be restored from Trash."}
+              </p>
+            ) : (
+              <>
+                <div role="group" aria-label="Cleanup action" className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant={mode === "trash" ? "default" : "outline"}
+                    aria-pressed={mode === "trash"}
                     disabled={pending}
-                    autoComplete="off"
+                    onClick={() => {
+                      setMode("trash");
+                      setConfirmation("");
+                    }}
+                  >
+                    Move to Trash
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-pressed={mode === "delete"}
+                    disabled={pending}
+                    onClick={() => {
+                      setMode("delete");
+                      setConfirmation("");
+                    }}
+                  >
+                    Permanently delete instead
+                  </Button>
+                </div>
+                {!preview.trashSupported && (
+                  <p role="status" className="text-sm text-warning">
+                    Trash is unavailable on this machine. Nothing will be permanently deleted unless
+                    you explicitly choose that action and confirm it.
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {mode === "trash"
+                    ? "Trash is recoverable until emptied and does not free disk space immediately."
+                    : "Permanent deletion bypasses Trash and cannot be undone."}
+                </p>
+                <label className="flex items-start gap-2 text-sm">
+                  <Checkbox
+                    aria-label="I stopped other agent activity on this machine"
+                    checked={externalStopped}
+                    disabled={pending}
+                    onCheckedChange={setExternalStopped}
                   />
+                  <span>
+                    I stopped other agent activity on this machine. Sessions in other apps, other T3
+                    servers and background provider helpers cannot be fully verified.
+                  </span>
                 </label>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Review expires {new Date(preview.expiresAt).toLocaleString()}. Files are checked
-                again before cleanup.
+                <label className="flex items-start gap-2 text-sm">
+                  <Checkbox
+                    aria-label="I understand native history and resume may be lost"
+                    checked={historyLoss}
+                    disabled={pending}
+                    onCheckedChange={setHistoryLoss}
+                  />
+                  <span>I understand that native session history and resume may be lost.</span>
+                </label>
+                {mode === "delete" && (
+                  <label className="block space-y-2 text-sm">
+                    <span>Type DELETE to confirm permanent deletion.</span>
+                    <Input
+                      aria-label="Permanent deletion confirmation"
+                      value={confirmation}
+                      onChange={(event) => setConfirmation(event.target.value)}
+                      disabled={pending}
+                      autoComplete="off"
+                    />
+                  </label>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Review expires {new Date(preview.expiresAt).toLocaleString()}. Files are checked
+                  again before cleanup.
+                </p>
+              </>
+            )}
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error} Close and review again before another attempt.
               </p>
-            </>
-          )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error} Close and review again before another attempt.
-            </p>
-          )}
+            )}
+          </div>
         </DialogPanel>
         <DialogFooter>
           <Button variant="outline" disabled={pending} onClick={close}>

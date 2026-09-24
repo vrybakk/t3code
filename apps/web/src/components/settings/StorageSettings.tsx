@@ -15,7 +15,7 @@ import {
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { Button } from "../ui/button";
 import { StorageUsagePanel } from "./StorageUsagePanel";
-import { toggleVariants } from "../ui/toggle";
+import { Toggle } from "../ui/toggle";
 import type { ScopedSettingsTarget } from "./scopedSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
 import {
@@ -111,7 +111,14 @@ export function StorageSettingsPanel() {
               id={`storage-tab-${value}`}
               aria-controls="storage-tab-panel"
               data-pressed={tab === value ? "" : undefined}
-              className={toggleVariants({ variant: "segmented", size: "segmented" })}
+              render={
+                <Toggle
+                  aria-pressed={undefined}
+                  variant="segmented"
+                  size="segmented"
+                  pressed={tab === value}
+                />
+              }
             >
               {label}
             </Tabs.Tab>
@@ -142,7 +149,14 @@ export function StorageSettingsPanel() {
                     id={`storage-usage-tab-${value}`}
                     aria-controls="storage-usage-tab-panel"
                     data-pressed={usageTab === value ? "" : undefined}
-                    className={toggleVariants({ variant: "segmented", size: "segmented" })}
+                    render={
+                      <Toggle
+                        aria-pressed={undefined}
+                        variant="segmented"
+                        size="segmented"
+                        pressed={usageTab === value}
+                      />
+                    }
                   >
                     {label}
                   </Tabs.Tab>

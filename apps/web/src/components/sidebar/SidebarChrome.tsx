@@ -94,7 +94,7 @@ function SidebarBrand({ isElectron, onBackdrop }: { isElectron: boolean; onBackd
     >
       {IS_NERD_EDITION ? (
         <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium tracking-tight">
-          <img alt="" className="size-5 shrink-0 rounded-[5px]" src="/apple-touch-icon.png" />
+          <img alt="" className="size-5 shrink-0 rounded-sm" src="/apple-touch-icon.png" />
           <span className="truncate [text-box:trim-both_cap_alphabetic]">T3 Code Nerd</span>
         </span>
       ) : (
