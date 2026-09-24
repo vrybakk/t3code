@@ -5,6 +5,7 @@ import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { ClickUpApi } from "./ClickUpApi.ts";
 import { ClickUpConnection } from "./ClickUpConnection.ts";
 import { ClickUpTasks, layer } from "./ClickUpTasks.ts";
+import { taskScopeFingerprint } from "./ClickUpTaskScope.ts";
 
 const task = {
   id: "abc",
@@ -16,6 +17,55 @@ const task = {
   time_estimate: "1800000",
   markdown_description: "**Requirements**",
 };
+
+it.effect("authorizes local handoff reads without fetching comments or list metadata", () => {
+  const test = setup(() => ({ id: "abc", team_id: "42" }));
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    yield* tasks.authorize({ workspaceId: "42", taskId: "abc", userId: 17 });
+    assert.deepEqual(test.paths, ["task/abc"]);
+    assert.equal(
+      (yield* Effect.result(tasks.authorize({ workspaceId: "other", taskId: "abc", userId: 17 })))
+        ._tag,
+      "Failure",
+    );
+    assert.equal(
+      (yield* Effect.result(tasks.authorize({ workspaceId: "42", taskId: "other", userId: 17 })))
+        ._tag,
+      "Failure",
+    );
+    const before = test.paths.length;
+    assert.equal(
+      (yield* Effect.result(tasks.authorize({ workspaceId: "42", taskId: "abc", userId: 18 })))
+        ._tag,
+      "Failure",
+    );
+    assert.equal(test.paths.length, before);
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect(
+  "returns the task scope token while excluding routine metadata and discussion changes",
+  () => {
+    const test = setup((path) => (path.includes("/comment") ? { comments: [] } : task));
+    return Effect.gen(function* () {
+      const tasks = yield* ClickUpTasks;
+      const details = yield* tasks.detail({ workspaceId: "42", taskId: "abc", userId: 17 });
+      assert.equal(details.scopeFingerprint, taskScopeFingerprint(details.task));
+      const changed = {
+        ...details.task,
+        status: "Code Review",
+        timeEstimate: 900000,
+        priority: "high",
+      };
+      assert.equal(taskScopeFingerprint(changed), details.scopeFingerprint);
+      assert.notEqual(
+        taskScopeFingerprint({ ...changed, description: "New criteria" }),
+        details.scopeFingerprint,
+      );
+    }).pipe(Effect.provide(test.layer));
+  },
+);
 
 function setup(response: (path: string) => unknown, workspaceId = "42") {
   const paths: string[] = [];

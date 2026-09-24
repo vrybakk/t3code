@@ -1,6 +1,6 @@
 # Coordination
 
-Use current task context, relevant Docs/linked tasks when accessible, attachments and comments to establish scope. Inspect the actual repositories before proposing changes. Images and videos need inspection, not inference from filenames. Ask targeted questions for material uncertainty after checking available evidence.
+Use current task context, relevant Docs/linked tasks when accessible, attachments and comments to establish scope. Inspect the actual repositories before proposing changes. Use `get_linked_clickup_comments` to page through task discussion when the task snapshot is truncated, following `nextCursor` until relevant context is complete. Use `get_linked_clickup_comment_replies` for discussion threads, passing the parent comment's page cursor when it came from an older page. Read replies before treating a question as unresolved or requirements as complete. Images and videos need inspection, not inference from filenames. Ask targeted questions for material uncertainty after checking available evidence.
 
 Use the task's mapped repositories as candidates. Identify which need changes and why; one mapped repository may be a shared API used by several products. Do not edit every mapped repository by default. Ask for an unmapped or ambiguous repository. Estimate the whole task once, without double-counting shared work.
 

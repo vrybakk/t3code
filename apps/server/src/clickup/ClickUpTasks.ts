@@ -23,6 +23,7 @@ import { ApiTaskDetails, normalizeTaskMetadata } from "./ClickUpTaskDetails.ts";
 import { validateSprintList } from "./ClickUpSprints.ts";
 import { readTaskTypes } from "./ClickUpTaskTypes.ts";
 import { normalizeComment } from "./ClickUpCommentData.ts";
+import { taskScopeFingerprint } from "./ClickUpTaskScope.ts";
 
 const decodeThreadLinks = Schema.decodeUnknownEffect(Schema.Array(ClickUpThreadLink));
 
@@ -36,6 +37,7 @@ export class ClickUpTasks extends Context.Service<
       ClickUpError
     >;
     readonly detail: (input: ClickUpTaskInput) => Effect.Effect<ClickUpTaskDetails, ClickUpError>;
+    readonly authorize: (input: ClickUpTaskInput) => Effect.Effect<void, ClickUpError>;
     readonly threads: (
       input: ClickUpTaskInput,
     ) => Effect.Effect<ReadonlyArray<typeof ClickUpThreadLink.Type>, ClickUpError>;
@@ -146,13 +148,37 @@ export const layer = Layer.effect(
         (task.custom_item_id ?? 0) > 1
           ? yield* readTaskTypes(api, token, input.workspaceId)
           : undefined;
+      const normalized = normalizeTask(
+        { ...task, space: location?.space ?? task.space },
+        taskTypes,
+      );
       return {
-        task: normalizeTask({ ...task, space: location?.space ?? task.space }, taskTypes),
+        task: normalized,
+        scopeFingerprint: taskScopeFingerprint(normalized),
         metadata: normalizeTaskMetadata(task),
         comments: comments.map(normalizeComment),
         commentsMayHaveMore: comments.length === 25,
         attachments: (task.attachments ?? []).map(normalizeAttachment),
       };
+    });
+
+    const authorize = Effect.fn("ClickUpTasks.authorize")(function* (input: ClickUpTaskInput) {
+      const { token, connection: account } = yield* connection.account;
+      if (account.user?.id !== input.userId)
+        return yield* new ClickUpError({
+          message: "The ClickUp account changed. Refresh the connection.",
+        });
+      const task = yield* api
+        .request(`task/${encodeURIComponent(input.taskId)}`, { token })
+        .pipe(
+          Effect.flatMap(
+            decodeResponse(Schema.Struct({ id: Schema.String, team_id: Schema.String })),
+          ),
+        );
+      if (task.id !== input.taskId || task.team_id !== input.workspaceId)
+        return yield* new ClickUpError({
+          message: "This task belongs to a different ClickUp workspace.",
+        });
     });
 
     const threads = Effect.fn("ClickUpTasks.threads")(function* (input: ClickUpTaskInput) {
@@ -174,6 +200,6 @@ export const layer = Layer.effect(
         ),
       );
     });
-    return ClickUpTasks.of({ list, detail, threads });
+    return ClickUpTasks.of({ list, detail, authorize, threads });
   }),
 );

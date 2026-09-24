@@ -93,6 +93,7 @@ export const ClickUpTaskPage = Schema.Struct({
 
 export const ClickUpTaskDetails = Schema.Struct({
   task: ClickUpTask,
+  scopeFingerprint: Schema.optional(TrimmedNonEmptyString),
   metadata: Schema.optional(
     Schema.Struct({
       assignees: Schema.Array(ClickUpUser),

@@ -33,6 +33,7 @@ export const ClickUpHandoff = Schema.Struct({
   id: TrimmedNonEmptyString,
   threadId: ThreadId,
   summary: ClickUpWorkflowText,
+  taskScopeFingerprint: Schema.optional(TrimmedNonEmptyString),
   createdAt: IsoDateTime,
   status: Schema.Literals(["pending", "submitting", "submitted", "partial", "uncertain"]),
   error: Schema.NullOr(Schema.String),
@@ -57,6 +58,7 @@ export const ClickUpFindingsInput = Schema.Struct({
 export type ClickUpFindingsInput = typeof ClickUpFindingsInput.Type;
 export const ClickUpPrepareHandoffInput = Schema.Struct({
   summary: ClickUpWorkflowText,
+  reviewedTaskScope: TrimmedNonEmptyString,
   evidence: Schema.Array(ClickUpWorkflowEvidence).check(
     Schema.isMinLength(2),
     Schema.isMaxLength(20),

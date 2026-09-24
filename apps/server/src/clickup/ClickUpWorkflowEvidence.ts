@@ -42,6 +42,7 @@ export function matchingHandoff(
   handoffs: ReadonlyArray<ClickUpHandoff>,
   expected: {
     threadId: ThreadId;
+    taskScopeFingerprint: string;
     summary: string;
     evidence: ClickUpHandoff["evidence"];
     pullRequests: ClickUpHandoff["pullRequests"];
@@ -50,6 +51,7 @@ export function matchingHandoff(
   return handoffs.find(
     (item) =>
       item.threadId === expected.threadId &&
+      item.taskScopeFingerprint === expected.taskScopeFingerprint &&
       item.summary === expected.summary &&
       item.evidence.length === expected.evidence.length &&
       item.evidence.every((entry, index) => {

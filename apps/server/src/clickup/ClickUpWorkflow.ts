@@ -9,7 +9,6 @@ import {
   type ClickUpPrepareHandoffInput,
   type ClickUpFindingsInput,
   type ThreadId,
-  type PullRequestRef,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -21,6 +20,8 @@ import { ClickUpTasks } from "./ClickUpTasks.ts";
 import { ClickUpTaskEditing } from "./ClickUpTaskEditing.ts";
 import { decodeWorkflowText, handoffSummary, matchingHandoff } from "./ClickUpWorkflowEvidence.ts";
 import { ClickUpWorkflowStore } from "./ClickUpWorkflowStore.ts";
+import { taskScopeFingerprint } from "./ClickUpTaskScope.ts";
+import { refreshHandoffPullRequest } from "./ClickUpWorkflowPullRequests.ts";
 
 export class ClickUpWorkflow extends Context.Service<
   ClickUpWorkflow,
@@ -75,26 +76,8 @@ export const layer = Layer.effect(
       if (options.status !== target.name)
         yield* editing.setStatus({ ...task, status: target.name });
     });
-    const freshPr = Effect.fn("ClickUpWorkflow.freshPr")(function* (ref: PullRequestRef) {
-      yield* prs
-        .invalidate({ reference: ref })
-        .pipe(Effect.mapError(() => failure("Could not refresh the pull request.")));
-      const detail = yield* prs
-        .detail(ref)
-        .pipe(Effect.mapError((error) => failure(error.message)));
-      if (
-        detail.provider !== "github" ||
-        !detail.headSha ||
-        !detail.author ||
-        detail.state !== "open"
-      )
-        return yield* failure(
-          "Handoffs require open GitHub pull requests with a known author and verifiable head commit.",
-        );
-      return { ...detail, headSha: detail.headSha };
-    });
     const read = Effect.fn("ClickUpWorkflow.read")(function* (task: ClickUpTaskInput) {
-      yield* tasks.detail(task);
+      yield* tasks.authorize(task);
       return { handoffs: yield* store.list(task) };
     });
     const start = Effect.fn("ClickUpWorkflow.start")(function* (task: ClickUpTaskInput) {
@@ -127,7 +110,12 @@ export const layer = Layer.effect(
       threadId: ThreadId,
       input: ClickUpPrepareHandoffInput,
     ) {
-      yield* current(task);
+      const details = yield* current(task);
+      const scope = taskScopeFingerprint(details.task);
+      if (input.reviewedTaskScope !== scope)
+        return yield* failure(
+          "The task title or description changed since review. Reconcile the requirements and review the current scope before preparing a handoff.",
+        );
       const summary = yield* handoffSummary(input);
       const registered = yield* store.registered(task);
       const pullRequests: Array<ClickUpHandoff["pullRequests"][number]> = [];
@@ -143,7 +131,7 @@ export const layer = Layer.effect(
           repository: link.repository,
           number: link.number,
         };
-        const detail = yield* freshPr(ref);
+        const detail = yield* refreshHandoffPullRequest(prs, ref);
         if (detail.headSha !== headSha)
           return yield* failure(
             "A PR changed since the recorded review. Review its current head before preparing a handoff.",
@@ -161,6 +149,7 @@ export const layer = Layer.effect(
       const existing = yield* store.list(task);
       const same = matchingHandoff(existing, {
         threadId,
+        taskScopeFingerprint: scope,
         summary,
         evidence: input.evidence,
         pullRequests,
@@ -169,6 +158,7 @@ export const layer = Layer.effect(
       const handoff: ClickUpHandoff = {
         id: NodeCrypto.randomUUID(),
         threadId,
+        taskScopeFingerprint: scope,
         summary,
         evidence: input.evidence,
         createdAt: DateTime.formatIso(yield* DateTime.now),
@@ -191,6 +181,14 @@ export const layer = Layer.effect(
           "This handoff does not belong to the current ClickUp account and task.",
         );
       if (found.status === "submitted" || found.status === "uncertain") return found;
+      const checkScope = (fingerprint: string) =>
+        found.taskScopeFingerprint === fingerprint
+          ? Effect.void
+          : Effect.fail(
+              failure(
+                "The task title or description changed, or this handoff predates scope checks. Reconcile the requirements and prepare a new handoff before submitting.",
+              ),
+            );
       if (!["in progress", "code review"].includes(taskDetails.task.status.trim().toLowerCase()))
         return yield* failure(
           "Submit requires In Progress or Code Review. The task status changed; review it before submitting.",
@@ -202,11 +200,12 @@ export const layer = Layer.effect(
       const save = () => store.save(task, receipt);
       yield* save();
       const run = Effect.gen(function* () {
+        yield* checkScope(taskScopeFingerprint(taskDetails.task));
         const registered = yield* store.registered(task);
         for (const pr of receipt.pullRequests) {
           if (!registered.some((item) => item.url === pr.url && item.projectId === pr.projectId))
             return yield* failure("A handoff PR was unlinked. Prepare a new handoff.");
-          const live = yield* freshPr(pr);
+          const live = yield* refreshHandoffPullRequest(prs, pr);
           if (live.headSha !== pr.headSha)
             return yield* failure(
               "A PR changed after review. Review the new head and prepare a new handoff.",
@@ -214,11 +213,12 @@ export const layer = Layer.effect(
         }
         for (let index = 0; index < receipt.pullRequests.length; index++) {
           const pr = receipt.pullRequests[index]!;
-          let live = yield* freshPr(pr);
+          let live = yield* refreshHandoffPullRequest(prs, pr);
           if (live.headSha !== pr.headSha)
             return yield* failure(
               "A PR changed during submission. Review the new head before continuing.",
             );
+          yield* checkScope(taskScopeFingerprint((yield* current(task)).task));
           if (live.isDraft)
             yield* prs
               .runAction({ ...pr, action: "ready" })
@@ -229,7 +229,7 @@ export const layer = Layer.effect(
             ),
           });
           yield* save();
-          live = yield* freshPr(pr);
+          live = yield* refreshHandoffPullRequest(prs, pr);
           if (live.headSha !== pr.headSha)
             return yield* failure(
               "A PR changed during submission. Review the new head before continuing.",
@@ -237,7 +237,8 @@ export const layer = Layer.effect(
           if (
             live.author?.login.toLowerCase() !== "vrybakk" &&
             !live.reviewers.some((reviewer) => reviewer.login.toLowerCase() === "vrybakk")
-          )
+          ) {
+            yield* checkScope(taskScopeFingerprint((yield* current(task)).task));
             yield* prs
               .requestReviewers({
                 ...pr,
@@ -245,6 +246,7 @@ export const layer = Layer.effect(
                 requested: true,
               })
               .pipe(Effect.mapError((error) => failure(error.message)));
+          }
           receipt = Object.assign({}, receipt, {
             pullRequests: receipt.pullRequests.map((item, i) =>
               i === index
@@ -255,12 +257,13 @@ export const layer = Layer.effect(
           yield* save();
         }
         for (const pr of receipt.pullRequests) {
-          if ((yield* freshPr(pr)).headSha !== pr.headSha)
+          if ((yield* refreshHandoffPullRequest(prs, pr)).headSha !== pr.headSha)
             return yield* failure(
               "A PR changed during submission. Review the new head before continuing.",
             );
         }
         const latestTask = yield* current(task);
+        yield* checkScope(taskScopeFingerprint(latestTask.task));
         if (!["in progress", "code review"].includes(latestTask.task.status.trim().toLowerCase()))
           return yield* failure(
             "The task status changed during submission. Review it before continuing.",
