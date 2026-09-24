@@ -5,6 +5,13 @@ import { ClickUpStatusPicker, ClickUpTagsPicker } from "./ClickUpTaskEditors";
 import { taskDate, taskDuration } from "./taskFormatting";
 import { ClickUpProjectBadge } from "./ClickUpProjectBadge";
 
+const customFieldLabels: Readonly<Record<string, string>> = {
+  BASELINE_due_date: "Due date",
+  BASELINE_duration: "Duration",
+  BASELINE_start_date: "Start date",
+  BASELINE_status: "Status",
+};
+
 export function ClickUpTaskFields({
   details,
   environmentId,
@@ -81,10 +88,22 @@ export function ClickUpCustomFields({ details }: { details: ClickUpTaskDetails }
     <>
       {metadata && (
         <section className="space-y-3 border-t border-border pt-6" aria-label="Custom fields">
-          <h3 className="text-sm font-medium">
-            Custom fields{" "}
-            <span className="ml-1 text-muted-foreground">{metadata.customFields.length}</span>
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-medium">
+              Custom fields{" "}
+              <span className="ml-1 text-muted-foreground">{metadata.customFields.length}</span>
+            </h3>
+            {emptyCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-expanded={showEmpty}
+                onClick={() => setShowEmpty(!showEmpty)}
+              >
+                {showEmpty ? "Hide empty" : "Show empty"} ({emptyCount})
+              </Button>
+            )}
+          </div>
           {metadata.customFields.length ? (
             <dl className="divide-y divide-border">
               {fields.map((field) => (
@@ -92,7 +111,9 @@ export function ClickUpCustomFields({ details }: { details: ClickUpTaskDetails }
                   key={field.id}
                   className="grid grid-cols-[minmax(7rem,1fr)_2fr] gap-4 py-3 text-sm"
                 >
-                  <dt className="break-words text-muted-foreground">{field.name}</dt>
+                  <dt className="break-words text-muted-foreground">
+                    {customFieldLabels[field.name] ?? field.name}
+                  </dt>
                   <dd className="whitespace-pre-wrap break-words">
                     {field.valueText ?? <span className="text-muted-foreground">Empty</span>}
                   </dd>
@@ -103,11 +124,6 @@ export function ClickUpCustomFields({ details }: { details: ClickUpTaskDetails }
             <p className="text-sm text-muted-foreground">No custom fields on this task.</p>
           )}
         </section>
-      )}
-      {emptyCount > 0 && (
-        <Button variant="ghost" size="sm" onClick={() => setShowEmpty(!showEmpty)}>
-          {showEmpty ? "Hide" : "Show"} {emptyCount} empty fields
-        </Button>
       )}
     </>
   );
