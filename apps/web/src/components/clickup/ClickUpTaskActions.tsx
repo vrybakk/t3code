@@ -54,7 +54,9 @@ export function ClickUpTaskActionButtons({
   return (
     <div
       className={
-        compact ? "ml-auto flex w-max items-center gap-1" : "flex flex-wrap items-center gap-1"
+        compact
+          ? "ml-auto flex w-max items-center gap-1"
+          : "flex flex-wrap items-center justify-end gap-2"
       }
       aria-label={`Actions for ${task.name}`}
     >
@@ -69,8 +71,16 @@ export function ClickUpTaskActionButtons({
             <TooltipTrigger
               render={
                 <Button
-                  size={compact ? "icon-sm" : "sm"}
-                  variant={action === "implement" ? "outline" : "ghost"}
+                  size={compact ? "icon-sm" : "default"}
+                  variant={
+                    compact
+                      ? action === "implement"
+                        ? "outline"
+                        : "ghost"
+                      : action === "implement"
+                        ? "default"
+                        : "outline"
+                  }
                   aria-label={`${label}: ${task.name}`}
                   aria-disabled={blocked || undefined}
                   onClick={() => {
