@@ -1011,7 +1011,7 @@ export function resolveWorkingStartedAt(
   thread: Pick<SidebarThreadSummary, "latestTurn" | "session">,
 ): string | null {
   const turn = thread.latestTurn;
-  if (turn && turn.completedAt === null) {
+  if (turn && (turn.state === "running" || turn.completedAt === null)) {
     return firstValidTimestamp(turn.startedAt, turn.requestedAt, thread.session?.updatedAt);
   }
   return firstValidTimestamp(thread.session?.updatedAt);

@@ -12,7 +12,7 @@ const thread = {
   environmentId: "environment",
   projectId: "project",
   title: "Review changes",
-  latestTurn: { requestedAt: start, startedAt: start, completedAt: null },
+  latestTurn: { state: "running", requestedAt: start, startedAt: start, completedAt: null },
   session: { status: "running", updatedAt: start },
   hasPendingApprovals: true,
   hasPendingUserInput: false,
@@ -24,6 +24,43 @@ afterEach(() => {
 });
 
 describe("Work running sessions", () => {
+  it("keeps all six running turns visible after checkpoints without resetting their timers", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-22T10:20:00.000Z"));
+    vi.stubGlobal("window", { setInterval, clearInterval });
+    const threads = Array.from({ length: 6 }, (_, index) => ({
+      ...thread,
+      id: `thread-${index}`,
+      title: `Running thread ${index}`,
+      session: { ...thread.session, updatedAt: "2026-09-22T10:18:00.000Z" },
+      latestTurn: {
+        ...thread.latestTurn,
+        completedAt: index < 3 ? "2026-09-22T10:05:00.000Z" : null,
+      },
+    }));
+    let renderer: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        createElement(WorkRunningSessions, {
+          threads: threads as never,
+          projects: [],
+          enabled: true,
+        }),
+      );
+    });
+    const rows = renderer!.root.findAllByType("a");
+    expect(rows).toHaveLength(6);
+    for (const row of rows) {
+      expect(row.findByType("span").children).toEqual(["20m"]);
+    }
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    for (const row of renderer!.root.findAllByType("a")) {
+      expect(row.findByType("span").children).toEqual(["21m"]);
+    }
+    act(() => renderer!.unmount());
+  });
   it("shows a starting session before its first turn projection arrives", () => {
     vi.stubGlobal("window", { setInterval, clearInterval });
     let renderer: ReactTestRenderer;
@@ -53,7 +90,11 @@ describe("Work running sessions", () => {
         threads: [
           {
             ...thread,
-            latestTurn: { ...thread.latestTurn, completedAt: completed ? start : null },
+            latestTurn: {
+              ...thread.latestTurn,
+              state: completed ? "completed" : "running",
+              completedAt: completed ? start : null,
+            },
           },
         ] as never,
         projects: [
