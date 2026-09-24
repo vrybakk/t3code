@@ -39,7 +39,7 @@ export function ClickUpSprintTable({
             <TableHead className="w-24">Priority</TableHead>
             <TableHead className="w-28">Status</TableHead>
             <TableHead className="w-36">Project</TableHead>
-            <TableHead className="w-28 pr-5">Actions</TableHead>
+            <TableHead className="w-32 pr-5 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

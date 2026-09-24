@@ -53,7 +53,9 @@ export function ClickUpTaskActionButtons({
 }) {
   return (
     <div
-      className={compact ? "flex w-max items-center gap-1" : "flex flex-wrap items-center gap-1"}
+      className={
+        compact ? "ml-auto flex w-max items-center gap-1" : "flex flex-wrap items-center gap-1"
+      }
       aria-label={`Actions for ${task.name}`}
     >
       {(Object.keys(actions) as ClickUpTaskAction[]).map((action) => {
