@@ -35,3 +35,44 @@ it.effect("keeps API error bodies out of errors and does not retry failed reques
     ),
   );
 });
+
+it.effect(
+  "sends explicit PUT boolean bodies and accepts empty success while preserving OAuth POST",
+  () => {
+    const methods: string[] = [];
+    return Effect.gen(function* () {
+      const api = yield* ClickUpApi;
+      assert.equal(
+        yield* api.request("comment/123", {
+          token: "fixture-token",
+          method: "PUT",
+          body: { resolved: true },
+        }),
+        null,
+      );
+      yield* api.request("oauth/token", { body: { code: "fixture-code" } });
+      assert.deepEqual(methods, ["PUT", "POST"]);
+    }).pipe(
+      Effect.provide(
+        layer.pipe(
+          Layer.provide(
+            Layer.succeed(
+              HttpClient.HttpClient,
+              HttpClient.make((request) => {
+                methods.push(request.method);
+                if (request.method === "PUT") {
+                  assert.equal(request.body._tag, "Uint8Array");
+                  if (request.body._tag === "Uint8Array")
+                    assert.equal(new TextDecoder().decode(request.body.body), '{"resolved":true}');
+                }
+                return Effect.succeed(
+                  HttpClientResponse.fromWeb(request, new Response(null, { status: 204 })),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
+  },
+);

@@ -11,6 +11,15 @@ import { describe, expect, it } from "@effect/vitest";
 import { RPC_REQUIRED_SCOPES, requiredScopeForRpcMethod } from "./RpcAuthorization.ts";
 
 describe("RPC authorization scopes", () => {
+  it("requires operate permission for ClickUp resolution changes", () => {
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpComments)).toBe(AuthOrchestrationReadScope);
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpSetCommentResolution)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpSetChecklistItemResolution)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+  });
   it("declares exactly one scope for every RPC in the server group", () => {
     expect(new Set(Object.keys(RPC_REQUIRED_SCOPES))).toEqual(new Set(WsRpcGroup.requests.keys()));
   });

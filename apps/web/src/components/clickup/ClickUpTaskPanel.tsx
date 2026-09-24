@@ -11,7 +11,8 @@ import { ScrollArea } from "../ui/scroll-area";
 import { ClickUpTaskActivity } from "./ClickUpTaskActivity";
 import { ClickUpCustomFields, ClickUpTaskFields } from "./ClickUpTaskFields";
 import { ClickUpTaskWork } from "./ClickUpTaskWork";
-import { safeClickUpAttachmentUrl } from "./taskPrompt";
+import { ClickUpAttachments } from "./ClickUpAttachments";
+import { ClickUpTaskChecklist } from "./ClickUpTaskChecklist";
 
 export function ClickUpTaskPanel({
   environmentId,
@@ -39,7 +40,7 @@ export function ClickUpTaskPanel({
             appAtomRegistry.refresh(linksQuery);
           }}
         >
-          <RefreshCwIcon className="size-4" /> Refresh task
+          <RefreshCwIcon className="size-4" /> Refresh details
         </Button>
         <a
           href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
@@ -84,46 +85,14 @@ export function ClickUpTaskPanel({
                 {!details.attachments.length && (
                   <p className="text-sm text-muted-foreground">No attachments.</p>
                 )}
-                {details.attachments.map((attachment) => {
-                  const url = safeClickUpAttachmentUrl(attachment.url);
-                  return url ? (
-                    <a
-                      key={attachment.url}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block rounded-md border border-border p-3 text-sm text-primary hover:bg-muted/40"
-                    >
-                      {attachment.name}
-                    </a>
-                  ) : (
-                    <p key={attachment.url} className="text-sm text-muted-foreground">
-                      {attachment.name} — open in ClickUp
-                    </p>
-                  );
-                })}
+                <ClickUpAttachments attachments={details.attachments} />
               </section>
-              {details.metadata?.checklists.map((checklist) => (
-                <section key={checklist.id} className="space-y-3 border-t border-border pt-6">
-                  <h3 className="text-sm font-medium">{checklist.name}</h3>
-                  <ul className="space-y-2">
-                    {checklist.items.map((item) => (
-                      <li key={item.id} className="flex items-start gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={item.resolved}
-                          readOnly
-                          aria-label={item.name}
-                          className="mt-1"
-                        />
-                        <span className={item.resolved ? "text-muted-foreground line-through" : ""}>
-                          {item.name}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
+              <ClickUpTaskChecklist
+                environmentId={environmentId}
+                input={input}
+                checklists={details.metadata?.checklists ?? []}
+                refreshing={result.waiting}
+              />
               {Boolean(details.metadata?.subtasks.length) && (
                 <section className="space-y-3 border-t border-border pt-6">
                   <h3 className="text-sm font-medium">Subtasks</h3>
@@ -159,7 +128,7 @@ export function ClickUpTaskPanel({
               )}
             </div>
           </ScrollArea>
-          <ClickUpTaskActivity details={details} />
+          <ClickUpTaskActivity details={details} environmentId={environmentId} input={input} />
         </div>
       )}
     </section>

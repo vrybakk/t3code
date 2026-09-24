@@ -58,3 +58,4 @@ export {
 
 export * from "./clickup.ts";
 export * from "./clickupSprints.ts";
+export * from "./clickupInteractions.ts";

@@ -12,7 +12,12 @@ including tasks planned from other project spaces and completed work.
 Select a task to open its full detail screen: description, task properties, custom fields,
 attachments, checklists, subtasks, and recent comments. Empty custom fields can be expanded.
 Use **Tasks** to return to the selected sprint, or **Open in ClickUp** for the full change
-history and discussion, including replies and older comments. Refresh to retrieve changes.
+history and comment replies. Use **Older** and **Newer** to browse comments. Refresh to retrieve changes.
+
+Open image and video attachments from the task or its comments in the media viewer.
+Assigned comments show their owner and can be resolved or reopened. Checklist items show
+their assignee and can be checked off or reopened here too. These actions update ClickUp;
+Nerd refreshes the item after saving. Other files open through their original attachment link.
 
 Choose a project and select **Open in coding thread** to prepare a draft containing the task
 context and studio workflow guidance. Review the model and permissions, then send it to begin.
@@ -20,7 +25,7 @@ The existing worktree setup creates an isolated checkout. The task link is saved
 is created; return to the task to find its coding threads and their linked pull requests. You can open additional threads for
 other repositories involved in the same task.
 
-This initial integration reads ClickUp data. Status updates, task edits, inbox notifications,
+Task status updates, description edits, inbox notifications,
 and automated PR handoff are not available yet. The task association
 does not change Work reports or export time to ClickUp.
 

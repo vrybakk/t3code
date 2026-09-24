@@ -10,10 +10,18 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
-import { ApiTask, ApiComment, ClickUpApi, decodeResponse, normalizeTask } from "./ClickUpApi.ts";
+import {
+  ApiTask,
+  ApiComment,
+  ClickUpApi,
+  decodeResponse,
+  normalizeTask,
+  normalizeAttachment,
+} from "./ClickUpApi.ts";
 import { ClickUpConnection } from "./ClickUpConnection.ts";
-import { ApiTaskDetails, normalizeTaskMetadata, nullableNumber } from "./ClickUpTaskDetails.ts";
+import { ApiTaskDetails, normalizeTaskMetadata } from "./ClickUpTaskDetails.ts";
 import { validateSprintList } from "./ClickUpSprints.ts";
+import { normalizeComment } from "./ClickUpCommentData.ts";
 
 const decodeThreadLinks = Schema.decodeUnknownEffect(Schema.Array(ClickUpThreadLink));
 
@@ -106,19 +114,9 @@ export const layer = Layer.effect(
       return {
         task: normalizeTask(task),
         metadata: normalizeTaskMetadata(task),
-        comments: comments.map((comment) => ({
-          id: String(comment.id),
-          author: comment.user.username ?? String(comment.user.id),
-          text: comment.comment_text,
-          createdAt: comment.date ?? null,
-          avatarUrl: comment.user.profilePicture ?? null,
-          replyCount: nullableNumber(comment.reply_count),
-        })),
+        comments: comments.map(normalizeComment),
         commentsMayHaveMore: comments.length === 25,
-        attachments: (task.attachments ?? []).map((attachment) => ({
-          name: attachment.title ?? "Attachment",
-          url: attachment.url,
-        })),
+        attachments: (task.attachments ?? []).map(normalizeAttachment),
       };
     });
 

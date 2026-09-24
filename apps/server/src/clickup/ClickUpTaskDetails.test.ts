@@ -62,7 +62,11 @@ it("normalizes rich task details without forwarding provider objects", () => {
   assert.equal(result.timeSpent, 0);
   assert.deepEqual(result.tags, ["frontend"]);
   assert.deepEqual(result.checklists, [
-    { id: "check-1", name: "QA", items: [{ id: "item-1", name: "Mobile", resolved: true }] },
+    {
+      id: "check-1",
+      name: "QA",
+      items: [{ id: "item-1", name: "Mobile", resolved: true, assignee: null }],
+    },
   ]);
   assert.deepEqual(result.subtasks, [{ id: "sub-1", name: "Tests", status: "open" }]);
   assert.deepEqual(result.relatedTasks, [
@@ -140,4 +144,35 @@ it("defaults missing and nullable metadata without losing zero values", () => {
   assert.equal(missing.creator, null);
   assert.equal(missing.timeEstimate, null);
   assert.equal(missing.createdAt, null);
+});
+
+it("normalizes checklist assignees as users and accepts unassigned items", () => {
+  const result = normalize({
+    ...base,
+    checklists: [
+      {
+        id: "check-1",
+        name: "QA",
+        items: [
+          {
+            id: "assigned",
+            name: "Verify",
+            resolved: false,
+            assignee: {
+              id: 23,
+              username: "Reviewer",
+              profilePicture: "https://example.test/user.png",
+            },
+          },
+          { id: "unassigned", name: "Test", resolved: false, assignee: null },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(result.checklists[0]?.items[0]?.assignee, {
+    id: 23,
+    username: "Reviewer",
+    avatarUrl: "https://example.test/user.png",
+  });
+  assert.equal(result.checklists[0]?.items[1]?.assignee, null);
 });

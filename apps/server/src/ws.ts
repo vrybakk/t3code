@@ -1,6 +1,7 @@
 import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
 import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
 import * as ClickUpSprints from "./clickup/ClickUpSprints.ts";
+import * as ClickUpInteractions from "./clickup/ClickUpInteractions.ts";
 import {
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
@@ -655,6 +656,7 @@ const makeWsRpcLayer = (
       const clickUpConnection = yield* ClickUpConnection.ClickUpConnection;
       const clickUpTasks = yield* ClickUpTasks.ClickUpTasks;
       const clickUpSprints = yield* ClickUpSprints.ClickUpSprints;
+      const clickUpInteractions = yield* ClickUpInteractions.ClickUpInteractions;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -2594,6 +2596,11 @@ const makeWsRpcLayer = (
         [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
         [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
         [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
+        [WS_METHODS.clickUpComments]: (input) => clickUpInteractions.comments(input),
+        [WS_METHODS.clickUpSetCommentResolution]: (input) =>
+          clickUpInteractions.setCommentResolution(input),
+        [WS_METHODS.clickUpSetChecklistItemResolution]: (input) =>
+          clickUpInteractions.setChecklistItemResolution(input),
         [WS_METHODS.clickUpTask]: (input) => clickUpTasks.detail(input),
         [WS_METHODS.clickUpThreads]: (input) => clickUpTasks.threads(input),
         [WS_METHODS.gitButlerWorkspaceStatus]: ({ projectId }) =>
@@ -3896,6 +3903,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const clickUpConnectionService = yield* ClickUpConnection.ClickUpConnection;
     const clickUpTasksService = yield* ClickUpTasks.ClickUpTasks;
     const clickUpSprintsService = yield* ClickUpSprints.ClickUpSprints;
+    const clickUpInteractionsService = yield* ClickUpInteractions.ClickUpInteractions;
     const sql = yield* SqlClient.SqlClient;
     const storageUsage = yield* StorageUsage.make;
     return HttpRouter.add(
@@ -3952,6 +3960,9 @@ export const websocketRpcRouteLayer = Layer.unwrap(
               ),
               Layer.provide(Layer.succeed(ClickUpTasks.ClickUpTasks, clickUpTasksService)),
               Layer.provide(Layer.succeed(ClickUpSprints.ClickUpSprints, clickUpSprintsService)),
+              Layer.provide(
+                Layer.succeed(ClickUpInteractions.ClickUpInteractions, clickUpInteractionsService),
+              ),
               Layer.provide(
                 SourceControlDiscovery.layer.pipe(
                   Layer.provide(

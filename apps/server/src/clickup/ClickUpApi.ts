@@ -11,6 +11,17 @@ export const ApiUser = Schema.Struct({
   profilePicture: Schema.optional(Schema.NullOr(Schema.String)),
 });
 export const ApiWorkspace = Schema.Struct({ id: Schema.String, name: Schema.String });
+const OptionalText = Schema.optional(Schema.NullOr(Schema.String));
+export const ApiAttachment = Schema.Struct({
+  title: OptionalText,
+  name: OptionalText,
+  url: Schema.String,
+  extension: OptionalText,
+  mimetype: OptionalText,
+  type: Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Int]))),
+  thumbnail_medium: OptionalText,
+  thumbnail_small: OptionalText,
+});
 export const ApiTask = Schema.Struct({
   id: Schema.String,
   team_id: Schema.String,
@@ -19,14 +30,7 @@ export const ApiTask = Schema.Struct({
   list: Schema.Struct({ name: Schema.String }),
   description: Schema.optional(Schema.NullOr(Schema.String)),
   markdown_description: Schema.optional(Schema.NullOr(Schema.String)),
-  attachments: Schema.optional(
-    Schema.Array(
-      Schema.Struct({
-        title: Schema.optional(Schema.String),
-        url: Schema.String,
-      }),
-    ),
-  ),
+  attachments: Schema.optional(Schema.NullOr(Schema.Array(ApiAttachment))),
 });
 
 export const ApiComment = Schema.Struct({
@@ -35,7 +39,45 @@ export const ApiComment = Schema.Struct({
   comment_text: Schema.String,
   date: Schema.optional(Schema.NullOr(Schema.String)),
   reply_count: Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number]))),
+  assignee: Schema.optional(Schema.NullOr(ApiUser)),
+  resolved: Schema.optional(Schema.Boolean),
+  comment: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Struct({
+          attachment: Schema.optional(Schema.NullOr(ApiAttachment)),
+          image: Schema.optional(Schema.NullOr(ApiAttachment)),
+          video: Schema.optional(Schema.NullOr(ApiAttachment)),
+        }),
+      ),
+    ),
+  ),
 });
+
+export const normalizeUser = (user: typeof ApiUser.Type) => ({
+  id: user.id,
+  username: user.username ?? String(user.id),
+  avatarUrl: user.profilePicture ?? null,
+});
+
+export const normalizeAttachment = (attachment: typeof ApiAttachment.Type) => ({
+  name: attachment.title ?? attachment.name ?? "Attachment",
+  url: attachment.url,
+  mimeType:
+    attachment.mimetype ?? (attachment.extension?.includes("/") ? attachment.extension : null),
+  extension: attachment.extension?.includes("/")
+    ? typeof attachment.type === "string"
+      ? attachment.type
+      : null
+    : (attachment.extension ?? null),
+  thumbnailUrl: attachment.thumbnail_medium ?? attachment.thumbnail_small ?? null,
+});
+
+export function nullableNumber(value: string | number | null | undefined): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
 
 export const normalizeTask = (task: typeof ApiTask.Type) => ({
   workspaceId: task.team_id,
@@ -51,7 +93,11 @@ export class ClickUpApi extends Context.Service<
   {
     readonly request: (
       path: string,
-      options?: { token?: string; body?: Record<string, string> },
+      options?: {
+        token?: string;
+        method?: "GET" | "POST" | "PUT";
+        body?: Record<string, string | number | boolean | null>;
+      },
     ) => Effect.Effect<unknown, ClickUpError>;
   }
 >()("t3/clickup/ClickUpApi") {}
@@ -62,7 +108,7 @@ export const layer = Layer.effect(
     const client = yield* HttpClient.HttpClient;
     const request: ClickUpApi["Service"]["request"] = (path, options) =>
       Effect.gen(function* () {
-        let request = HttpClientRequest.make(options?.body ? "POST" : "GET")(
+        let request = HttpClientRequest.make(options?.method ?? (options?.body ? "POST" : "GET"))(
           `https://api.clickup.com/api/v2/${path}`,
         );
         if (options?.token)
@@ -91,6 +137,7 @@ export const layer = Layer.effect(
                   : `ClickUp request failed (${response.status}). Try again.`;
           return yield* new ClickUpError({ message });
         }
+        if (response.status === 204) return null;
         return yield* response.json.pipe(
           Effect.mapError(
             () => new ClickUpError({ message: "ClickUp returned an unexpected response." }),

@@ -1077,6 +1077,19 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.clickUpThreads,
       staleTimeMs: 30_000,
     }),
+    clickUpComments: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpComments",
+      tag: WS_METHODS.clickUpComments,
+      staleTimeMs: 30_000,
+    }),
+    clickUpSetCommentResolution: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSetCommentResolution",
+      tag: WS_METHODS.clickUpSetCommentResolution,
+    }),
+    clickUpSetChecklistItemResolution: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSetChecklistItemResolution",
+      tag: WS_METHODS.clickUpSetChecklistItemResolution,
+    }),
     clickUpConnect: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:clickup:clickUpConnect",
       tag: WS_METHODS.clickUpConnect,

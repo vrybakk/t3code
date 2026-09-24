@@ -1,5 +1,11 @@
 import { ClickUpSprintsInput, ClickUpSprintWindow } from "./clickupSprints.ts";
 import {
+  ClickUpCommentsInput,
+  ClickUpCommentsPage,
+  ClickUpSetCommentResolutionInput,
+  ClickUpSetChecklistItemResolutionInput,
+} from "./clickupInteractions.ts";
+import {
   ClickUpConnection,
   ClickUpError,
   ClickUpTasksInput,
@@ -378,6 +384,9 @@ export const WS_METHODS = {
   clickUpDisconnect: "clickup.disconnect",
   clickUpTasks: "clickup.tasks",
   clickUpSprints: "clickup.sprints",
+  clickUpComments: "clickup.comments",
+  clickUpSetCommentResolution: "clickup.setCommentResolution",
+  clickUpSetChecklistItemResolution: "clickup.setChecklistItemResolution",
   clickUpTask: "clickup.task",
   clickUpThreads: "clickup.threads",
 
@@ -690,6 +699,24 @@ const WsClickUpSprintsRpc = Rpc.make(WS_METHODS.clickUpSprints, {
   success: ClickUpSprintWindow,
   error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
+const WsClickUpCommentsRpc = Rpc.make(WS_METHODS.clickUpComments, {
+  payload: ClickUpCommentsInput,
+  success: ClickUpCommentsPage,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetCommentResolutionRpc = Rpc.make(WS_METHODS.clickUpSetCommentResolution, {
+  payload: ClickUpSetCommentResolutionInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetChecklistItemResolutionRpc = Rpc.make(
+  WS_METHODS.clickUpSetChecklistItemResolution,
+  {
+    payload: ClickUpSetChecklistItemResolutionInput,
+    success: Schema.Void,
+    error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+  },
+);
 const WsClickUpTaskRpc = Rpc.make(WS_METHODS.clickUpTask, {
   payload: ClickUpTaskInput,
   success: ClickUpTaskDetails,
@@ -1631,6 +1658,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsClickUpDisconnectRpc,
   WsClickUpTasksRpc,
   WsClickUpSprintsRpc,
+  WsClickUpCommentsRpc,
+  WsClickUpSetCommentResolutionRpc,
+  WsClickUpSetChecklistItemResolutionRpc,
   WsClickUpTaskRpc,
   WsClickUpThreadsRpc,
 

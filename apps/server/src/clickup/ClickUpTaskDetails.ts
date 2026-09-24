@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { ApiTask, ApiUser } from "./ClickUpApi.ts";
+import { ApiTask, ApiUser, normalizeUser, nullableNumber } from "./ClickUpApi.ts";
 
 const OptionalText = Schema.optional(Schema.NullOr(Schema.String));
 const OptionalNumber = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number])));
@@ -53,6 +53,7 @@ export const ApiTaskDetails = Schema.Struct({
                 id: Schema.String,
                 name: Schema.String,
                 resolved: Schema.Boolean,
+                assignee: Schema.optional(Schema.NullOr(ApiUser)),
               }),
             ),
           ),
@@ -93,12 +94,6 @@ export const ApiTaskDetails = Schema.Struct({
     ),
   ),
 });
-
-export function nullableNumber(value: string | number | null | undefined): number | null {
-  if (value === undefined || value === null || value === "") return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
 
 function valueText(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
@@ -145,12 +140,6 @@ function customFieldValue(field: typeof ApiCustomField.Type): string | null {
   return valueText(field.value);
 }
 
-const normalizeUser = (user: typeof ApiUser.Type) => ({
-  id: user.id,
-  username: user.username ?? String(user.id),
-  avatarUrl: user.profilePicture ?? null,
-});
-
 export function normalizeTaskMetadata(task: typeof ApiTaskDetails.Type) {
   const relatedTasks = [
     ...(task.parent ? [{ id: task.parent, label: "Parent task" }] : []),
@@ -184,7 +173,12 @@ export function normalizeTaskMetadata(task: typeof ApiTaskDetails.Type) {
     })),
     checklists: (task.checklists ?? []).map((checklist) => ({
       ...checklist,
-      items: checklist.items ?? [],
+      items: (checklist.items ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        resolved: item.resolved,
+        assignee: item.assignee ? normalizeUser(item.assignee) : null,
+      })),
     })),
     subtasks: (task.subtasks ?? []).map((task) => ({
       id: task.id,

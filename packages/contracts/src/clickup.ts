@@ -18,6 +18,27 @@ export const ClickUpUser = Schema.Struct({
   username: Schema.String,
   avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
 });
+export type ClickUpUser = typeof ClickUpUser.Type;
+export const ClickUpAttachment = Schema.Struct({
+  name: Schema.String,
+  url: Schema.String,
+  mimeType: Schema.optional(Schema.NullOr(Schema.String)),
+  extension: Schema.optional(Schema.NullOr(Schema.String)),
+  thumbnailUrl: Schema.optional(Schema.NullOr(Schema.String)),
+});
+export type ClickUpAttachment = typeof ClickUpAttachment.Type;
+export const ClickUpComment = Schema.Struct({
+  id: Schema.String,
+  author: Schema.String,
+  text: Schema.String,
+  createdAt: Schema.optional(Schema.NullOr(Schema.String)),
+  avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
+  replyCount: Schema.optional(Schema.NullOr(Schema.Number)),
+  assignee: Schema.optional(Schema.NullOr(ClickUpUser)),
+  resolved: Schema.optional(Schema.Boolean),
+  attachments: Schema.optional(Schema.Array(ClickUpAttachment)),
+});
+export type ClickUpComment = typeof ClickUpComment.Type;
 export const ClickUpWorkspace = Schema.Struct({ id: ClickUpId, name: Schema.String });
 export const ClickUpConnection = Schema.Struct({
   configured: Schema.Boolean,
@@ -81,7 +102,12 @@ export const ClickUpTaskDetails = Schema.Struct({
           id: Schema.String,
           name: Schema.String,
           items: Schema.Array(
-            Schema.Struct({ id: Schema.String, name: Schema.String, resolved: Schema.Boolean }),
+            Schema.Struct({
+              id: Schema.String,
+              name: Schema.String,
+              resolved: Schema.Boolean,
+              assignee: Schema.optional(Schema.NullOr(ClickUpUser)),
+            }),
           ),
         }),
       ),
@@ -91,18 +117,9 @@ export const ClickUpTaskDetails = Schema.Struct({
       relatedTasks: Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String })),
     }),
   ),
-  comments: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      author: Schema.String,
-      text: Schema.String,
-      createdAt: Schema.optional(Schema.NullOr(Schema.String)),
-      avatarUrl: Schema.optional(Schema.NullOr(Schema.String)),
-      replyCount: Schema.optional(Schema.NullOr(Schema.Number)),
-    }),
-  ),
+  comments: Schema.Array(ClickUpComment),
   commentsMayHaveMore: Schema.Boolean,
-  attachments: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.String })),
+  attachments: Schema.Array(ClickUpAttachment),
 });
 export type ClickUpTaskDetails = typeof ClickUpTaskDetails.Type;
 
