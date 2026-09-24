@@ -1,6 +1,6 @@
 import type { ClickUpTask, EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
-import { CircleIcon, FlagIcon } from "lucide-react";
+import { FlagIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -10,6 +10,7 @@ import { taskPriorityRank } from "./sprintTaskGroups";
 import { ClickUpProjectBadge } from "./ClickUpProjectBadge";
 import { ClickUpTaskActionButtons, ClickUpTaskActionDialog } from "./ClickUpTaskActions";
 import type { ClickUpTaskAction } from "./taskPrompt";
+import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
 
 export function ClickUpSprintTable({
   environmentId,
@@ -78,11 +79,14 @@ export function ClickUpSprintTable({
                             />
                           }
                         >
-                          <CircleIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                          <ClickUpTaskTypeIcon
+                            name={task.taskType?.name ?? "Task"}
+                            className="mt-0.5"
+                          />
                           <span className="min-w-0 truncate">{task.name}</span>
                         </TooltipTrigger>
                         <TooltipPopup className="max-w-96 whitespace-normal break-words text-left">
-                          {task.name}
+                          {task.taskType?.name ?? "Task"}: {task.name}
                         </TooltipPopup>
                       </Tooltip>
                     </TableCell>

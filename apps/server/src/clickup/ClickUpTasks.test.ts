@@ -57,6 +57,11 @@ it.effect("filters by the authenticated user, includes subtasks, and preserves p
     assert.equal(page.tasks[0]?.description, "");
     assert.equal(page.tasks[0]?.dueDate, null);
     assert.equal(page.tasks[0]?.timeEstimate, 1_800_000);
+    assert.deepEqual(page.tasks[0]?.taskType, { id: 0, name: "Task" });
+    assert.equal(
+      test.paths.some((path) => path.endsWith("/custom_item")),
+      false,
+    );
     const query = new URL(`https://example.test/${test.paths[0]}`).searchParams;
     assert.equal(query.get("assignees[]"), "17");
     assert.equal(query.get("page"), "2");
@@ -323,6 +328,95 @@ it.effect(
         fallback.task.sources?.find((source) => source.kind === "space")?.name,
         "Space space",
       );
+    }).pipe(Effect.provide(test.layer));
+  },
+);
+
+it.effect(
+  "resolves native types once across all sprint pages without interpreting Item Type custom fields",
+  () => {
+    const test = setup((path) => {
+      if (path === "list/sprint-1") return { folder: { id: "90122725830" } };
+      if (path === "team/2179724/custom_item")
+        return {
+          custom_items: [
+            { id: 73, name: "Bug" },
+            { id: 94, name: "User Story" },
+          ],
+        };
+      const page = new URL(`https://example.test/${path}`).searchParams.get("page");
+      return {
+        tasks:
+          page === "0"
+            ? [
+                { ...task, team_id: "2179724", id: "default" },
+                {
+                  ...task,
+                  team_id: "2179724",
+                  id: "bug",
+                  custom_item_id: 73,
+                  custom_fields: [
+                    { id: "item-type", name: "Item Type", type: "text", value: "User Story" },
+                  ],
+                },
+              ]
+            : [
+                { ...task, team_id: "2179724", id: "story", custom_item_id: 94 },
+                { ...task, team_id: "2179724", id: "unknown", custom_item_id: 500 },
+              ],
+        last_page: page === "1",
+      };
+    }, "2179724");
+    return Effect.gen(function* () {
+      const service = yield* ClickUpTasks;
+      const page = yield* service.list({
+        workspaceId: "2179724",
+        listId: "sprint-1",
+        page: 0,
+        userId: 17,
+      });
+      assert.deepEqual(
+        page.tasks.map((item) => item.taskType),
+        [
+          { id: 0, name: "Task" },
+          { id: 73, name: "Bug" },
+          { id: 94, name: "User Story" },
+          { id: 500, name: "Unknown type" },
+        ],
+      );
+      assert.equal(test.paths.filter((path) => path.endsWith("/custom_item")).length, 1);
+    }).pipe(Effect.provide(test.layer));
+  },
+);
+
+it.effect(
+  "enriches task details and retains native IDs if optional type metadata cannot be decoded",
+  () => {
+    let catalogAvailable = true;
+    const test = setup((path) => {
+      if (path === "team/42/custom_item")
+        return catalogAvailable
+          ? { custom_items: [{ id: 73, name: "Bug" }] }
+          : { unavailable: true };
+      if (path.endsWith("/comment")) return { comments: [] };
+      return {
+        ...task,
+        custom_item_id: 73,
+        custom_fields: [{ id: "item-type", name: "Item Type", type: "text", value: "User Story" }],
+      };
+    });
+    return Effect.gen(function* () {
+      const service = yield* ClickUpTasks;
+      const input = { workspaceId: "42", taskId: "abc", userId: 17 };
+      const details = yield* service.detail(input);
+      assert.deepEqual(details.task.taskType, { id: 73, name: "Bug" });
+      assert.equal(details.metadata?.customFields[0]?.valueText, "User Story");
+      catalogAvailable = false;
+      assert.deepEqual((yield* service.detail(input)).task.taskType, {
+        id: 73,
+        name: "Unknown type",
+      });
+      assert.equal(test.paths.filter((path) => path.endsWith("/custom_item")).length, 2);
     }).pipe(Effect.provide(test.layer));
   },
 );

@@ -21,6 +21,7 @@ import {
 import { ClickUpConnection } from "./ClickUpConnection.ts";
 import { ApiTaskDetails, normalizeTaskMetadata } from "./ClickUpTaskDetails.ts";
 import { validateSprintList } from "./ClickUpSprints.ts";
+import { readTaskTypes } from "./ClickUpTaskTypes.ts";
 import { normalizeComment } from "./ClickUpCommentData.ts";
 
 const decodeThreadLinks = Schema.decodeUnknownEffect(Schema.Array(ClickUpThreadLink));
@@ -79,6 +80,7 @@ export const layer = Layer.effect(
       // Sprint status groups and priority ordering must include tasks beyond the first API page.
       const collected = new Map<string, ReturnType<typeof normalizeTask>>();
       let page = 0;
+      let taskTypes: ReadonlyMap<number, string> | undefined;
       while (true) {
         const response = yield* api.request(`${scope}/task?${query}`, { token }).pipe(
           Effect.flatMap(
@@ -90,7 +92,15 @@ export const layer = Layer.effect(
             ),
           ),
         );
-        const tasks = response.tasks.map((task) => ({ ...normalizeTask(task), description: "" }));
+        if (
+          taskTypes === undefined &&
+          response.tasks.some((task) => (task.custom_item_id ?? 0) > 1)
+        )
+          taskTypes = yield* readTaskTypes(api, token, input.workspaceId);
+        const tasks = response.tasks.map((task) => ({
+          ...normalizeTask(task, taskTypes),
+          description: "",
+        }));
         const hasMore =
           response.last_page === undefined ? response.tasks.length === 100 : !response.last_page;
         if (!input.listId) return { tasks, hasMore };
@@ -132,8 +142,12 @@ export const layer = Layer.effect(
         .pipe(
           Effect.flatMap(decodeResponse(Schema.Struct({ comments: Schema.Array(ApiComment) }))),
         );
+      const taskTypes =
+        (task.custom_item_id ?? 0) > 1
+          ? yield* readTaskTypes(api, token, input.workspaceId)
+          : undefined;
       return {
-        task: normalizeTask({ ...task, space: location?.space ?? task.space }),
+        task: normalizeTask({ ...task, space: location?.space ?? task.space }, taskTypes),
         metadata: normalizeTaskMetadata(task),
         comments: comments.map(normalizeComment),
         commentsMayHaveMore: comments.length === 25,

@@ -59,6 +59,7 @@ export type ClickUpTaskSource = typeof ClickUpTaskSource.Type;
 
 export const ClickUpTask = Schema.Struct({
   ...ClickUpTaskReference.fields,
+  taskType: Schema.optional(Schema.Struct({ id: NonNegativeInt, name: Schema.String })),
   status: Schema.String,
   timeEstimate: Schema.optional(Schema.NullOr(Schema.Number)),
   statusColor: Schema.optional(Schema.NullOr(Schema.String)),

@@ -8,6 +8,7 @@ import { serverEnvironment } from "../../state/server";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import ChatMarkdown from "../ChatMarkdown";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { ClickUpTaskActivity } from "./ClickUpTaskActivity";
 import { ClickUpCustomFields, ClickUpTaskFields } from "./ClickUpTaskFields";
@@ -16,6 +17,7 @@ import { ClickUpAttachments } from "./ClickUpAttachments";
 import { ClickUpTaskChecklist } from "./ClickUpTaskChecklist";
 import { ClickUpTaskActionButtons, ClickUpTaskActionDialog } from "./ClickUpTaskActions";
 import type { ClickUpTaskAction } from "./taskPrompt";
+import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
 
 export function ClickUpTaskPanel({
   environmentId,
@@ -70,9 +72,15 @@ export function ClickUpTaskPanel({
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
           <ScrollArea className="min-h-0 min-w-0 flex-1">
             <div className="mx-auto max-w-4xl space-y-7 px-6 py-8 xl:px-10">
-              <h2 className="text-2xl font-semibold leading-snug tracking-tight">
-                {details.task.name}
-              </h2>
+              <div className="space-y-3">
+                <Badge variant="outline" className="gap-1.5">
+                  <ClickUpTaskTypeIcon name={details.task.taskType?.name ?? "Task"} />
+                  {details.task.taskType?.name ?? "Task"}
+                </Badge>
+                <h2 className="text-2xl font-semibold leading-snug tracking-tight">
+                  {details.task.name}
+                </h2>
+              </div>
               <ClickUpTaskActionButtons task={details.task} onSelect={setAction} />
               <ClickUpTaskFields details={details} environmentId={environmentId} input={input} />
               <section aria-label="Description" className="space-y-4 border-t border-border pt-6">

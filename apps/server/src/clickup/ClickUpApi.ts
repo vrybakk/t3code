@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientRequest } from "effect/unstable/http";
+import { nativeTaskType } from "./ClickUpTaskTypes.ts";
 import { ApiTaskSourceFields, normalizeTaskSources } from "./ClickUpTaskSources.ts";
 
 export const ApiUser = Schema.Struct({
@@ -25,6 +26,7 @@ export const ApiAttachment = Schema.Struct({
 });
 export const ApiTask = Schema.Struct({
   id: Schema.String,
+  custom_item_id: Schema.optional(Schema.NullOr(Schema.Int)),
   team_id: Schema.String,
   name: Schema.String,
   status: Schema.Struct({ status: Schema.String, color: OptionalText }),
@@ -86,7 +88,11 @@ export function nullableNumber(value: string | number | null | undefined): numbe
   return Number.isFinite(number) ? number : null;
 }
 
-export const normalizeTask = (task: typeof ApiTask.Type) => ({
+export const normalizeTask = (
+  task: typeof ApiTask.Type,
+  taskTypes?: ReadonlyMap<number, string>,
+) => ({
+  taskType: nativeTaskType(task.custom_item_id, taskTypes),
   workspaceId: task.team_id,
   taskId: task.id,
   name: task.name,
