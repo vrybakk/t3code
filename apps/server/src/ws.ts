@@ -2671,6 +2671,9 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
+        [WS_METHODS.clickUpOAuthConfig]: () => clickUpConnection.oauthConfig,
+        [WS_METHODS.clickUpSaveOAuthConfig]: (input) => clickUpConnection.saveOAuthConfig(input),
+        [WS_METHODS.clickUpClearOAuthConfig]: () => clickUpConnection.clearOAuthConfig,
         [WS_METHODS.clickUpConnection]: () => clickUpConnection.status,
         [WS_METHODS.clickUpConnect]: ({ returnToApp }) =>
           clickUpConnection.begin(currentSession.sessionId, returnToApp),

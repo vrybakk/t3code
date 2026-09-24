@@ -1,4 +1,5 @@
 import {
+  AuthAccessWriteScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthRelayReadScope,
@@ -15,6 +16,15 @@ import {
 } from "./RpcAuthorization.ts";
 
 describe("RPC authorization scopes", () => {
+  it("requires administrative access to read or change ClickUp OAuth settings", () => {
+    for (const method of [
+      WS_METHODS.clickUpOAuthConfig,
+      WS_METHODS.clickUpSaveOAuthConfig,
+      WS_METHODS.clickUpClearOAuthConfig,
+    ]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthAccessWriteScope);
+    }
+  });
   it("requires operate permission for ClickUp resolution changes", () => {
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpWorkflow)).toBe(AuthOrchestrationReadScope);
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpSubmitWorkflow)).toBe(

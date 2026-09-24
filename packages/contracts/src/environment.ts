@@ -107,6 +107,7 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
       the links as literal text -- so a client must serialize context the legacy way for them. */
   inlineMessageContext: Schema.optionalKey(Schema.Boolean),
   clickUpTasks: Schema.optionalKey(Schema.Boolean),
+  clickUpOAuthConfiguration: Schema.optionalKey(Schema.Boolean),
   /** Server rejects required worktrees instead of falling back to the project checkout. */
   requiredWorktreeBootstrap: Schema.optionalKey(Schema.Boolean),
   /** Server exposes the read-only GitButler workspace status RPC. */
