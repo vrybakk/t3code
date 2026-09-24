@@ -1,3 +1,4 @@
+import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
 
@@ -602,6 +603,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   Layer.provide(ClickUpTasks.layer),
   Layer.provide(ClickUpSprints.layer),
   Layer.provide(ClickUpInteractions.layer),
+  Layer.provide(ClickUpTaskEditing.layer),
   Layer.provide(ClickUpConnection.layer),
   Layer.provide(ClickUpApi.layer),
   Layer.provide(PreviewAutomationBroker.layer),

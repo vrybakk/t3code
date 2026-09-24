@@ -1,3 +1,4 @@
+import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
 import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
 import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
 import * as ClickUpSprints from "./clickup/ClickUpSprints.ts";
@@ -657,6 +658,7 @@ const makeWsRpcLayer = (
       const clickUpTasks = yield* ClickUpTasks.ClickUpTasks;
       const clickUpSprints = yield* ClickUpSprints.ClickUpSprints;
       const clickUpInteractions = yield* ClickUpInteractions.ClickUpInteractions;
+      const clickUpTaskEditing = yield* ClickUpTaskEditing.ClickUpTaskEditing;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -2596,6 +2598,9 @@ const makeWsRpcLayer = (
         [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
         [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
         [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
+        [WS_METHODS.clickUpTaskOptions]: (input) => clickUpTaskEditing.options(input),
+        [WS_METHODS.clickUpSetStatus]: (input) => clickUpTaskEditing.setStatus(input),
+        [WS_METHODS.clickUpSetTag]: (input) => clickUpTaskEditing.setTag(input),
         [WS_METHODS.clickUpComments]: (input) => clickUpInteractions.comments(input),
         [WS_METHODS.clickUpSetCommentResolution]: (input) =>
           clickUpInteractions.setCommentResolution(input),
@@ -3904,6 +3909,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const clickUpTasksService = yield* ClickUpTasks.ClickUpTasks;
     const clickUpSprintsService = yield* ClickUpSprints.ClickUpSprints;
     const clickUpInteractionsService = yield* ClickUpInteractions.ClickUpInteractions;
+    const clickUpTaskEditingService = yield* ClickUpTaskEditing.ClickUpTaskEditing;
     const sql = yield* SqlClient.SqlClient;
     const storageUsage = yield* StorageUsage.make;
     return HttpRouter.add(
@@ -3959,6 +3965,9 @@ export const websocketRpcRouteLayer = Layer.unwrap(
                 Layer.succeed(ClickUpConnection.ClickUpConnection, clickUpConnectionService),
               ),
               Layer.provide(Layer.succeed(ClickUpTasks.ClickUpTasks, clickUpTasksService)),
+              Layer.provide(
+                Layer.succeed(ClickUpTaskEditing.ClickUpTaskEditing, clickUpTaskEditingService),
+              ),
               Layer.provide(Layer.succeed(ClickUpSprints.ClickUpSprints, clickUpSprintsService)),
               Layer.provide(
                 Layer.succeed(ClickUpInteractions.ClickUpInteractions, clickUpInteractionsService),

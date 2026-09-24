@@ -37,7 +37,7 @@ it.effect("keeps API error bodies out of errors and does not retry failed reques
 });
 
 it.effect(
-  "sends explicit PUT boolean bodies and accepts empty success while preserving OAuth POST",
+  "sends explicit mutation methods and accepts empty success while preserving OAuth POST",
   () => {
     const methods: string[] = [];
     return Effect.gen(function* () {
@@ -50,8 +50,9 @@ it.effect(
         }),
         null,
       );
+      yield* api.request("task/abc/tag/estimate", { token: "fixture-token", method: "DELETE" });
       yield* api.request("oauth/token", { body: { code: "fixture-code" } });
-      assert.deepEqual(methods, ["PUT", "POST"]);
+      assert.deepEqual(methods, ["PUT", "DELETE", "POST"]);
     }).pipe(
       Effect.provide(
         layer.pipe(

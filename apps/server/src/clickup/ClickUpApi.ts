@@ -26,11 +26,12 @@ export const ApiTask = Schema.Struct({
   id: Schema.String,
   team_id: Schema.String,
   name: Schema.String,
-  status: Schema.Struct({ status: Schema.String }),
+  status: Schema.Struct({ status: Schema.String, color: OptionalText }),
   list: Schema.Struct({ name: Schema.String }),
   description: Schema.optional(Schema.NullOr(Schema.String)),
   markdown_description: Schema.optional(Schema.NullOr(Schema.String)),
   attachments: Schema.optional(Schema.NullOr(Schema.Array(ApiAttachment))),
+  tags: Schema.optional(Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String })))),
 });
 
 export const ApiComment = Schema.Struct({
@@ -84,6 +85,8 @@ export const normalizeTask = (task: typeof ApiTask.Type) => ({
   taskId: task.id,
   name: task.name,
   status: task.status.status,
+  statusColor: task.status.color ?? null,
+  tags: (task.tags ?? []).map((tag) => tag.name),
   listName: task.list.name,
   description: task.markdown_description ?? task.description ?? "",
 });
@@ -95,7 +98,7 @@ export class ClickUpApi extends Context.Service<
       path: string,
       options?: {
         token?: string;
-        method?: "GET" | "POST" | "PUT";
+        method?: "GET" | "POST" | "PUT" | "DELETE";
         body?: Record<string, string | number | boolean | null>;
       },
     ) => Effect.Effect<unknown, ClickUpError>;

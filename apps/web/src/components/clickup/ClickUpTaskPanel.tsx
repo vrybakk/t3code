@@ -66,7 +66,7 @@ export function ClickUpTaskPanel({
               <h2 className="text-2xl font-semibold leading-snug tracking-tight">
                 {details.task.name}
               </h2>
-              <ClickUpTaskFields details={details} />
+              <ClickUpTaskFields details={details} environmentId={environmentId} input={input} />
               <section aria-label="Description" className="space-y-4 border-t border-border pt-6">
                 <h3 className="text-sm font-medium">Description</h3>
                 <ChatMarkdown

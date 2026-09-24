@@ -4,6 +4,7 @@ import { ClickUpPage } from "../components/clickup/ClickUpPage";
 
 export const Route = createFileRoute("/tasks")({
   validateSearch: (raw: Record<string, unknown>) => ({
+    ...(raw.showAll === true ? { showAll: true } : {}),
     ...(typeof raw.environmentId === "string" && raw.environmentId
       ? { environmentId: EnvironmentId.make(raw.environmentId) }
       : {}),

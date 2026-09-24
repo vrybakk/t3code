@@ -1,3 +1,8 @@
+import {
+  ClickUpTaskOptions,
+  ClickUpSetStatusInput,
+  ClickUpSetTagInput,
+} from "./clickupTaskEditing.ts";
 import { ClickUpSprintsInput, ClickUpSprintWindow } from "./clickupSprints.ts";
 import {
   ClickUpCommentsInput,
@@ -384,6 +389,9 @@ export const WS_METHODS = {
   clickUpDisconnect: "clickup.disconnect",
   clickUpTasks: "clickup.tasks",
   clickUpSprints: "clickup.sprints",
+  clickUpTaskOptions: "clickup.taskOptions",
+  clickUpSetStatus: "clickup.setStatus",
+  clickUpSetTag: "clickup.setTag",
   clickUpComments: "clickup.comments",
   clickUpSetCommentResolution: "clickup.setCommentResolution",
   clickUpSetChecklistItemResolution: "clickup.setChecklistItemResolution",
@@ -697,6 +705,21 @@ const WsClickUpTasksRpc = Rpc.make(WS_METHODS.clickUpTasks, {
 const WsClickUpSprintsRpc = Rpc.make(WS_METHODS.clickUpSprints, {
   payload: ClickUpSprintsInput,
   success: ClickUpSprintWindow,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpTaskOptionsRpc = Rpc.make(WS_METHODS.clickUpTaskOptions, {
+  payload: ClickUpTaskInput,
+  success: ClickUpTaskOptions,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetStatusRpc = Rpc.make(WS_METHODS.clickUpSetStatus, {
+  payload: ClickUpSetStatusInput,
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSetTagRpc = Rpc.make(WS_METHODS.clickUpSetTag, {
+  payload: ClickUpSetTagInput,
+  success: Schema.Void,
   error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 const WsClickUpCommentsRpc = Rpc.make(WS_METHODS.clickUpComments, {
@@ -1658,6 +1681,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsClickUpDisconnectRpc,
   WsClickUpTasksRpc,
   WsClickUpSprintsRpc,
+  WsClickUpTaskOptionsRpc,
+  WsClickUpSetStatusRpc,
+  WsClickUpSetTagRpc,
   WsClickUpCommentsRpc,
   WsClickUpSetCommentResolutionRpc,
   WsClickUpSetChecklistItemResolutionRpc,

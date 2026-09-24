@@ -1,13 +1,31 @@
-import type { ClickUpTaskDetails } from "@t3tools/contracts";
+import type { ClickUpTaskDetails, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import { useState } from "react";
 import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
+import { ClickUpStatusPicker, ClickUpTagsPicker } from "./ClickUpTaskEditors";
 import { taskDate, taskDuration } from "./taskFormatting";
 
-export function ClickUpTaskFields({ details }: { details: ClickUpTaskDetails }) {
+export function ClickUpTaskFields({
+  details,
+  environmentId,
+  input,
+}: {
+  details: ClickUpTaskDetails;
+  environmentId: EnvironmentId;
+  input: ClickUpTaskInput;
+}) {
   const metadata = details.metadata;
-  const fields = [
-    ["Status", details.task.status],
+  const fields: ReadonlyArray<readonly [string, React.ReactNode]> = [
+    [
+      "Status",
+      <ClickUpStatusPicker
+        key="status"
+        environmentId={environmentId}
+        input={input}
+        taskName={details.task.name}
+        status={details.task.status}
+        color={details.task.statusColor}
+      />,
+    ],
     ["Assignees", metadata?.assignees.map((user) => user.username).join(", ") || "Unassigned"],
     ["Start date", taskDate(metadata?.startDate)],
     ["Due date", taskDate(metadata?.dueDate)],
@@ -17,9 +35,9 @@ export function ClickUpTaskFields({ details }: { details: ClickUpTaskDetails }) 
     ["Created by", metadata?.creator?.username || "Not available"],
     ["Created", taskDate(metadata?.createdAt)],
     ["Updated", taskDate(metadata?.updatedAt)],
-    ...(metadata?.closedAt ? [["Closed", taskDate(metadata.closedAt)]] : []),
+    ...(metadata?.closedAt ? [["Closed", taskDate(metadata.closedAt)] as const] : []),
     ...(metadata?.watchers.length
-      ? [["Watchers", metadata.watchers.map((user) => user.username).join(", ")]]
+      ? [["Watchers", metadata.watchers.map((user) => user.username).join(", ")] as const]
       : []),
   ];
   return (
@@ -34,15 +52,12 @@ export function ClickUpTaskFields({ details }: { details: ClickUpTaskDetails }) 
         <div className="grid grid-cols-[7rem_1fr] gap-3 xl:col-span-2">
           <dt className="text-muted-foreground">Tags</dt>
           <dd className="flex flex-wrap gap-1.5">
-            {metadata?.tags.length ? (
-              metadata.tags.map((tag) => (
-                <Badge key={tag} variant="secondary">
-                  {tag}
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground">None</span>
-            )}
+            <ClickUpTagsPicker
+              environmentId={environmentId}
+              input={input}
+              taskName={details.task.name}
+              tags={metadata?.tags ?? []}
+            />
           </dd>
         </div>
       </dl>

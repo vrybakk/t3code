@@ -8,6 +8,12 @@ Open **Tasks** from the sidebar or command palette and select the Nerd studio wo
 The sprint sidebar shows three previous sprints, the active sprint, and the next sprint when
 available. The active sprint opens automatically. Tasks come from **Dev Hub → Sprints**,
 including tasks planned from other project spaces and completed work.
+Sprints initially show tasks assigned to you. Use **Show all** to see the team's tasks;
+your selection is preserved while opening a task and returning to the sprint.
+
+Change a task's status or add/remove its tags directly from the sprint table or task details.
+The choices come from that task's original project list and space, including when it is
+planned in a shared company sprint.
 
 Select a task to open its full detail screen: description, task properties, custom fields,
 attachments, checklists, subtasks, and recent comments. Empty custom fields can be expanded.
@@ -25,7 +31,15 @@ The existing worktree setup creates an isolated checkout. The task link is saved
 is created; return to the task to find its coding threads and their linked pull requests. You can open additional threads for
 other repositories involved in the same task.
 
-Task status updates, description edits, inbox notifications,
+When a linked task has the **estimation needed** tag, the agent researches the scope and
+proposes an AI-assisted estimate for reaching a review-ready result: implementation,
+verification, and likely fixes, excluding waiting for CTO review or deployment. During
+implementation it saves the estimate in ClickUp, verifies it, then removes the tag. In plan
+mode it only proposes the estimate. Unclear requirements need clarification first. A failed
+tag removal leaves the saved estimate intact and is reported separately. Refresh task details
+to see agent updates; existing provider sessions may need restarting to pick up the new tools.
+
+Description edits, inbox notifications,
 and automated PR handoff are not available yet. The task association
 does not change Work reports or export time to ClickUp.
 

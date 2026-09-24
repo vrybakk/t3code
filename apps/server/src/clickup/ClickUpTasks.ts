@@ -69,7 +69,8 @@ export const layer = Layer.effect(
       if (input.listId) {
         yield* validateSprintList(api, token, input.workspaceId, input.listId);
         query.set("include_timl", "true");
-      } else {
+      }
+      if (!input.listId || input.showAll !== true) {
         query.set("assignees[]", String(account.user.id));
       }
       const scope = input.listId

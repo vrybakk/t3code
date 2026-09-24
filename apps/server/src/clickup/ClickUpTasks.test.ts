@@ -91,6 +91,7 @@ it.effect(
         listId: "sprint-1",
         page: 1,
         userId: 17,
+        showAll: true,
       });
       assert.equal(page.hasMore, false);
       assert.equal(page.tasks.length, 1);
@@ -105,6 +106,39 @@ it.effect(
     }).pipe(Effect.provide(test.layer));
   },
 );
+
+it.effect("defaults sprint task pages to the connected user's assignments", () => {
+  const test = setup(
+    (path) =>
+      path === "list/sprint-1"
+        ? { folder: { id: "90122725830" } }
+        : {
+            tasks: [
+              {
+                ...task,
+                team_id: "2179724",
+                status: { status: "review", color: "#abc" },
+                tags: [{ name: "estimation needed" }],
+              },
+            ],
+            last_page: true,
+          },
+    "2179724",
+  );
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    const page = yield* tasks.list({
+      workspaceId: "2179724",
+      listId: "sprint-1",
+      page: 0,
+      userId: 17,
+    });
+    const url = new URL(`https://example.test/${test.paths[1]}`);
+    assert.equal(url.searchParams.get("assignees[]"), "17");
+    assert.deepEqual(page.tasks[0]?.tags, ["estimation needed"]);
+    assert.equal(page.tasks[0]?.statusColor, "#abc");
+  }).pipe(Effect.provide(test.layer));
+});
 
 it.effect("does not fetch sprint tasks outside the configured folder", () => {
   const test = setup(() => ({ folder: { id: "other" } }), "2179724");

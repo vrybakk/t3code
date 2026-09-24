@@ -50,6 +50,8 @@ export type ClickUpConnection = typeof ClickUpConnection.Type;
 export const ClickUpTask = Schema.Struct({
   ...ClickUpTaskReference.fields,
   status: Schema.String,
+  statusColor: Schema.optional(Schema.NullOr(Schema.String)),
+  tags: Schema.optional(Schema.Array(Schema.String)),
   listName: Schema.String,
   description: Schema.String,
 });
@@ -64,6 +66,7 @@ export type ClickUpTaskInput = typeof ClickUpTaskInput.Type;
 export const ClickUpTasksInput = Schema.Struct({
   workspaceId: ClickUpId,
   listId: Schema.optional(ClickUpId),
+  showAll: Schema.optional(Schema.Boolean),
   page: NonNegativeInt,
   userId: Schema.Int,
 });
