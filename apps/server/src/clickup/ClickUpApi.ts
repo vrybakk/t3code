@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientRequest } from "effect/unstable/http";
+import { ApiTaskSourceFields, normalizeTaskSources } from "./ClickUpTaskSources.ts";
 
 export const ApiUser = Schema.Struct({
   id: Schema.Int,
@@ -29,7 +30,7 @@ export const ApiTask = Schema.Struct({
   status: Schema.Struct({ status: Schema.String, color: OptionalText }),
   priority: Schema.optional(Schema.NullOr(Schema.Struct({ priority: Schema.String }))),
   due_date: OptionalText,
-  list: Schema.Struct({ name: Schema.String }),
+  ...ApiTaskSourceFields,
   description: Schema.optional(Schema.NullOr(Schema.String)),
   markdown_description: Schema.optional(Schema.NullOr(Schema.String)),
   attachments: Schema.optional(Schema.NullOr(Schema.Array(ApiAttachment))),
@@ -94,6 +95,7 @@ export const normalizeTask = (task: typeof ApiTask.Type) => ({
   dueDate: task.due_date ?? null,
   tags: (task.tags ?? []).map((tag) => tag.name),
   listName: task.list.name,
+  sources: normalizeTaskSources(task),
   description: task.markdown_description ?? task.description ?? "",
 });
 

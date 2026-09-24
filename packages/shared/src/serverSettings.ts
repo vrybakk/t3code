@@ -276,6 +276,7 @@ export function applyServerSettingsPatch(
     worktreeCleanup: worktreeCleanupPatch,
     // Merged per entry below; its `null` removals must not reach deepMerge.
     usageLimitSources: usageLimitSourcesPatch,
+    clickUpProjectMappings: clickUpProjectMappingsPatch,
     usagePriceOverrides: usagePriceOverridesPatch,
     // Entry replacement: deepMerge would keep keys the client meant to clear.
     projectSettingsOverrides: projectSettingsOverridesPatch,
@@ -324,6 +325,14 @@ export function applyServerSettingsPatch(
   const next = deepMerge(current, patchForMerge);
   const nextWithReplacementsBase = {
     ...next,
+    ...(clickUpProjectMappingsPatch === undefined
+      ? {}
+      : {
+          clickUpProjectMappings: mergeSettingsEntries(
+            current.clickUpProjectMappings,
+            clickUpProjectMappingsPatch,
+          ),
+        }),
     ...(worktreeCleanupPatch === undefined
       ? {}
       : {

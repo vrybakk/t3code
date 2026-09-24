@@ -14,6 +14,7 @@ import { MessageSquareIcon } from "lucide-react";
 import { useState } from "react";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
+import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useOpenChangeRequestLink } from "../../lib/openPullRequestLink";
 import { useProjects, useThreadShells } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
@@ -22,6 +23,8 @@ import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { buildClickUpTaskPrompt, safeClickUpAttachmentUrl } from "./taskPrompt";
+import { ClickUpRepositoryMappings } from "./ClickUpRepositoryMappings";
+import { resolveClickUpMapping } from "./projectMappings";
 
 export function ClickUpTaskWork({
   environmentId,
@@ -35,6 +38,14 @@ export function ClickUpTaskWork({
   const linksResult = useAtomValue(serverEnvironment.clickUpThreads({ environmentId, input }));
   const links = Option.getOrNull(AsyncResult.value(linksResult)) ?? [];
   const projects = useProjects().filter((project) => project.environmentId === environmentId);
+  const mappings = useEnvironmentSettings(
+    environmentId,
+    (settings) => settings.clickUpProjectMappings,
+  );
+  const mapping = resolveClickUpMapping(details.task, mappings);
+  const mappedProjects = projects.filter((project) => mapping?.projectIds.includes(project.id));
+  const [showAllRepositories, setShowAllRepositories] = useState(false);
+  const availableProjects = mapping && !showAllRepositories ? mappedProjects : projects;
   const shells = useThreadShells();
   const openPr = useOpenChangeRequestLink();
   const pullRequests = [
@@ -58,7 +69,10 @@ export function ClickUpTaskWork({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const newThread = useNewThreadHandler();
-  const selectedProject = projects.find((project) => project.id === projectId);
+  const selectedProject = availableProjects.find(
+    (project) =>
+      project.id === (projectId ?? (mappedProjects.length === 1 ? mappedProjects[0]?.id : null)),
+  );
   async function prepareThread() {
     if (!selectedProject) return;
     setBusy(true);
@@ -150,15 +164,18 @@ export function ClickUpTaskWork({
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 p-3">
         <div className="min-w-48 flex-1">
           <Select
-            value={projectId}
+            value={selectedProject?.id ?? null}
             onValueChange={(value) => setProjectId(value as ProjectId | null)}
-            items={projects.map((project) => ({ value: project.id, label: project.title }))}
+            items={availableProjects.map((project) => ({
+              value: project.id,
+              label: project.title,
+            }))}
           >
             <SelectTrigger aria-label="Repository project">
               <SelectValue placeholder="Choose a project" />
             </SelectTrigger>
             <SelectPopup>
-              {projects.map((project) => (
+              {availableProjects.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.title}
                 </SelectItem>
@@ -169,6 +186,22 @@ export function ClickUpTaskWork({
         <Button size="sm" disabled={!selectedProject || busy} onClick={() => void prepareThread()}>
           Open in coding thread
         </Button>
+        <ClickUpRepositoryMappings task={details.task} environmentId={environmentId} />
+        {mapping && (
+          <div className="flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              Linked to {mapping.sources.map((source) => source.name).join(", ")} ·{" "}
+              {mappedProjects.length} repositories
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowAllRepositories((value) => !value)}
+            >
+              {showAllRepositories ? "Show linked repositories" : "Show all repositories"}
+            </Button>
+          </div>
+        )}
         <p className="w-full text-xs text-muted-foreground">
           Prepare a linked draft to review before starting work.
         </p>

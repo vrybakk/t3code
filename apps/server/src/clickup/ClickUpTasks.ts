@@ -114,13 +114,26 @@ export const layer = Layer.effect(
         return yield* new ClickUpError({
           message: "This task belongs to a different ClickUp workspace.",
         });
+      // Task payloads only carry a space ID; optional list metadata supplies its display name.
+      const location = task.list.id
+        ? yield* api.request(`list/${encodeURIComponent(task.list.id)}`, { token }).pipe(
+            Effect.flatMap(
+              decodeResponse(
+                Schema.Struct({
+                  space: Schema.optional(Schema.Struct({ id: Schema.String, name: Schema.String })),
+                }),
+              ),
+            ),
+            Effect.catch(() => Effect.succeed(null)),
+          )
+        : null;
       const { comments } = yield* api
         .request(`${path}/comment`, { token })
         .pipe(
           Effect.flatMap(decodeResponse(Schema.Struct({ comments: Schema.Array(ApiComment) }))),
         );
       return {
-        task: normalizeTask(task),
+        task: normalizeTask({ ...task, space: location?.space ?? task.space }),
         metadata: normalizeTaskMetadata(task),
         comments: comments.map(normalizeComment),
         commentsMayHaveMore: comments.length === 25,

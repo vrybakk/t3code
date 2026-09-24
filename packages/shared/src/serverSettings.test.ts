@@ -24,6 +24,28 @@ import {
 const FOLDED_SERVER_SETTINGS = { ...DEFAULT_SERVER_SETTINGS, projectSettingsFolded: true };
 
 describe("serverSettings helpers", () => {
+  it("replaces and removes one ClickUp mapping while preserving other mappings and shared repositories", () => {
+    const api = ProjectId.make("api"),
+      mobile = ProjectId.make("mobile"),
+      web = ProjectId.make("web");
+    const first = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
+      clickUpProjectMappings: { "42:folder::app": [mobile, api] },
+    });
+    const second = applyServerSettingsPatch(first, {
+      clickUpProjectMappings: { "42:folder::web": [web, api] },
+    });
+    const replaced = applyServerSettingsPatch(second, {
+      clickUpProjectMappings: { "42:folder::app": [mobile] },
+    });
+    expect(replaced.clickUpProjectMappings).toEqual({
+      "42:folder::app": [mobile],
+      "42:folder::web": [web, api],
+    });
+    const removed = applyServerSettingsPatch(replaced, {
+      clickUpProjectMappings: { "42:folder::app": null },
+    });
+    expect(removed.clickUpProjectMappings).toEqual({ "42:folder::web": [web, api] });
+  });
   it("changes a cleanup rule without replacing the machine's other rules", () => {
     const enabled = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       storageCleanup: { worktreeAfterDays: 8, worktreeOnMerge: true, logsAfterDays: 30 },

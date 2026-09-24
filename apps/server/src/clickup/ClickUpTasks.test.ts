@@ -295,3 +295,32 @@ it.effect("loads bounded comment context and rejects tasks from another workspac
     assert.equal(test.paths.filter((path) => path.endsWith("/comment")).length, 1);
   }).pipe(Effect.provide(test.layer));
 });
+
+it.effect(
+  "uses the home list to label the source space without losing task access when metadata is unavailable",
+  () => {
+    let readable = true;
+    const test = setup((path) => {
+      if (path === "list/home")
+        return readable ? { space: { id: "space", name: "MadHeads" } } : { space: "unavailable" };
+      if (path.endsWith("/comment")) return { comments: [] };
+      return { ...task, list: { id: "home", name: "Backlog" }, space: { id: "space" } };
+    });
+    return Effect.gen(function* () {
+      const tasks = yield* ClickUpTasks;
+      const input = { workspaceId: "42", taskId: "abc", userId: 17 };
+      const details = yield* tasks.detail(input);
+      assert.equal(
+        details.task.sources?.find((source) => source.kind === "space")?.name,
+        "MadHeads",
+      );
+      readable = false;
+      const fallback = yield* tasks.detail(input);
+      assert.equal(fallback.task.sources?.find((source) => source.kind === "space")?.id, "space");
+      assert.equal(
+        fallback.task.sources?.find((source) => source.kind === "space")?.name,
+        "Space space",
+      );
+    }).pipe(Effect.provide(test.layer));
+  },
+);

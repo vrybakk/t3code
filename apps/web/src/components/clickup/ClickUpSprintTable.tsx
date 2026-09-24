@@ -7,6 +7,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { ClickUpStatusPicker, ClickUpTagsPicker } from "./ClickUpTaskEditors";
 import { taskPriorityRank } from "./sprintTaskGroups";
+import { ClickUpProjectBadge } from "./ClickUpProjectBadge";
 
 export function ClickUpSprintTable({
   environmentId,
@@ -31,7 +32,7 @@ export function ClickUpSprintTable({
           <TableHead>Priority</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Tags</TableHead>
-          <TableHead className="pr-5">Project list</TableHead>
+          <TableHead className="pr-5">Project</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -99,12 +100,15 @@ export function ClickUpSprintTable({
                     />
                   </TableCell>
                   <TableCell className="max-w-56 truncate pr-5 text-muted-foreground">
-                    <Tooltip>
-                      <TooltipTrigger render={<span className="block truncate" />}>
-                        {task.listName}
-                      </TooltipTrigger>
-                      <TooltipPopup>{task.listName}</TooltipPopup>
-                    </Tooltip>
+                    <ClickUpProjectBadge task={task} />
+                    {task.sources?.some((source) => source.kind === "project") && (
+                      <Tooltip>
+                        <TooltipTrigger render={<span className="mt-1 block truncate text-xs" />}>
+                          {task.listName}
+                        </TooltipTrigger>
+                        <TooltipPopup>{task.listName}</TooltipPopup>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

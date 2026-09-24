@@ -48,6 +48,15 @@ export const ClickUpConnection = Schema.Struct({
 });
 export type ClickUpConnection = typeof ClickUpConnection.Type;
 
+export const ClickUpTaskSource = Schema.Struct({
+  kind: Schema.Literals(["project", "list", "folder", "space"]),
+  id: ClickUpId,
+  fieldId: Schema.optional(ClickUpId),
+  name: Schema.String,
+  color: Schema.optional(Schema.NullOr(Schema.String)),
+});
+export type ClickUpTaskSource = typeof ClickUpTaskSource.Type;
+
 export const ClickUpTask = Schema.Struct({
   ...ClickUpTaskReference.fields,
   status: Schema.String,
@@ -56,6 +65,7 @@ export const ClickUpTask = Schema.Struct({
   dueDate: Schema.optional(Schema.NullOr(Schema.String)),
   tags: Schema.optional(Schema.Array(Schema.String)),
   listName: Schema.String,
+  sources: Schema.optional(Schema.Array(ClickUpTaskSource)),
   description: Schema.String,
 });
 export type ClickUpTask = typeof ClickUpTask.Type;

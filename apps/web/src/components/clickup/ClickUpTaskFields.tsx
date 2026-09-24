@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "../ui/button";
 import { ClickUpStatusPicker, ClickUpTagsPicker } from "./ClickUpTaskEditors";
 import { taskDate, taskDuration } from "./taskFormatting";
+import { ClickUpProjectBadge } from "./ClickUpProjectBadge";
 
 export function ClickUpTaskFields({
   details,
@@ -15,6 +16,7 @@ export function ClickUpTaskFields({
 }) {
   const metadata = details.metadata;
   const fields: ReadonlyArray<readonly [string, React.ReactNode]> = [
+    ["Project", <ClickUpProjectBadge key="project" task={details.task} />],
     [
       "Status",
       <ClickUpStatusPicker

@@ -29,7 +29,14 @@ Assigned comments show their owner and can be resolved or reopened. Checklist it
 their assignee and can be checked off or reopened here too. These actions update ClickUp;
 Nerd refreshes the item after saving. Other files open through their original attachment link.
 
-Choose a project and select **Open in coding thread** to prepare a draft containing the task
+Use **Link repositories** in a task’s **Linked work** section to connect its Project-field value,
+source List, Folder, or Space to one or more local repositories. A shared API repository can
+belong to several mappings. Mappings are saved on the selected environment. The first match
+wins: Project field, List, Folder, then Space; removing a mapping restores the broader fallback.
+The repository picker suggests the linked repositories; **Show all repositories** allows a manual
+choice. Project badges use the ClickUp Project-field color when available.
+
+Choose a repository and select **Open in coding thread** to prepare a draft containing the task
 context and studio workflow guidance. Review the model and permissions, then send it to begin.
 The existing worktree setup creates an isolated checkout. The task link is saved when the thread
 is created; return to the task to find its coding threads and their linked pull requests. You can open additional threads for
