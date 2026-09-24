@@ -1,3 +1,4 @@
+import Migration0056 from "./Migrations/056_ClickUpThreadTasks.ts";
 /**
  * Migration runner with an inline loader.
  *
@@ -134,6 +135,7 @@ const migrationEntries = [
   [53, "PullRequestFilesViewed", Migration0053],
   [54, "WorkTracking", Migration0054],
   [55, "WorkTrackingReportSnapshots", Migration0055],
+  [56, "ClickUpThreadTasks", Migration0056],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

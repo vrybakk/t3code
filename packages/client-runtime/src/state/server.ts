@@ -1052,6 +1052,34 @@ export function createServerEnvironmentAtoms<R, E>(
       staleTimeMs: 60_000,
       refreshTrigger: ({ environmentId }) => usagePricesAtom(environmentId),
     }),
+    clickUpConnection: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpConnection",
+      tag: WS_METHODS.clickUpConnection,
+      staleTimeMs: 30_000,
+    }),
+    clickUpTasks: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpTasks",
+      tag: WS_METHODS.clickUpTasks,
+      staleTimeMs: 30_000,
+    }),
+    clickUpTask: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpTask",
+      tag: WS_METHODS.clickUpTask,
+      staleTimeMs: 30_000,
+    }),
+    clickUpThreads: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpThreads",
+      tag: WS_METHODS.clickUpThreads,
+      staleTimeMs: 30_000,
+    }),
+    clickUpConnect: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpConnect",
+      tag: WS_METHODS.clickUpConnect,
+    }),
+    clickUpDisconnect: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpDisconnect",
+      tag: WS_METHODS.clickUpDisconnect,
+    }),
     workOverview: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:work:overview",
       tag: WS_METHODS.workGetOverview,

@@ -1,3 +1,12 @@
+import {
+  ClickUpConnection,
+  ClickUpError,
+  ClickUpTasksInput,
+  ClickUpTaskInput,
+  ClickUpTaskPage,
+  ClickUpTaskDetails,
+  ClickUpThreadLink,
+} from "./clickup.ts";
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
@@ -363,6 +372,12 @@ export const WS_METHODS = {
 
   // GitButler methods
   gitButlerWorkspaceStatus: "gitButler.workspaceStatus",
+  clickUpConnection: "clickup.connection",
+  clickUpConnect: "clickup.connect",
+  clickUpDisconnect: "clickup.disconnect",
+  clickUpTasks: "clickup.tasks",
+  clickUpTask: "clickup.task",
+  clickUpThreads: "clickup.threads",
 
   // Review methods
   reviewGetDiffPreview: "review.getDiffPreview",
@@ -646,6 +661,37 @@ const WsServerDiscoverSourceControlRpc = Rpc.make(WS_METHODS.serverDiscoverSourc
   payload: Schema.Struct({}),
   success: SourceControlDiscoveryResult,
   error: EnvironmentAuthorizationError,
+});
+
+const WsClickUpConnectionRpc = Rpc.make(WS_METHODS.clickUpConnection, {
+  payload: Schema.Struct({}),
+  success: ClickUpConnection,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpConnectRpc = Rpc.make(WS_METHODS.clickUpConnect, {
+  payload: Schema.Struct({ returnToApp: Schema.optional(Schema.Boolean) }),
+  success: Schema.Struct({ url: Schema.String }),
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpDisconnectRpc = Rpc.make(WS_METHODS.clickUpDisconnect, {
+  payload: Schema.Struct({}),
+  success: Schema.Void,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpTasksRpc = Rpc.make(WS_METHODS.clickUpTasks, {
+  payload: ClickUpTasksInput,
+  success: ClickUpTaskPage,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpTaskRpc = Rpc.make(WS_METHODS.clickUpTask, {
+  payload: ClickUpTaskInput,
+  success: ClickUpTaskDetails,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpThreadsRpc = Rpc.make(WS_METHODS.clickUpThreads, {
+  payload: ClickUpTaskInput,
+  success: Schema.Array(ClickUpThreadLink),
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 
 const WsGitButlerWorkspaceStatusRpc = Rpc.make(WS_METHODS.gitButlerWorkspaceStatus, {
@@ -1573,6 +1619,13 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerUpdateSettingsRpc,
   WsServerDiscoverSourceControlRpc,
   WsGitButlerWorkspaceStatusRpc,
+  WsClickUpConnectionRpc,
+  WsClickUpConnectRpc,
+  WsClickUpDisconnectRpc,
+  WsClickUpTasksRpc,
+  WsClickUpTaskRpc,
+  WsClickUpThreadsRpc,
+
   WsServerGetTraceDiagnosticsRpc,
   WsServerGetProcessDiagnosticsRpc,
   WsServerGetHostResourcesRpc,

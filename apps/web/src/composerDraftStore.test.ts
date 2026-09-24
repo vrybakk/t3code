@@ -3403,3 +3403,28 @@ describe("composerDraftStore attachment references", () => {
     );
   });
 });
+
+describe("ClickUp task draft identity", () => {
+  it("preserves task association across draft updates and persistence", () => {
+    const store = useComposerDraftStore.getState();
+    const projectRef = scopeProjectRef(
+      EnvironmentId.make("clickup-environment"),
+      ProjectId.make("clickup-project"),
+    );
+    const draftId = DraftId.make("clickup-draft");
+    const task = { workspaceId: "42", taskId: "abc", name: "Fix checkout" };
+    store.setProjectDraftThreadId(projectRef, draftId, { envMode: "worktree" });
+    store.setDraftThreadContext(draftId, { clickUpTask: task });
+    store.setDraftThreadContext(draftId, { branch: "main" });
+    expect(useComposerDraftStore.getState().getDraftSession(draftId)?.clickUpTask).toEqual(task);
+    const saved = partializeComposerDraftStoreState(useComposerDraftStore.getState());
+    const merge = useComposerDraftStore.persist.getOptions().merge;
+    expect(merge).toBeDefined();
+    const hydrated = merge!(saved, useComposerDraftStore.getInitialState());
+    useComposerDraftStore.setState(hydrated);
+    expect(useComposerDraftStore.getState().getDraftSession(draftId)?.clickUpTask).toEqual(task);
+    useComposerDraftStore.getState().setDraftThreadContext(draftId, { clickUpTask: null });
+    expect(useComposerDraftStore.getState().getDraftSession(draftId)?.clickUpTask).toBeUndefined();
+    expect(useComposerDraftStore.getState().getDraftSession(draftId)?.branch).toBe("main");
+  });
+});

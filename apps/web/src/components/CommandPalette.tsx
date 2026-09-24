@@ -49,6 +49,7 @@ import {
   FolderIcon,
   FolderPlusIcon,
   LinkIcon,
+  ListTodoIcon,
   MessageSquareIcon,
   MonitorIcon,
   MoonIcon,
@@ -1831,6 +1832,17 @@ function OpenCommandPaletteDialog(props: {
     shortcutCommand: "filePicker.toggle",
     run: async () => {
       openOverlayMode("files");
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:clickup-tasks",
+    searchTerms: ["clickup", "tasks", "assigned"],
+    title: "Open ClickUp tasks",
+    icon: <ListTodoIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/tasks" });
     },
   });
 

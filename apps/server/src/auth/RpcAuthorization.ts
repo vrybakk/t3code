@@ -1,5 +1,6 @@
 import {
   AuthAccessReadScope,
+  AuthAccessWriteScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthRelayReadScope,
@@ -52,6 +53,13 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.serverUpdateSettings]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverDiscoverSourceControl]: AuthOrchestrationReadScope,
   [WS_METHODS.gitButlerWorkspaceStatus]: AuthOrchestrationReadScope,
+  [WS_METHODS.clickUpConnection]: AuthOrchestrationReadScope,
+  [WS_METHODS.clickUpConnect]: AuthAccessWriteScope,
+  [WS_METHODS.clickUpDisconnect]: AuthAccessWriteScope,
+  [WS_METHODS.clickUpTasks]: AuthOrchestrationReadScope,
+  [WS_METHODS.clickUpTask]: AuthOrchestrationReadScope,
+  [WS_METHODS.clickUpThreads]: AuthOrchestrationReadScope,
+
   [WS_METHODS.serverGetTraceDiagnostics]: AuthOrchestrationReadScope,
   [WS_METHODS.serverGetProcessDiagnostics]: AuthOrchestrationReadScope,
   [WS_METHODS.serverGetHostResources]: AuthOrchestrationReadScope,

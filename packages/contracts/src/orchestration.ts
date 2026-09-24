@@ -1,3 +1,4 @@
+import { ClickUpTaskReference } from "./clickup.ts";
 import { PROVIDER_SEND_TURN_MAX_VIDEO_BYTES, isFileAttachmentWithinSizeLimit } from "./video.ts";
 export { PROVIDER_SEND_TURN_MAX_FILE_BYTES } from "./video.ts";
 import * as Effect from "effect/Effect";
@@ -1093,6 +1094,7 @@ const ProjectDeleteCommand = Schema.Struct({
 });
 
 const ThreadCreateCommand = Schema.Struct({
+  clickUpTask: Schema.optional(ClickUpTaskReference),
   type: Schema.Literal("thread.create"),
   commandId: CommandId,
   threadId: ThreadId,
@@ -1258,6 +1260,7 @@ const ThreadInteractionModeSetCommand = Schema.Struct({
 });
 
 const ThreadTurnStartBootstrapCreateThread = Schema.Struct({
+  clickUpTask: Schema.optional(ClickUpTaskReference),
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
   modelSelection: ModelSelection,
@@ -1727,6 +1730,7 @@ export const ProjectDeletedPayload = Schema.Struct({
 });
 
 export const ThreadCreatedPayload = Schema.Struct({
+  clickUpTask: Schema.optional(ClickUpTaskReference),
   threadId: ThreadId,
   projectId: ProjectId,
   title: TrimmedNonEmptyString,

@@ -1,3 +1,5 @@
+import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
+import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
 import {
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
@@ -649,6 +651,8 @@ const makeWsRpcLayer = (
       const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
       const sourceControlDiscovery = yield* SourceControlDiscovery.SourceControlDiscovery;
       const gitButlerWorkspace = yield* GitButlerWorkspace.GitButlerWorkspace;
+      const clickUpConnection = yield* ClickUpConnection.ClickUpConnection;
+      const clickUpTasks = yield* ClickUpTasks.ClickUpTasks;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -1413,6 +1417,9 @@ const makeWsRpcLayer = (
                 commandId: yield* serverCommandId("bootstrap-thread-create"),
                 threadId: command.threadId,
                 projectId: bootstrap.createThread.projectId,
+                ...(bootstrap.createThread.clickUpTask
+                  ? { clickUpTask: bootstrap.createThread.clickUpTask }
+                  : {}),
                 title: bootstrap.createThread.title,
                 modelSelection: bootstrap.createThread.modelSelection,
                 runtimeMode: bootstrap.createThread.runtimeMode,
@@ -2579,6 +2586,13 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
+        [WS_METHODS.clickUpConnection]: () => clickUpConnection.status,
+        [WS_METHODS.clickUpConnect]: ({ returnToApp }) =>
+          clickUpConnection.begin(currentSession.sessionId, returnToApp),
+        [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
+        [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
+        [WS_METHODS.clickUpTask]: (input) => clickUpTasks.detail(input),
+        [WS_METHODS.clickUpThreads]: (input) => clickUpTasks.threads(input),
         [WS_METHODS.gitButlerWorkspaceStatus]: ({ projectId }) =>
           observeRpcEffect(
             WS_METHODS.gitButlerWorkspaceStatus,
@@ -3876,6 +3890,8 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         ),
     });
     const pullRequests = yield* PullRequestService.PullRequestService;
+    const clickUpConnectionService = yield* ClickUpConnection.ClickUpConnection;
+    const clickUpTasksService = yield* ClickUpTasks.ClickUpTasks;
     const sql = yield* SqlClient.SqlClient;
     const storageUsage = yield* StorageUsage.make;
     return HttpRouter.add(
@@ -3927,6 +3943,10 @@ export const websocketRpcRouteLayer = Layer.unwrap(
               // One server-lifetime service means clients share the same PR caches, and a WS
               // mutation invalidates the HTTP diff cache that every client reads from.
               Layer.provide(Layer.succeed(PullRequestService.PullRequestService, pullRequests)),
+              Layer.provide(
+                Layer.succeed(ClickUpConnection.ClickUpConnection, clickUpConnectionService),
+              ),
+              Layer.provide(Layer.succeed(ClickUpTasks.ClickUpTasks, clickUpTasksService)),
               Layer.provide(
                 SourceControlDiscovery.layer.pipe(
                   Layer.provide(
