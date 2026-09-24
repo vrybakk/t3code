@@ -1,30 +1,17 @@
 import { useAtomValue } from "@effect/atom-react";
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import type {
-  ClickUpTaskDetails,
-  ClickUpTaskInput,
-  EnvironmentId,
-  ProjectId,
-} from "@t3tools/contracts";
+import type { ClickUpTaskDetails, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { MessageSquareIcon } from "lucide-react";
-import { useState } from "react";
-import { useComposerDraftStore } from "../../composerDraftStore";
-import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
-import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useOpenChangeRequestLink } from "../../lib/openPullRequestLink";
-import { useProjects, useThreadShells } from "../../state/entities";
+import { useThreadShells } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { Badge } from "../ui/badge";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
-import { Button } from "../ui/button";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { buildClickUpTaskPrompt, safeClickUpAttachmentUrl } from "./taskPrompt";
+import { safeClickUpAttachmentUrl } from "./taskPrompt";
 import { ClickUpRepositoryMappings } from "./ClickUpRepositoryMappings";
-import { resolveClickUpMapping } from "./projectMappings";
 
 export function ClickUpTaskWork({
   environmentId,
@@ -37,15 +24,6 @@ export function ClickUpTaskWork({
 }) {
   const linksResult = useAtomValue(serverEnvironment.clickUpThreads({ environmentId, input }));
   const links = Option.getOrNull(AsyncResult.value(linksResult)) ?? [];
-  const projects = useProjects().filter((project) => project.environmentId === environmentId);
-  const mappings = useEnvironmentSettings(
-    environmentId,
-    (settings) => settings.clickUpProjectMappings,
-  );
-  const mapping = resolveClickUpMapping(details.task, mappings);
-  const mappedProjects = projects.filter((project) => mapping?.projectIds.includes(project.id));
-  const [showAllRepositories, setShowAllRepositories] = useState(false);
-  const availableProjects = mapping && !showAllRepositories ? mappedProjects : projects;
   const shells = useThreadShells();
   const openPr = useOpenChangeRequestLink();
   const pullRequests = [
@@ -65,39 +43,6 @@ export function ClickUpTaskWork({
       }),
     ).values(),
   ];
-  const [projectId, setProjectId] = useState<ProjectId | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const newThread = useNewThreadHandler();
-  const selectedProject = availableProjects.find(
-    (project) =>
-      project.id === (projectId ?? (mappedProjects.length === 1 ? mappedProjects[0]?.id : null)),
-  );
-  async function prepareThread() {
-    if (!selectedProject) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const draft = await newThread(scopeProjectRef(environmentId, selectedProject.id), {
-        envMode: "worktree",
-      });
-      if (!draft) return;
-      const store = useComposerDraftStore.getState();
-      store.setDraftThreadContext(draft.draftId, {
-        clickUpTask: {
-          taskId: details.task.taskId,
-          workspaceId: details.task.workspaceId,
-          name: details.task.name,
-        },
-        environmentSelection: "manual",
-      });
-      store.setPrompt(draft.draftId, buildClickUpTaskPrompt(details));
-    } catch {
-      setError("Could not prepare the coding thread. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <section className="space-y-4 border-t border-border pt-6" aria-label="Linked work">
       <h3 className="flex items-center gap-2 text-sm font-medium">
@@ -161,59 +106,7 @@ export function ClickUpTaskWork({
           </div>
         </dl>
       )}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 p-3">
-        <div className="min-w-48 flex-1">
-          <Select
-            value={selectedProject?.id ?? null}
-            onValueChange={(value) => setProjectId(value as ProjectId | null)}
-            items={availableProjects.map((project) => ({
-              value: project.id,
-              label: project.title,
-            }))}
-          >
-            <SelectTrigger aria-label="Repository project">
-              <SelectValue placeholder="Choose a project" />
-            </SelectTrigger>
-            <SelectPopup>
-              {availableProjects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </div>
-        <Button size="sm" disabled={!selectedProject || busy} onClick={() => void prepareThread()}>
-          Open in coding thread
-        </Button>
-        <ClickUpRepositoryMappings task={details.task} environmentId={environmentId} />
-        {mapping && (
-          <div className="flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>
-              Linked to {mapping.sources.map((source) => source.name).join(", ")} ·{" "}
-              {mappedProjects.length} repositories
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowAllRepositories((value) => !value)}
-            >
-              {showAllRepositories ? "Show linked repositories" : "Show all repositories"}
-            </Button>
-          </div>
-        )}
-        <p className="w-full text-xs text-muted-foreground">
-          Prepare a linked draft to review before starting work.
-        </p>
-        {!projects.length && (
-          <p className="text-xs text-muted-foreground">Add a project to start a coding thread.</p>
-        )}
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-      </div>
+      <ClickUpRepositoryMappings task={details.task} environmentId={environmentId} />
     </section>
   );
 }

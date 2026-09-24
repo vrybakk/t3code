@@ -15,7 +15,7 @@ day and priority ordering within it. Undated tasks follow the dated groups, then
 Staging, and In Production are collapsed below it; expand the section to see those groups
 in that order, each sorted by priority. Tasks without a priority appear last in their group.
 
-Change a task's status or add/remove its tags directly from the sprint table or task details.
+Change a task's status from the sprint table or task details. Add or remove tags in task details.
 The choices come from that task's original project list and space, including when it is
 planned in a shared company sprint.
 
@@ -39,8 +39,13 @@ wins: Project field, List, Folder, then Space; removing a mapping restores the b
 The repository picker suggests the linked repositories; **Show all repositories** allows a manual
 choice. Project badges use the ClickUp Project-field color when available.
 
-Choose a repository and select **Open in coding thread** to prepare a draft containing the task
-context and studio workflow guidance. Review the model and permissions, then send it to begin.
+Use **Check requirements**, **Estimate task**, or **Implement** from the sprint table or task page.
+Choose a repository and select **Prepare thread**, then review the request, model and permissions
+and send it to begin. Requirements checks request a review of gaps without editing files or
+ClickUp; native plan mode applies when enabled in your settings and supported by the selected provider.
+Review the thread's mode and permissions before sending. Estimates research the time to a review-ready result without implementing; when the task
+has **estimation needed**, the agent can save the estimate and remove the tag. Otherwise it proposes
+the estimate in the thread. Implement follows the studio implementation and verification workflow.
 The existing worktree setup creates an isolated checkout. The task link is saved when the thread
 is created; return to the task to find its coding threads and their linked pull requests. You can open additional threads for
 other repositories involved in the same task.
@@ -48,7 +53,7 @@ other repositories involved in the same task.
 When a linked task has the **estimation needed** tag, the agent researches the scope and
 proposes an AI-assisted estimate for reaching a review-ready result: implementation,
 verification, and likely fixes, excluding waiting for CTO review or deployment. During
-implementation it saves the estimate in ClickUp, verifies it, then removes the tag. In plan
+authorized estimation or implementation it saves the estimate in ClickUp, verifies it, then removes the tag. In plan
 mode it only proposes the estimate. Unclear requirements need clarification first. A failed
 tag removal leaves the saved estimate intact and is reported separately. Refresh task details
 to see agent updates; existing provider sessions may need restarting to pick up the new tools.

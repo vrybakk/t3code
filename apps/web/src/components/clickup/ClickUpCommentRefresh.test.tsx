@@ -30,6 +30,10 @@ vi.mock("./ClickUpTaskFields", () => ({
 vi.mock("./ClickUpTaskWork", () => ({ ClickUpTaskWork: () => null }));
 vi.mock("./ClickUpAttachments", () => ({ ClickUpAttachments: () => null }));
 vi.mock("./ClickUpTaskChecklist", () => ({ ClickUpTaskChecklist: () => null }));
+vi.mock("./ClickUpTaskActions", () => ({
+  ClickUpTaskActionButtons: () => null,
+  ClickUpTaskActionDialog: () => null,
+}));
 import { ClickUpTaskPanel } from "./ClickUpTaskPanel";
 
 let renderer: ReactTestRenderer;

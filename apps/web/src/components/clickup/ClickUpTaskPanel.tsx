@@ -3,6 +3,7 @@ import type { ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { ExternalLinkIcon, PaperclipIcon, RefreshCwIcon } from "lucide-react";
+import { useState } from "react";
 import { serverEnvironment } from "../../state/server";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import ChatMarkdown from "../ChatMarkdown";
@@ -13,6 +14,8 @@ import { ClickUpCustomFields, ClickUpTaskFields } from "./ClickUpTaskFields";
 import { ClickUpTaskWork } from "./ClickUpTaskWork";
 import { ClickUpAttachments } from "./ClickUpAttachments";
 import { ClickUpTaskChecklist } from "./ClickUpTaskChecklist";
+import { ClickUpTaskActionButtons, ClickUpTaskActionDialog } from "./ClickUpTaskActions";
+import type { ClickUpTaskAction } from "./taskPrompt";
 
 export function ClickUpTaskPanel({
   environmentId,
@@ -21,6 +24,7 @@ export function ClickUpTaskPanel({
   environmentId: EnvironmentId;
   input: ClickUpTaskInput;
 }) {
+  const [action, setAction] = useState<ClickUpTaskAction | null>(null);
   const query = serverEnvironment.clickUpTask({ environmentId, input });
   const result = useAtomValue(query);
   const details = Option.getOrNull(AsyncResult.value(result));
@@ -69,6 +73,7 @@ export function ClickUpTaskPanel({
               <h2 className="text-2xl font-semibold leading-snug tracking-tight">
                 {details.task.name}
               </h2>
+              <ClickUpTaskActionButtons taskName={details.task.name} onSelect={setAction} />
               <ClickUpTaskFields details={details} environmentId={environmentId} input={input} />
               <section aria-label="Description" className="space-y-4 border-t border-border pt-6">
                 <h3 className="text-sm font-medium">Description</h3>
@@ -133,6 +138,15 @@ export function ClickUpTaskPanel({
           </ScrollArea>
           <ClickUpTaskActivity details={details} environmentId={environmentId} input={input} />
         </div>
+      )}
+      {action && details && (
+        <ClickUpTaskActionDialog
+          environmentId={environmentId}
+          input={input}
+          taskName={details.task.name}
+          action={action}
+          onClose={() => setAction(null)}
+        />
       )}
     </section>
   );
