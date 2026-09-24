@@ -944,6 +944,10 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
   const prepareMcpSession = (threadId: ThreadId, providerInstanceId: ProviderInstanceId) =>
     Effect.gen(function* () {
       const capabilities = yield* agentAccessCapabilities(threadId);
+      const adapter = yield* registry.getByInstance(providerInstanceId);
+      if (adapter.provider === "codex" || adapter.provider === "claudeAgent") {
+        capabilities.add("video");
+      }
       const credential = yield* issueMcpCredential({ threadId, providerInstanceId, capabilities });
       if (credential) {
         const deviceEnvironment = capabilities.has("device")

@@ -1,7 +1,7 @@
 import {
   type EnvironmentId,
   isProviderSendTurnSupportedImageMimeType,
-  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
+  PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
 } from "@t3tools/contracts";
 import {
   clampFileAttachmentUploadBytes,
@@ -102,7 +102,7 @@ export function composerOtherFilesForPresentation(
 /** Byte limit for adding a generic file to the local composer draft. */
 export function fileAttachmentStagingLimit(input: FileAttachmentCapabilityState): number | null {
   if (!input.attachmentUploadsCapabilityKnown) {
-    return PROVIDER_SEND_TURN_MAX_FILE_BYTES;
+    return PROVIDER_SEND_TURN_MAX_VIDEO_BYTES;
   }
   if (!input.supportsAttachmentUploads || input.maxFileAttachmentBytes === null) {
     return null;
@@ -113,7 +113,11 @@ export function fileAttachmentStagingLimit(input: FileAttachmentCapabilityState)
 /** Why retained generic files cannot send with the current server config. */
 export function fileAttachmentCapabilityBlockReason(
   input: FileAttachmentCapabilityState & {
-    readonly files: ReadonlyArray<{ readonly name: string; readonly sizeBytes: number }>;
+    readonly files: ReadonlyArray<{
+      readonly name: string;
+      readonly mimeType?: string;
+      readonly sizeBytes: number;
+    }>;
   },
 ): string | null {
   if (input.files.length === 0) {
@@ -126,9 +130,14 @@ export function fileAttachmentCapabilityBlockReason(
   if (maxFileAttachmentBytes === null) {
     return "This server does not accept file attachments right now. Remove the files to send.";
   }
-  const oversizedFile = input.files.find((file) => file.sizeBytes > maxFileAttachmentBytes);
+  const oversizedFile = input.files.find(
+    (file) => file.sizeBytes > clampFileAttachmentUploadBytes(maxFileAttachmentBytes, file),
+  );
   if (oversizedFile) {
-    return fileAttachmentTooLargeMessage(oversizedFile.name, maxFileAttachmentBytes);
+    return fileAttachmentTooLargeMessage(
+      oversizedFile.name,
+      clampFileAttachmentUploadBytes(maxFileAttachmentBytes, oversizedFile),
+    );
   }
   return null;
 }

@@ -149,7 +149,7 @@ describe("composer attachment files", () => {
         supportsAttachmentUploads: false,
         maxFileAttachmentBytes: null,
       }),
-    ).toBe(PROVIDER_SEND_TURN_MAX_FILE_BYTES);
+    ).toBe(250 * 1024 * 1024);
     expect(
       fileAttachmentCapabilityBlockReason({
         files: [{ name: "pending.zip", sizeBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES }],
@@ -220,7 +220,7 @@ describe("composer attachment files", () => {
         supportsAttachmentUploads: true,
         maxFileAttachmentBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES * 2,
       }),
-    ).toBe(PROVIDER_SEND_TURN_MAX_FILE_BYTES);
+    ).toBe(PROVIDER_SEND_TURN_MAX_FILE_BYTES * 2);
     expect(
       fileAttachmentCapabilityBlockReason({
         files: [{ name: "report.pdf", sizeBytes: 1024 }],

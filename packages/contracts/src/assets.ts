@@ -1,8 +1,8 @@
+import { PROVIDER_SEND_TURN_MAX_VIDEO_BYTES, isFileAttachmentWithinSizeLimit } from "./video.ts";
 import * as Schema from "effect/Schema";
 
 import { NonNegativeInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import {
-  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
   PROVIDER_SEND_TURN_SUPPORTED_IMAGE_MIME_TYPES,
   ProjectFaviconPath,
@@ -100,9 +100,9 @@ const FileAttachmentCreateUploadUrlInput = Schema.Struct({
   mimeType: TrimmedNonEmptyString.check(Schema.isMaxLength(100)),
   sizeBytes: NonNegativeInt.check(
     Schema.isGreaterThanOrEqualTo(1),
-    Schema.isLessThanOrEqualTo(PROVIDER_SEND_TURN_MAX_FILE_BYTES),
+    Schema.isLessThanOrEqualTo(PROVIDER_SEND_TURN_MAX_VIDEO_BYTES),
   ),
-});
+}).check(Schema.makeFilter(isFileAttachmentWithinSizeLimit));
 
 export const AttachmentCreateUploadUrlInput = Schema.Union([
   ImageAttachmentCreateUploadUrlInput,

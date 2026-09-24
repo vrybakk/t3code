@@ -901,7 +901,7 @@ export class PreviewAutomationRecordingTooLargeError extends Schema.TaggedError<
   { threadId: ThreadId, cause: Schema.optional(Schema.Defect()) },
 ) {
   override get message(): string {
-    return "The recording exceeds 50 MiB. The saved copy remains on the desktop.";
+    return "The recording exceeds 250 MiB. The saved copy remains on the desktop.";
   }
 }
 

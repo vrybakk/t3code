@@ -65,8 +65,15 @@ export function validateDraftFileAttachments(input: {
     return "This server does not support file attachments.";
   }
   const maxBytes = clampFileAttachmentUploadBytes(capabilities.fileAttachments.maxUploadBytes);
-  const oversized = files.find((attachment) => attachment.sizeBytes > maxBytes);
-  return oversized ? fileAttachmentTooLargeMessage(oversized.name, maxBytes) : null;
+  const oversized = files.find(
+    (attachment) => attachment.sizeBytes > clampFileAttachmentUploadBytes(maxBytes, attachment),
+  );
+  return oversized
+    ? fileAttachmentTooLargeMessage(
+        oversized.name,
+        clampFileAttachmentUploadBytes(maxBytes, oversized),
+      )
+    : null;
 }
 
 /** Keep uploaded ids alongside the local bytes so a later send can reuse them. */

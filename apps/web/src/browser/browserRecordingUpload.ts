@@ -1,5 +1,5 @@
 import {
-  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
+  PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
   PreviewAutomationRecordingTransferError,
   PreviewAutomationRecordingTooLargeError,
   PreviewAutomationRecordingDeadlineExpiredError,
@@ -23,7 +23,7 @@ export async function uploadBrowserRecording(
   blob: Blob,
   deadlineMs: number,
 ): Promise<string> {
-  if (blob.size > PROVIDER_SEND_TURN_MAX_FILE_BYTES) {
+  if (blob.size > PROVIDER_SEND_TURN_MAX_VIDEO_BYTES) {
     throw new PreviewAutomationRecordingTooLargeError({ threadId });
   }
   const result = await runAttachmentUploadCycle({

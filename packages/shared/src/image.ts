@@ -14,7 +14,7 @@ const IMAGE_MIME_TYPE_BY_EXTENSION = new Map([
 const SUPPORTED_IMAGE_MIME_TYPES = new Set(IMAGE_MIME_TYPE_BY_EXTENSION.values());
 
 /** What a picker writes when it did not recognize the file; the name is better evidence. */
-export const GENERIC_MIME_TYPES = new Set([
+const GENERIC_MIME_TYPES = new Set([
   "application/octet-stream",
   "binary/octet-stream",
   "application/unknown",

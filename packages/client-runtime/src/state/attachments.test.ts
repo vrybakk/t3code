@@ -166,9 +166,9 @@ describe("verifyPersistedAttachmentUpload", () => {
 describe("file attachment limits", () => {
   it("clamps the advertised limit to the turn contract cap", () => {
     expect(clampFileAttachmentUploadBytes(1024)).toBe(1024);
-    expect(clampFileAttachmentUploadBytes(PROVIDER_SEND_TURN_MAX_FILE_BYTES * 2)).toBe(
-      PROVIDER_SEND_TURN_MAX_FILE_BYTES,
-    );
+    expect(
+      clampFileAttachmentUploadBytes(PROVIDER_SEND_TURN_MAX_FILE_BYTES * 2, { name: "report.pdf" }),
+    ).toBe(PROVIDER_SEND_TURN_MAX_FILE_BYTES);
   });
 
   it("formats attachment row sizes", () => {

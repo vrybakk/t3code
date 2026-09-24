@@ -446,10 +446,10 @@ describe("composer file attachments", () => {
       },
       {
         reason: "server advertises more than the contract limit",
-        reported: 51 * 1024 * 1024,
+        reported: 251 * 1024 * 1024,
         stored: 42,
-        limit: 80 * 1024 * 1024,
-        error: "'clip.mov' exceeds the 50 MB attachment limit.",
+        limit: 300 * 1024 * 1024,
+        error: "'clip.mov' exceeds the 250 MB attachment limit.",
       },
     ])(
       "rejects a video when $reason while retaining the selected photo",

@@ -48,3 +48,10 @@ export * from "./usage.ts";
 export * from "./workTracking.ts";
 export * from "./rpc.ts";
 export * from "./worktreeSetup.ts";
+
+export {
+  VIDEO_FILE_EXTENSIONS,
+  videoMimeType,
+  PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
+  fileAttachmentMaxBytes,
+} from "./video.ts";

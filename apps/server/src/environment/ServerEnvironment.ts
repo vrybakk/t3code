@@ -1,7 +1,7 @@
 import {
   EnvironmentId,
   ORCHESTRATION_PROTOCOL_VERSION,
-  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
+  PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
   type ExecutionEnvironmentDescriptor,
 } from "@t3tools/contracts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
@@ -219,7 +219,7 @@ export const make = Effect.gen(function* () {
       connectionProbe: true,
       attachmentUploads: true,
       questionAttachments: true,
-      fileAttachments: { maxUploadBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES },
+      fileAttachments: { maxUploadBytes: PROVIDER_SEND_TURN_MAX_VIDEO_BYTES },
       pullRequests: true,
       inlineMessageContext: true,
       requiredWorktreeBootstrap: true,

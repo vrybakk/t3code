@@ -130,6 +130,36 @@ describe("claimPreviewRecording", () => {
       ),
   );
 
+  it.effect.each([250 * 1024 * 1024, 250 * 1024 * 1024 + 1])(
+    "enforces the video limit when claiming a recording (%s bytes)",
+    (sizeBytes) =>
+      Effect.gen(function* () {
+        const config = yield* ServerConfig.ServerConfig;
+        const fs = yield* FileSystem.FileSystem;
+        const id = createPendingAttachmentId(".webm");
+        const pendingPath = `${config.attachmentsDir}/${id}.webm`;
+        yield* fs.makeDirectory(config.attachmentsDir, { recursive: true });
+        yield* fs.writeFileString(pendingPath, "");
+        yield* fs.truncate(pendingPath, sizeBytes);
+        const result = yield* claimPreviewRecording(ThreadId.make("thread-1"), {
+          id: "desktop-recording",
+          tabId: "tab-1",
+          path: "/desktop/recording.webm",
+          mimeType: "video/webm",
+          sizeBytes,
+          createdAt: "2026-09-07T00:00:00.000Z",
+          uploadedAttachmentId: id,
+        }).pipe(Effect.result);
+        expect(result._tag).toBe(sizeBytes === 250 * 1024 * 1024 ? "Success" : "Failure");
+      }).pipe(
+        Effect.provide(
+          ServerConfig.layerTest(process.cwd(), { prefix: "t3-preview-recording-" }).pipe(
+            Layer.provideMerge(NodeServices.layer),
+          ),
+        ),
+      ),
+  );
+
   it.effect("reports an older desktop without returning its inaccessible path", () =>
     Effect.gen(function* () {
       const result = yield* claimPreviewRecording(ThreadId.make("thread-1"), {

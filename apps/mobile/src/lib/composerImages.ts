@@ -245,18 +245,19 @@ async function createComposerFileAttachment(input: {
   readonly sizeBytes: number | null;
   readonly maxBytes: number;
 }): Promise<DraftComposerFileAttachment> {
-  if (input.sizeBytes !== null && input.sizeBytes > input.maxBytes) {
-    throw new Error(fileAttachmentTooLargeMessage(input.name, input.maxBytes));
+  const maxBytes = clampFileAttachmentUploadBytes(input.maxBytes, input);
+  if (input.sizeBytes !== null && input.sizeBytes > maxBytes) {
+    throw new Error(fileAttachmentTooLargeMessage(input.name, maxBytes));
   }
   const { File } = await import("expo-file-system");
-  const fileUri = await persistComposerAttachmentFile(input.uri, input.name, input.maxBytes);
+  const fileUri = await persistComposerAttachmentFile(input.uri, input.name, maxBytes);
   try {
     const sizeBytes = new File(fileUri).size ?? input.sizeBytes ?? 0;
     if (sizeBytes <= 0) {
       throw new Error(`'${input.name}' is empty or could not be read.`);
     }
-    if (sizeBytes > input.maxBytes) {
-      throw new Error(fileAttachmentTooLargeMessage(input.name, input.maxBytes));
+    if (sizeBytes > maxBytes) {
+      throw new Error(fileAttachmentTooLargeMessage(input.name, maxBytes));
     }
     return {
       id: uuidv4(),

@@ -1,5 +1,5 @@
+import { PROVIDER_SEND_TURN_MAX_VIDEO_BYTES, fileAttachmentMaxBytes } from "@t3tools/contracts";
 import {
-  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   WS_METHODS,
   type AttachmentCreateUploadUrlInput,
   type AttachmentCreateUploadUrlResult,
@@ -213,8 +213,14 @@ export async function runAttachmentUploadCycle<E, RE>(input: {
  * turn may reference, so a larger advertised value must not admit files the
  * send would then refuse.
  */
-export function clampFileAttachmentUploadBytes(advertisedMaxUploadBytes: number): number {
-  return Math.min(advertisedMaxUploadBytes, PROVIDER_SEND_TURN_MAX_FILE_BYTES);
+export function clampFileAttachmentUploadBytes(
+  advertisedMaxUploadBytes: number,
+  attachment?: { readonly name: string; readonly mimeType?: string | undefined },
+): number {
+  return Math.min(
+    advertisedMaxUploadBytes,
+    attachment ? fileAttachmentMaxBytes(attachment) : PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
+  );
 }
 
 /** "3.2 MB" / "48 KB" label for attachment rows. Never shows "0 KB". */
