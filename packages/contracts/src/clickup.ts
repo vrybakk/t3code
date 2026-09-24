@@ -51,6 +51,8 @@ export const ClickUpTask = Schema.Struct({
   ...ClickUpTaskReference.fields,
   status: Schema.String,
   statusColor: Schema.optional(Schema.NullOr(Schema.String)),
+  priority: Schema.optional(Schema.NullOr(Schema.String)),
+  dueDate: Schema.optional(Schema.NullOr(Schema.String)),
   tags: Schema.optional(Schema.Array(Schema.String)),
   listName: Schema.String,
   description: Schema.String,

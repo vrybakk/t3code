@@ -60,7 +60,7 @@ export const layer = Layer.effect(
         });
       }
       const query = new URLSearchParams({
-        page: String(input.page),
+        page: String(input.listId ? 0 : input.page),
         subtasks: "true",
         include_closed: input.listId ? "true" : "false",
         order_by: "updated",
@@ -76,21 +76,28 @@ export const layer = Layer.effect(
       const scope = input.listId
         ? `list/${encodeURIComponent(input.listId)}`
         : `team/${encodeURIComponent(input.workspaceId)}`;
-      const response = yield* api.request(`${scope}/task?${query}`, { token }).pipe(
-        Effect.flatMap(
-          decodeResponse(
-            Schema.Struct({
-              tasks: Schema.Array(ApiTask),
-              last_page: Schema.optional(Schema.Boolean),
-            }),
+      // Sprint status groups and priority ordering must include tasks beyond the first API page.
+      const collected = new Map<string, ReturnType<typeof normalizeTask>>();
+      let page = 0;
+      while (true) {
+        const response = yield* api.request(`${scope}/task?${query}`, { token }).pipe(
+          Effect.flatMap(
+            decodeResponse(
+              Schema.Struct({
+                tasks: Schema.Array(ApiTask),
+                last_page: Schema.optional(Schema.Boolean),
+              }),
+            ),
           ),
-        ),
-      );
-      return {
-        tasks: response.tasks.map((task) => ({ ...normalizeTask(task), description: "" })),
-        hasMore:
-          response.last_page === undefined ? response.tasks.length === 100 : !response.last_page,
-      };
+        );
+        const tasks = response.tasks.map((task) => ({ ...normalizeTask(task), description: "" }));
+        const hasMore =
+          response.last_page === undefined ? response.tasks.length === 100 : !response.last_page;
+        if (!input.listId) return { tasks, hasMore };
+        for (const task of tasks) collected.set(task.taskId, task);
+        if (!hasMore) return { tasks: [...collected.values()], hasMore: false };
+        query.set("page", String(++page));
+      }
     });
 
     const detail = Effect.fn("ClickUpTasks.detail")(function* (input: ClickUpTaskInput) {

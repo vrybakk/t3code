@@ -54,6 +54,7 @@ it.effect("filters by the authenticated user, includes subtasks, and preserves p
     const page = yield* tasks.list({ workspaceId: "42", page: 2, userId: 17 });
     assert.equal(page.hasMore, true);
     assert.equal(page.tasks[0]?.description, "");
+    assert.equal(page.tasks[0]?.dueDate, null);
     const query = new URL(`https://example.test/${test.paths[0]}`).searchParams;
     assert.equal(query.get("assignees[]"), "17");
     assert.equal(query.get("page"), "2");
@@ -98,7 +99,7 @@ it.effect(
       assert.equal(test.paths[0], "list/sprint-1");
       const url = new URL(`https://example.test/${test.paths[1]}`);
       assert.equal(url.pathname, "/list/sprint-1/task");
-      assert.equal(url.searchParams.get("page"), "1");
+      assert.equal(url.searchParams.get("page"), "0");
       assert.equal(url.searchParams.get("include_timl"), "true");
       assert.equal(url.searchParams.get("include_closed"), "true");
       assert.equal(url.searchParams.get("subtasks"), "true");
@@ -118,6 +119,8 @@ it.effect("defaults sprint task pages to the connected user's assignments", () =
                 ...task,
                 team_id: "2179724",
                 status: { status: "review", color: "#abc" },
+                priority: { priority: "high" },
+                due_date: "1790222400000",
                 tags: [{ name: "estimation needed" }],
               },
             ],
@@ -137,6 +140,103 @@ it.effect("defaults sprint task pages to the connected user's assignments", () =
     assert.equal(url.searchParams.get("assignees[]"), "17");
     assert.deepEqual(page.tasks[0]?.tags, ["estimation needed"]);
     assert.equal(page.tasks[0]?.statusColor, "#abc");
+    assert.equal(page.tasks[0]?.priority, "high");
+    assert.equal(page.tasks[0]?.dueDate, "1790222400000");
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("collects every sprint page and deduplicates tasks before returning summaries", () => {
+  const firstPage = Array.from({ length: 100 }, (_, index) => ({
+    ...task,
+    id: String(index),
+    team_id: "2179724",
+  }));
+  const test = setup((path) => {
+    if (path === "list/sprint-1") return { folder: { id: "90122725830" } };
+    const page = new URL(`https://example.test/${path}`).searchParams.get("page");
+    return page === "0"
+      ? { tasks: firstPage, last_page: false }
+      : {
+          tasks: [
+            { ...firstPage[0], priority: { priority: "urgent" } },
+            { ...task, id: "100", team_id: "2179724", priority: null },
+          ],
+          last_page: true,
+        };
+  }, "2179724");
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    const result = yield* tasks.list({
+      workspaceId: "2179724",
+      listId: "sprint-1",
+      page: 7,
+      userId: 17,
+    });
+    assert.equal(result.hasMore, false);
+    assert.equal(result.tasks.length, 101);
+    assert.equal(result.tasks.find((item) => item.taskId === "0")?.priority, "urgent");
+    assert.equal(result.tasks.find((item) => item.taskId === "100")?.priority, null);
+    assert.isTrue(result.tasks.every((item) => item.description === ""));
+    const queries = test.paths
+      .slice(1)
+      .map((path) => new URL(`https://example.test/${path}`).searchParams);
+    assert.deepEqual(
+      queries.map((query) => query.get("page")),
+      ["0", "1"],
+    );
+    assert.isTrue(
+      queries.every(
+        (query) => query.get("assignees[]") === "17" && query.get("include_timl") === "true",
+      ),
+    );
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("continues full sprint pages when ClickUp omits last_page", () => {
+  const test = setup((path) => {
+    if (path === "list/sprint-1") return { folder: { id: "90122725830" } };
+    const page = new URL(`https://example.test/${path}`).searchParams.get("page");
+    return {
+      tasks:
+        page === "0"
+          ? Array.from({ length: 100 }, (_, index) => ({ ...task, id: String(index) }))
+          : [],
+    };
+  }, "2179724");
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    const result = yield* tasks.list({
+      workspaceId: "2179724",
+      listId: "sprint-1",
+      page: 0,
+      userId: 17,
+      showAll: true,
+    });
+    assert.equal(result.tasks.length, 100);
+    assert.equal(result.hasMore, false);
+    assert.equal(test.paths.length, 3);
+    assert.isTrue(
+      test.paths
+        .slice(1)
+        .every((path) => !new URL(`https://example.test/${path}`).searchParams.has("assignees[]")),
+    );
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("fails the whole sprint listing when a later page cannot be decoded", () => {
+  const test = setup((path) => {
+    if (path === "list/sprint-1") return { folder: { id: "90122725830" } };
+    return new URL(`https://example.test/${path}`).searchParams.get("page") === "0"
+      ? { tasks: [{ ...task, team_id: "2179724" }], last_page: false }
+      : { tasks: null };
+  }, "2179724");
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    const result = yield* Effect.result(
+      tasks.list({ workspaceId: "2179724", listId: "sprint-1", page: 0, userId: 17 }),
+    );
+    assert.equal(result._tag, "Failure");
+    assert.equal(test.paths.length, 3);
   }).pipe(Effect.provide(test.layer));
 });
 

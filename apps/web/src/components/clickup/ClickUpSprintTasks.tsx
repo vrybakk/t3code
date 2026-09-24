@@ -1,18 +1,18 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { ClickUpSprint, EnvironmentId } from "@t3tools/contracts";
-import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { CircleIcon, RefreshCwIcon } from "lucide-react";
+import { ChevronRightIcon, RefreshCwIcon } from "lucide-react";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
+import { ClickUpSprintTable } from "./ClickUpSprintTable";
+import { groupSprintTasks } from "./sprintTaskGroups";
 import { taskDate } from "./taskFormatting";
-
-import { ClickUpStatusPicker, ClickUpTagsPicker } from "./ClickUpTaskEditors";
 
 export function SprintTasks({
   environmentId,
@@ -27,16 +27,15 @@ export function SprintTasks({
 }) {
   const search = useSearch({ from: "/tasks" });
   const navigate = useNavigate({ from: "/tasks" });
-  const page = search.page ?? 0;
   const showAll = search.showAll === true;
   const query = serverEnvironment.clickUpTasks({
     environmentId,
-    input: { workspaceId, page, userId, listId: sprint.id, showAll },
+    input: { workspaceId, page: 0, userId, listId: sprint.id, showAll },
   });
   const result = useAtomValue(query);
   const data = Option.getOrNull(AsyncResult.value(result));
-  const setPage = (page: number) =>
-    void navigate({ search: { environmentId, workspaceId, sprintId: sprint.id, page, showAll } });
+  const groups = groupSprintTasks(data?.tasks ?? []);
+  const tableProps = { environmentId, workspaceId, userId, sprintId: sprint.id, showAll };
   return (
     <section aria-label="Sprint tasks" className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -88,89 +87,38 @@ export function SprintTasks({
         ) : data.tasks.length === 0 ? (
           <p className="p-5 text-sm text-muted-foreground">
             {showAll
-              ? "No tasks on this sprint page."
-              : "No tasks assigned to you on this sprint page. Use Show all to see the team’s tasks."}
+              ? "No tasks in this sprint."
+              : "No tasks assigned to you in this sprint. Use Show all to see the team’s tasks."}
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-5">Task</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead className="pr-5">Project list</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.tasks.map((task) => (
-                <TableRow key={task.taskId}>
-                  <TableCell className="min-w-64 whitespace-normal pl-5 py-3">
-                    <Link
-                      to="/tasks"
-                      search={{
-                        environmentId,
-                        workspaceId,
-                        sprintId: sprint.id,
-                        page,
-                        showAll,
-                        taskId: task.taskId,
-                      }}
-                      className="flex items-start gap-3 text-sm font-medium hover:text-primary"
-                    >
-                      <CircleIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                      <span>{task.name}</span>
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <ClickUpStatusPicker
-                      environmentId={environmentId}
-                      input={{ workspaceId, userId, taskId: task.taskId }}
-                      taskName={task.name}
-                      status={task.status}
-                      color={task.statusColor}
-                    />
-                  </TableCell>
-                  <TableCell className="max-w-72 whitespace-normal">
-                    <ClickUpTagsPicker
-                      environmentId={environmentId}
-                      input={{ workspaceId, userId, taskId: task.taskId }}
-                      taskName={task.name}
-                      tags={task.tags ?? []}
-                    />
-                  </TableCell>
-                  <TableCell
-                    className="max-w-56 truncate pr-5 text-muted-foreground"
-                    title={task.listName}
-                  >
-                    {task.listName}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="pb-8">
+            {groups.working.length + groups.review.length > 0 ? (
+              <ClickUpSprintTable
+                {...tableProps}
+                groups={[...groups.days, { label: "Code Review", tasks: groups.review }]}
+              />
+            ) : (
+              <p className="p-5 text-sm text-muted-foreground">
+                All tasks are in QA Testing, Staging or In Production.
+              </p>
+            )}
+            {groups.deliveryCount > 0 && (
+              <Collapsible key={showAll ? "all" : "mine"} className="border-t border-border">
+                <CollapsibleTrigger className="group flex w-full items-center gap-2 px-5 py-4 text-left text-sm font-medium hover:bg-muted/30">
+                  <ChevronRightIcon className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-90" />
+                  <span>QA Testing, Staging &amp; In Production</span>
+                  <Badge variant="secondary" className="ml-auto">
+                    {groups.deliveryCount}
+                  </Badge>
+                </CollapsibleTrigger>
+                <CollapsiblePanel>
+                  <ClickUpSprintTable {...tableProps} groups={groups.delivery} />
+                </CollapsiblePanel>
+              </Collapsible>
+            )}
+          </div>
         )}
       </ScrollArea>
-      {data?.hasMore || page > 0 ? (
-        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
-          <span className="mr-auto text-xs text-muted-foreground">Page {page + 1}</span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page === 0 || result.waiting}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!data?.hasMore || result.waiting || AsyncResult.isFailure(result)}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      ) : null}
     </section>
   );
 }

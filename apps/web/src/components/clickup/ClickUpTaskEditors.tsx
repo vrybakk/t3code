@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { CheckIcon, ChevronDownIcon, PlusIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, PlusIcon, TagIcon } from "lucide-react";
 import { useState } from "react";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
@@ -33,15 +33,18 @@ export function ClickUpStatusPicker(
 export function ClickUpTagsPicker(props: Props & { tags: ReadonlyArray<string> }) {
   return (
     <TaskEditor {...props} kind="tags">
-      {props.tags.length ? (
-        props.tags.map((tag) => (
-          <Badge key={tag} variant="secondary">
-            {tag}
-          </Badge>
-        ))
-      ) : (
-        <span className="text-muted-foreground">Add tags</span>
-      )}
+      <span className="flex min-w-0 flex-wrap gap-1.5">
+        {props.tags.length ? (
+          props.tags.map((tag) => (
+            <Badge key={tag} variant="outline" size="control" className="gap-1.5 rounded-md px-2">
+              <TagIcon className="size-3" />
+              {tag}
+            </Badge>
+          ))
+        ) : (
+          <span className="text-muted-foreground">Add tags</span>
+        )}
+      </span>
       <PlusIcon className="size-3 shrink-0 text-muted-foreground" />
     </TaskEditor>
   );
@@ -63,7 +66,7 @@ function TaskEditor({
           <Button
             variant="ghost"
             size="sm"
-            className={`h-auto min-h-7 max-w-full justify-start px-2 py-1 text-xs ${kind === "tags" ? "flex-wrap" : "whitespace-nowrap"}`}
+            className={`h-auto min-h-7 max-w-full justify-start px-2 py-1 text-xs ${kind === "tags" ? "items-center" : "whitespace-nowrap"}`}
           />
         }
         aria-label={`Change ${kind} for ${props.taskName}`}
