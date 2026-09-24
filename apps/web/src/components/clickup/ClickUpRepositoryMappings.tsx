@@ -1,9 +1,15 @@
-import type { ClickUpTask, EnvironmentId, ProjectId } from "@t3tools/contracts";
+import type {
+  ClickUpRepositoryLink,
+  ClickUpTask,
+  EnvironmentId,
+  ProjectId,
+} from "@t3tools/contracts";
 import { useState } from "react";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
-import { useProjects } from "../../state/entities";
+import { useProjects, useServerConfigs } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { ClickUpKnownRepositories } from "./ClickUpKnownRepositories";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import {
@@ -16,7 +22,13 @@ import {
   DialogFooter,
 } from "../ui/dialog";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { clickUpSourceKey, resolveClickUpMapping } from "./projectMappings";
+import {
+  clickUpSourceKey,
+  resolveClickUpMapping,
+  repositoryKey,
+  suggestClickUpRepository,
+  savedGithubRepositoryUrl,
+} from "./projectMappings";
 
 export function ClickUpRepositoryMappings({
   task,
@@ -29,11 +41,21 @@ export function ClickUpRepositoryMappings({
     environmentId,
     (settings) => settings.clickUpProjectMappings,
   );
+  const repositories = useEnvironmentSettings(
+    environmentId,
+    (settings) => settings.clickUpRepositoryMappings,
+  );
+  const supportsSetup =
+    useServerConfigs().get(environmentId)?.environment.capabilities.clickUpRepositorySetup === true;
   const projects = useProjects().filter((project) => project.environmentId === environmentId);
-  const sources = task.sources ?? [];
+  const sourceOrder = ["project", "list", "folder", "space"];
+  const sources = [...(task.sources ?? [])].sort(
+    (left, right) => sourceOrder.indexOf(left.kind) - sourceOrder.indexOf(right.kind),
+  );
   const [open, setOpen] = useState(false);
   const [sourceKey, setSourceKey] = useState("");
   const [selected, setSelected] = useState<ReadonlyArray<ProjectId>>([]);
+  const [remotes, setRemotes] = useState<ReadonlyArray<ClickUpRepositoryLink>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const update = useAtomCommand(serverEnvironment.updateSettings, { reportFailure: false });
@@ -44,6 +66,7 @@ export function ClickUpRepositoryMappings({
   function choose(key: string) {
     setSourceKey(key);
     setSelected(mappings[key] ?? []);
+    setRemotes(repositories[key] ?? []);
     setError(null);
   }
   async function save(remove = false) {
@@ -52,7 +75,34 @@ export function ClickUpRepositoryMappings({
     try {
       const result = await update({
         environmentId,
-        input: { patch: { clickUpProjectMappings: { [sourceKey]: remove ? null : selected } } },
+        input: {
+          patch: {
+            clickUpProjectMappings: { [sourceKey]: remove ? null : selected },
+            ...(supportsSetup
+              ? {
+                  clickUpRepositoryMappings: {
+                    [sourceKey]: remove
+                      ? null
+                      : [
+                          ...new Map(
+                            [
+                              ...remotes,
+                              ...projects.flatMap((project) => {
+                                if (!selected.includes(project.id) || !project.repositoryIdentity)
+                                  return [];
+                                const remoteUrl = savedGithubRepositoryUrl(
+                                  project.repositoryIdentity.locator.remoteUrl,
+                                );
+                                return remoteUrl ? [{ remoteUrl, projectId: project.id }] : [];
+                              }),
+                            ].map((link) => [repositoryKey(link.remoteUrl), link]),
+                          ).values(),
+                        ],
+                  },
+                }
+              : {}),
+          },
+        },
       });
       if (result._tag === "Success") setOpen(false);
       else setError("Could not save repository links. Try again.");
@@ -60,6 +110,11 @@ export function ClickUpRepositoryMappings({
       setBusy(false);
     }
   }
+  const source = sources.find((item) => clickUpSourceKey(task.workspaceId, item) === sourceKey);
+  const suggestion =
+    mappings[sourceKey] === undefined && repositories[sourceKey] === undefined
+      ? suggestClickUpRepository(source, projects)
+      : null;
   return (
     <>
       <Button
@@ -67,7 +122,7 @@ export function ClickUpRepositoryMappings({
         variant="outline"
         disabled={!sources.length}
         onClick={() => {
-          const mapped = resolveClickUpMapping(task, mappings)?.sources[0];
+          const mapped = resolveClickUpMapping(task, mappings, repositories)?.sources[0];
           choose(mapped ? clickUpSourceKey(task.workspaceId, mapped) : items[0]!.value);
           setOpen(true);
         }}
@@ -112,6 +167,16 @@ export function ClickUpRepositoryMappings({
               The first matching mapping is used: Project field, List, Folder, then Space. Removing
               a mapping restores that fallback.
             </p>
+            {suggestion && !selected.includes(suggestion.id) && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => setSelected((current) => [...current, suggestion.id])}
+              >
+                Use matching repository: {suggestion.title}
+              </Button>
+            )}
             <div className="space-y-2">
               {projects.map((project) => (
                 <label
@@ -122,13 +187,17 @@ export function ClickUpRepositoryMappings({
                     aria-label={`${project.title} — ${project.workspaceRoot}`}
                     checked={selected.includes(project.id)}
                     disabled={busy}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked) => {
+                      if (!checked)
+                        setRemotes((current) =>
+                          current.filter((link) => link.projectId !== project.id),
+                        );
                       setSelected((current) =>
                         checked
                           ? [...current, project.id]
                           : current.filter((id) => id !== project.id),
-                      )
-                    }
+                      );
+                    }}
                   />
                   <span className="min-w-0 text-sm">
                     <span className="block">{project.title}</span>
@@ -148,6 +217,22 @@ export function ClickUpRepositoryMappings({
                 </p>
               )}
             </div>
+            {supportsSetup ? (
+              <ClickUpKnownRepositories
+                key={sourceKey}
+                value={remotes}
+                onChange={setRemotes}
+                disabled={busy}
+                onRemove={(link) => {
+                  if (link.projectId)
+                    setSelected((current) => current.filter((id) => id !== link.projectId));
+                }}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Update this environment to save GitHub repositories for download.
+              </p>
+            )}
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}
@@ -155,7 +240,7 @@ export function ClickUpRepositoryMappings({
             )}
           </DialogPanel>
           <DialogFooter>
-            {mappings[sourceKey] && (
+            {(mappings[sourceKey] || repositories[sourceKey]) && (
               <Button variant="ghost" disabled={busy} onClick={() => void save(true)}>
                 Remove mapping
               </Button>
@@ -163,7 +248,10 @@ export function ClickUpRepositoryMappings({
             <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button disabled={busy || !selected.length} onClick={() => void save()}>
+            <Button
+              disabled={busy || (!selected.length && !remotes.length)}
+              onClick={() => void save()}
+            >
               {busy ? "Saving…" : "Save links"}
             </Button>
           </DialogFooter>

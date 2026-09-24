@@ -277,6 +277,7 @@ export function applyServerSettingsPatch(
     // Merged per entry below; its `null` removals must not reach deepMerge.
     usageLimitSources: usageLimitSourcesPatch,
     clickUpProjectMappings: clickUpProjectMappingsPatch,
+    clickUpRepositoryMappings: clickUpRepositoryMappingsPatch,
     clickUpWorkflowModels: clickUpWorkflowModelsPatch,
     usagePriceOverrides: usagePriceOverridesPatch,
     // Entry replacement: deepMerge would keep keys the client meant to clear.
@@ -335,6 +336,14 @@ export function applyServerSettingsPatch(
           clickUpProjectMappings: mergeSettingsEntries(
             current.clickUpProjectMappings,
             clickUpProjectMappingsPatch,
+          ),
+        }),
+    ...(clickUpRepositoryMappingsPatch === undefined
+      ? {}
+      : {
+          clickUpRepositoryMappings: mergeSettingsEntries(
+            current.clickUpRepositoryMappings,
+            clickUpRepositoryMappingsPatch,
           ),
         }),
     ...(worktreeCleanupPatch === undefined

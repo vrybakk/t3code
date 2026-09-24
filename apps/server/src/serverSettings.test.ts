@@ -79,6 +79,32 @@ const recordProviderUsage = (provider: string, instanceId: string | null = provi
   });
 
 it.layer(NodeServices.layer)("server settings", (it) => {
+  it.effect("persists ClickUp repository identities and removes only the requested scope", () =>
+    Effect.gen(function* () {
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const projectId = ProjectId.make("api");
+      const repository = { remoteUrl: "https://github.com/studio/api.git", projectId };
+      yield* service.updateSettings({
+        clickUpProjectMappings: { "42:folder::app": [projectId] },
+        clickUpRepositoryMappings: {
+          "42:folder::app": [repository],
+          "42:folder::web": [repository],
+        },
+      });
+      const saved = yield* decodeServerSettingsJson(yield* fs.readFileString(config.settingsPath));
+      assert.deepEqual(saved.clickUpRepositoryMappings["42:folder::app"], [repository]);
+      yield* service.updateSettings({
+        clickUpRepositoryMappings: { "42:folder::app": null },
+      });
+      const updated = yield* decodeServerSettingsJson(
+        yield* fs.readFileString(config.settingsPath),
+      );
+      assert.deepEqual(updated.clickUpRepositoryMappings, { "42:folder::web": [repository] });
+      assert.deepEqual(updated.clickUpProjectMappings, { "42:folder::app": [projectId] });
+    }).pipe(Effect.provide(makeServerSettingsLayer())),
+  );
   it.effect(
     "persists a workflow role selection while other roles inherit and restores defaults",
     () =>
