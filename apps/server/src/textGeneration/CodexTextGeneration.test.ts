@@ -172,6 +172,27 @@ function withFakeCodexEnv<A, E, R>(
 }
 
 it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
+  it.effect("isolates estimation research and forwards supplied images", () =>
+    withFakeCodexEnv(
+      {
+        output: '{"summary":"Inspect checkout","searches":[],"files":[],"estimate":null}',
+        requireImage: true,
+        requireArg:
+          '--ignore-user-config --ignore-rules --config mcp_servers={} --config web_search="disabled" --config agents.max_concurrent_threads_per_session=1 --disable shell_tool --disable unified_exec --disable apps --disable plugins --disable remote_plugin --disable multi_agent --disable multi_agent_v2 --disable skill_search --disable skill_mcp_dependency_install --disable code_mode_host --disable view_image --disable browser_use --disable computer_use --disable hooks --disable goals --disable sleep_tool',
+      },
+      (generation) =>
+        Effect.gen(function* () {
+          const result = yield* generation.researchTaskEstimate({
+            cwd: process.cwd(),
+            prompt: "Inspect supplied evidence only",
+            imagePaths: ["/tmp/evidence.png"],
+            modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5"),
+          });
+          expect(result.estimate).toBeNull();
+        }),
+    ),
+  );
+
   it.effect("generates structured task analysis with the selected model", () =>
     withFakeCodexEnv(
       {

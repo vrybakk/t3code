@@ -19,6 +19,7 @@ const makeStubTextGeneration = (
   overrides: Partial<TextGeneration.TextGeneration["Service"]>,
 ): TextGeneration.TextGeneration["Service"] =>
   TextGeneration.TextGeneration.of({
+    researchTaskEstimate: () => Effect.die("Estimation research is not used by this test"),
     generateTaskAnalysis: () =>
       Effect.die("generateTaskAnalysis stub not configured for this test"),
     generateCommitMessage: () =>

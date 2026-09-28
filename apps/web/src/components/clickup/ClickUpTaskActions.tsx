@@ -30,7 +30,7 @@ const actions = {
     label: "Estimate task",
     icon: CalculatorIcon,
     description:
-      "Estimate AI-assisted work from the task context using your default text-generation model.",
+      "Estimate AI-assisted implementation and verification using your default text-generation model.",
   },
   implement: {
     label: "Start task",

@@ -35,3 +35,28 @@ it("only announces posted findings when posting is confirmed", () => {
     }).title,
   ).toBe("Requirements findings posted");
 });
+
+it("distinguishes insufficient research from preserved estimates", () => {
+  expect(
+    taskAnalysisFeedback("estimate", {
+      error: null,
+      result: { ...result, estimatePreserved: true },
+    }).title,
+  ).toBe("Existing estimate kept");
+  expect(
+    taskAnalysisFeedback("estimate", {
+      error: null,
+      result: {
+        ...result,
+        estimationEvidence: {
+          implementationMinutes: 0,
+          verificationMinutes: 0,
+          followUpMinutes: 0,
+          confidence: "low",
+          files: [],
+          limitations: ["Required API is missing"],
+        },
+      },
+    }),
+  ).toEqual({ title: "More investigation needed", type: "warning" });
+});

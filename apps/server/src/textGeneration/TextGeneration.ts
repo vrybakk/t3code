@@ -6,6 +6,7 @@ import type {
   ModelSelection,
   ProviderInstanceId,
   TaskAnalysis,
+  TaskEstimationResponse,
 } from "@t3tools/contracts";
 import { TextGenerationError } from "@t3tools/contracts";
 
@@ -79,6 +80,7 @@ export interface TaskAnalysisGenerationInput {
   cwd: string;
   prompt: string;
   modelSelection: ModelSelection;
+  imagePaths?: ReadonlyArray<string> | undefined;
 }
 
 export interface ThreadTitleGenerationResult {
@@ -113,6 +115,10 @@ export class TextGeneration extends Context.Service<
       input: BranchNameGenerationInput,
     ) => Effect.Effect<BranchNameGenerationResult, TextGenerationError>;
 
+    readonly researchTaskEstimate: (
+      input: TaskAnalysisGenerationInput,
+    ) => Effect.Effect<TaskEstimationResponse, TextGenerationError>;
+
     readonly generateTaskAnalysis: (
       input: TaskAnalysisGenerationInput,
     ) => Effect.Effect<TaskAnalysis, TextGenerationError>;
@@ -129,7 +135,8 @@ type TextGenerationOp =
   | "generatePrContent"
   | "generateBranchName"
   | "generateThreadTitle"
-  | "generateTaskAnalysis";
+  | "generateTaskAnalysis"
+  | "researchTaskEstimate";
 
 const resolveInstance = (
   registry: ProviderInstanceRegistry.ProviderInstanceRegistry["Service"],
@@ -154,6 +161,10 @@ export const make = Effect.gen(function* () {
   const registry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
   const sourceControl = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   return TextGeneration.of({
+    researchTaskEstimate: (input) =>
+      resolveInstance(registry, "researchTaskEstimate", input.modelSelection.instanceId).pipe(
+        Effect.flatMap((generation) => generation.researchTaskEstimate(input)),
+      ),
     generateTaskAnalysis: (input) =>
       resolveInstance(registry, "generateTaskAnalysis", input.modelSelection.instanceId).pipe(
         Effect.flatMap((textGeneration) => textGeneration.generateTaskAnalysis(input)),

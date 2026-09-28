@@ -24,7 +24,11 @@ export function taskAnalysisFeedback(
         title: `Estimate saved · ${result.estimateMinutes} min`,
         type: result.tagRemoved ? ("success" as const) : ("warning" as const),
       };
-    return { title: "Estimation complete", type: "success" as const };
+    if (result.estimatePreserved)
+      return { title: "Existing estimate kept", type: "success" as const };
+    return result.estimationEvidence
+      ? { title: "More investigation needed", type: "warning" as const }
+      : { title: "Estimation complete", type: "success" as const };
   }
   return {
     title: result.findingsPosted ? "Requirements findings posted" : "Requirements checked",

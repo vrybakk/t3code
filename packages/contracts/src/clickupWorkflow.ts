@@ -1,3 +1,4 @@
+import { TaskEstimationEvidence } from "./taskEstimation.ts";
 import * as Schema from "effect/Schema";
 import { ClickUpTaskInput } from "./clickup.ts";
 import {
@@ -86,6 +87,8 @@ export type TaskAnalysis = typeof TaskAnalysis.Type;
 export const ClickUpTaskAnalysis = Schema.Struct({
   ...TaskAnalysis.fields,
   estimateSaved: Schema.Boolean,
+  estimatePreserved: Schema.optionalKey(Schema.Boolean),
+  estimationEvidence: Schema.optionalKey(TaskEstimationEvidence),
   tagRemoved: Schema.Boolean,
   findingsPosted: Schema.Boolean,
 });
