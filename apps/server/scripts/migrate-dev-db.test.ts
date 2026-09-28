@@ -170,6 +170,7 @@ it.layer(NodeServices.layer)("migrate-dev-db", (it) => {
         { migration_id: 57, name: "ClickUpWorkflow" },
         { migration_id: 58, name: "ProjectionThreadsAutoSettleDisabledAt" },
         { migration_id: 59, name: "ThreadTaskLinks" },
+        { migration_id: 60, name: "ClickUpTimeExports" },
       ]);
     }),
   );

@@ -1,3 +1,4 @@
+import * as ClickUpTimeSync from "./clickup/ClickUpTimeSync.ts";
 import * as ClickUpTaskEstimation from "./clickup/ClickUpTaskEstimation.ts";
 import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
 import * as ClickUpTaskArchiver from "./clickup/ClickUpTaskArchiver.ts";
@@ -637,6 +638,7 @@ export const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(WorkspaceEntriesLayerLive),
     ),
   ),
+  Layer.provide(ClickUpTimeSync.layer),
   Layer.provide(ClickUpWorkflow.layer),
   Layer.provide(ClickUpWorkflowStore.layer),
   Layer.provide(PullRequestServiceLive),

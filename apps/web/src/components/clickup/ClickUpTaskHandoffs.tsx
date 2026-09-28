@@ -1,3 +1,4 @@
+import { ClickUpTimeSync } from "./ClickUpTimeSync";
 import { useAtomValue } from "@effect/atom-react";
 import type { ClickUpHandoff, ClickUpTaskInput, EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
@@ -206,6 +207,9 @@ function HandoffCard({
           Check the result in GitHub and ClickUp with the agent before continuing. Automatic retry
           is paused.
         </p>
+      )}
+      {handoff.status === "submitted" && (
+        <ClickUpTimeSync environmentId={environmentId} threadId={handoff.threadId} />
       )}
       {canSubmit && (
         <>

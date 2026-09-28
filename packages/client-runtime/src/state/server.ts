@@ -1110,6 +1110,15 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.clickUpThreads,
       staleTimeMs: 30_000,
     }),
+    clickUpTimePreview: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpTimePreview",
+      tag: WS_METHODS.clickUpTimePreview,
+      staleTimeMs: 0,
+    }),
+    clickUpTimeSync: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpTimeSync",
+      tag: WS_METHODS.clickUpTimeSync,
+    }),
     clickUpWorkflow: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:clickup:clickUpWorkflow",
       tag: WS_METHODS.clickUpWorkflow,

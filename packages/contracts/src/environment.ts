@@ -110,6 +110,7 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   threadTaskLinks: Schema.optionalKey(Schema.Boolean),
   clickUpMergedHandoffs: Schema.optionalKey(Schema.Boolean),
   composerTaskMentions: Schema.optionalKey(Schema.Boolean),
+  clickUpTimeSync: Schema.optionalKey(Schema.Boolean),
   clickUpRepositorySetup: Schema.optionalKey(Schema.Boolean),
   clickUpLocalRepositories: Schema.optionalKey(Schema.Boolean),
   clickUpOAuthConfiguration: Schema.optionalKey(Schema.Boolean),
