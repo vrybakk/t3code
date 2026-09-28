@@ -1,4 +1,5 @@
 import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
+import * as ClickUpTaskArchiver from "./clickup/ClickUpTaskArchiver.ts";
 import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpWorkflowStore from "./clickup/ClickUpWorkflowStore.ts";
 import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
@@ -603,6 +604,7 @@ const commandReadinessLayer = HttpRouter.middleware(
 );
 
 export const makeRoutesLayer = Layer.mergeAll(
+  ClickUpTaskArchiver.layer,
   Layer.mergeAll(
     HttpApiBuilder.layer(EnvironmentHttpApi).pipe(
       Layer.provide(authHttpApiLayer),
