@@ -260,6 +260,28 @@ function withFakeClaudeEnv<A, E, R>(
 }
 
 it.layer(ClaudeTextGenerationTestLayer)("ClaudeTextGeneration", (it) => {
+  it.effect("generates structured task analysis with the selected model", () =>
+    withFakeClaudeEnv(
+      {
+        output:
+          '{"structured_output":{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}}',
+      },
+      (generation) =>
+        Effect.gen(function* () {
+          const result = yield* generation.generateTaskAnalysis({
+            cwd: process.cwd(),
+            prompt: "Analyze the task context",
+            modelSelection: createModelSelection(ProviderInstanceId.make("claudeAgent"), "sonnet"),
+          });
+          expect(result).toEqual({
+            summary: "Task context estimate",
+            estimateMinutes: 30,
+            findings: null,
+          });
+        }),
+    ),
+  );
+
   it.effect("forwards Claude thinking settings without passing unsupported effort", () =>
     withFakeClaudeEnv(
       {

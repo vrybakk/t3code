@@ -1092,6 +1092,14 @@ export function createServerEnvironmentAtoms<R, E>(
       staleTimeMs: 5_000,
       refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
     }),
+    clickUpAnalyzeTask: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpAnalyzeTask",
+      tag: WS_METHODS.clickUpAnalyzeTask,
+      onSettled: ({ environmentId }, registry) =>
+        Effect.sync(() => {
+          registry.update(clickUpRevisionAtom(environmentId), (revision) => revision + 1);
+        }),
+    }),
     clickUpSubmitWorkflow: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:clickup:clickUpSubmitWorkflow",
       tag: WS_METHODS.clickUpSubmitWorkflow,

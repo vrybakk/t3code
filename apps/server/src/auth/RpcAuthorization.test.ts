@@ -16,6 +16,9 @@ import {
 
 describe("RPC authorization scopes", () => {
   it("requires operate permission for ClickUp resolution changes", () => {
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpAnalyzeTask)).toBe(
+      AuthOrchestrationOperateScope,
+    );
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpWorkflow)).toBe(AuthOrchestrationReadScope);
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpSubmitWorkflow)).toBe(
       AuthOrchestrationOperateScope,

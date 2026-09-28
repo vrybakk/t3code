@@ -69,3 +69,22 @@ export const ClickUpPrepareHandoffInput = Schema.Struct({
   ).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
 });
 export type ClickUpPrepareHandoffInput = typeof ClickUpPrepareHandoffInput.Type;
+
+export const ClickUpAnalyzeTaskInput = Schema.Struct({
+  ...ClickUpTaskInput.fields,
+  action: Schema.Literals(["requirements", "estimate"]),
+});
+export type ClickUpAnalyzeTaskInput = typeof ClickUpAnalyzeTaskInput.Type;
+export const TaskAnalysis = Schema.Struct({
+  summary: TrimmedNonEmptyString.check(Schema.isMaxLength(4000)),
+  estimateMinutes: Schema.NullOr(PositiveInt),
+  findings: Schema.NullOr(ClickUpWorkflowText),
+});
+export type TaskAnalysis = typeof TaskAnalysis.Type;
+export const ClickUpTaskAnalysis = Schema.Struct({
+  ...TaskAnalysis.fields,
+  estimateSaved: Schema.Boolean,
+  tagRemoved: Schema.Boolean,
+  findingsPosted: Schema.Boolean,
+});
+export type ClickUpTaskAnalysis = typeof ClickUpTaskAnalysis.Type;

@@ -1,3 +1,4 @@
+import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
 import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
 import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
@@ -665,6 +666,7 @@ const makeWsRpcLayer = (
       const clickUpSprints = yield* ClickUpSprints.ClickUpSprints;
       const clickUpInteractions = yield* ClickUpInteractions.ClickUpInteractions;
       const clickUpWorkflow = yield* ClickUpWorkflow.ClickUpWorkflow;
+      const clickUpTaskAnalysis = yield* ClickUpTaskAnalysis.ClickUpTaskAnalysis;
       const clickUpTaskEditing = yield* ClickUpTaskEditing.ClickUpTaskEditing;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
@@ -2677,6 +2679,7 @@ const makeWsRpcLayer = (
         [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
         [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
         [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
+        [WS_METHODS.clickUpAnalyzeTask]: (input) => clickUpTaskAnalysis.run(input),
         [WS_METHODS.clickUpWorkflow]: (input) => clickUpWorkflow.read(input),
         [WS_METHODS.clickUpSubmitWorkflow]: (input) => clickUpWorkflow.submit(input),
         [WS_METHODS.clickUpTaskOptions]: (input) => clickUpTaskEditing.options(input),
@@ -4007,6 +4010,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const clickUpSprintsService = yield* ClickUpSprints.ClickUpSprints;
     const clickUpInteractionsService = yield* ClickUpInteractions.ClickUpInteractions;
     const clickUpWorkflowService = yield* ClickUpWorkflow.ClickUpWorkflow;
+    const clickUpTaskAnalysisService = yield* ClickUpTaskAnalysis.ClickUpTaskAnalysis;
     const clickUpTaskEditingService = yield* ClickUpTaskEditing.ClickUpTaskEditing;
     const sql = yield* SqlClient.SqlClient;
     const storageUsage = yield* StorageUsage.make;
@@ -4063,6 +4067,9 @@ export const websocketRpcRouteLayer = Layer.unwrap(
                 Layer.succeed(ClickUpConnection.ClickUpConnection, clickUpConnectionService),
               ),
               Layer.provide(Layer.succeed(ClickUpTasks.ClickUpTasks, clickUpTasksService)),
+              Layer.provide(
+                Layer.succeed(ClickUpTaskAnalysis.ClickUpTaskAnalysis, clickUpTaskAnalysisService),
+              ),
               Layer.provide(Layer.succeed(ClickUpWorkflow.ClickUpWorkflow, clickUpWorkflowService)),
               Layer.provide(
                 Layer.succeed(ClickUpTaskEditing.ClickUpTaskEditing, clickUpTaskEditingService),

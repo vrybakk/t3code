@@ -39,21 +39,29 @@ wins: Project field, List, Folder, then Space; removing a mapping restores the b
 The repository picker suggests the linked repositories; **Show all repositories** allows a manual
 choice. Project badges use the ClickUp Project-field color when available.
 
-Use **Check requirements**, **Estimate task**, or **Implement** from the sprint table or task page.
-Choose a repository and select **Prepare thread**, then review the request, model and permissions
-and send it to begin. Configure research, implementation, and review model defaults in
-**Settings → Integrations → ClickUp**, or override them for one launch. An unset role uses the
-thread's model. If a provider cannot use a requested model, the agent asks how to continue.
+Use **Check requirements** or **Estimate task** from the sprint table or task page to run
+background analysis with your environment's default text-generation model. Results appear in
+the action dialog and a completion notification; you can close the dialog while it runs.
+Reopening shows the same run or its last result for this app session. Use **Run again** for a fresh analysis.
+These actions use the task description and supplied comments. They do not inspect repository
+code or attachment contents, and report missing information when the context is insufficient.
 
-**Check requirements** researches gaps and questions without implementing or changing status.
+**Check requirements** identifies gaps and questions without implementing or changing status.
 It posts one short, plain-language findings comment only when something needs attention.
-A clean check does not post a comment. **Estimate task** researches AI-assisted time to a
+A clean check does not post a comment. **Estimate task** estimates AI-assisted time to a
 review-ready result, including implementation, verification, and likely fixes, excluding waiting
-for CTO review or deployment. It saves the missing estimate without posting a comment, then
+for CTO review or deployment. It saves a missing estimate without posting a comment, then
 removes **estimation needed** if present. Existing estimates are preserved and hide the action.
 Unclear requirements need clarification first. If tag removal fails, the saved estimate remains.
 
-**Implement** coordinates the linked repositories, moves the task to In Progress when coding
+Use **Start task**, choose a repository and select **Prepare thread** to create a linked draft
+with the studio workflow skill and task reference. Review the model and permissions, then send
+it to begin. The agent loads the current task through its link. Configure research,
+implementation, and review model defaults in **Settings → Integrations → ClickUp**, or override
+them for one launch. An unset role uses the thread's model. If a provider cannot use a requested
+model, the agent asks how to continue.
+
+**Start task** coordinates the linked repositories, moves the task to In Progress when coding
 starts, verifies the result, and requests an independent review. It fixes findings before preparing
 draft pull requests and a handoff in **Linked work**. The agent asks for help if required testing
 is blocked; continuing without that check requires your explicit approval. Tasks tagged

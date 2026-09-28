@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { buildClickUpTaskPrompt, safeClickUpAttachmentUrl } from "./taskPrompt";
 
 describe("ClickUp task context", () => {
-  it("carries task identity, requirements and verification limitations into the prepared draft", () => {
+  it("references the workflow and linked task without copying task materials", () => {
     const prompt = buildClickUpTaskPrompt({
       task: {
         taskId: "abc",
@@ -16,12 +16,12 @@ describe("ClickUp task context", () => {
       commentsMayHaveMore: true,
       attachments: [{ name: "Recording", url: "https://attachments.example.test/video.mp4" }],
     });
-    expect(prompt).toContain("Task ID: abc; workspace: 42");
-    expect(prompt).toContain("Handle an empty cart.");
-    expect(prompt).toContain("Reviewer: Verify the mobile layout.");
-    expect(prompt).toContain("replies and older comments may not be included");
-    expect(prompt).toContain("these links are not their contents");
-    expect(prompt).toContain("request explicit approval before proceeding without it");
+    expect(prompt).toContain("$studio-task-workflow Start task abc: Checkout fix");
+    expect(prompt).toContain('mode "implement"');
+    expect(prompt).toContain("get_linked_clickup_task");
+    expect(prompt).not.toContain("Handle an empty cart.");
+    expect(prompt).not.toContain("Verify the mobile layout.");
+    expect(prompt).not.toContain("attachments.example.test");
   });
 
   it("only renders HTTPS attachment links", () => {

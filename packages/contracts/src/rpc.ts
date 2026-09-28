@@ -1,4 +1,6 @@
 import {
+  ClickUpAnalyzeTaskInput,
+  ClickUpTaskAnalysis,
   ClickUpWorkflow,
   ClickUpHandoff,
   ClickUpWorkflowInput,
@@ -403,6 +405,7 @@ export const WS_METHODS = {
   clickUpTasks: "clickup.tasks",
   clickUpSprints: "clickup.sprints",
   clickUpTaskOptions: "clickup.taskOptions",
+  clickUpAnalyzeTask: "clickup.analyzeTask",
   clickUpWorkflow: "clickup.workflow",
   clickUpSubmitWorkflow: "clickup.submitWorkflow",
   clickUpSetStatus: "clickup.setStatus",
@@ -707,6 +710,11 @@ const WsServerDiscoverSourceControlRpc = Rpc.make(WS_METHODS.serverDiscoverSourc
   error: EnvironmentAuthorizationError,
 });
 
+const WsClickUpAnalyzeTaskRpc = Rpc.make(WS_METHODS.clickUpAnalyzeTask, {
+  payload: ClickUpAnalyzeTaskInput,
+  success: ClickUpTaskAnalysis,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
 const WsClickUpWorkflowRpc = Rpc.make(WS_METHODS.clickUpWorkflow, {
   payload: ClickUpWorkflowInput,
   success: ClickUpWorkflow,
@@ -1727,6 +1735,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerUpdateSettingsRpc,
   WsServerDiscoverSourceControlRpc,
   WsGitButlerWorkspaceStatusRpc,
+  WsClickUpAnalyzeTaskRpc,
   WsClickUpWorkflowRpc,
   WsClickUpSubmitWorkflowRpc,
   WsClickUpConnectionRpc,

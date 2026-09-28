@@ -36,7 +36,6 @@ vi.mock("../ui/select", () => ({
   SelectValue: "span",
 }));
 import { ClickUpTaskLauncher } from "./ClickUpTaskLauncher";
-import type { ClickUpTaskAction } from "./taskPrompt";
 
 const details: ClickUpTaskDetails = {
   task: {
@@ -62,14 +61,10 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
   vi.unstubAllGlobals();
 });
-async function mount(action: ClickUpTaskAction, taskDetails = details) {
+async function mount(taskDetails = details) {
   await act(async () => {
     renderer = create(
-      <ClickUpTaskLauncher
-        environmentId={EnvironmentId.make("test")}
-        details={taskDetails}
-        action={action}
-      />,
+      <ClickUpTaskLauncher environmentId={EnvironmentId.make("test")} details={taskDetails} />,
     );
   });
 }
@@ -78,41 +73,33 @@ function prepare() {
     .findAllByType("button")
     .find((button) => button.children.includes("Prepare thread"))!;
 }
-it.each([
-  ["requirements", "default", "Check requirements only"],
-  ["estimate", "default", "Estimate this task only"],
-  ["implement", "default", "Implement the agreed scope"],
-] as const)(
-  "prepares a linked %s draft with the correct mode and full context",
-  async (action, mode, instruction) => {
-    await mount(action);
-    expect(renderer.root.findByType("select").props.value).toBe("repo");
-    expect(renderer.root.findAllByType("option")).toHaveLength(1);
-    await act(async () => prepare().props.onClick());
-    expect(mocks.newThread).toHaveBeenCalledWith(
-      { environmentId: EnvironmentId.make("test"), projectId: ProjectId.make("repo") },
-      { envMode: "worktree" },
-    );
-    expect(mocks.setInteractionMode).toHaveBeenCalledWith("draft", mode);
-    expect(mocks.setDraftThreadContext).toHaveBeenCalledWith("draft", {
-      clickUpTask: { taskId: "task", workspaceId: "42", name: "Fix checkout" },
-      environmentSelection: "manual",
-      interactionMode: mode,
-    });
-    const prompt = mocks.setPrompt.mock.calls[0]?.[1] as string;
-    expect(prompt).toContain(instruction);
-    expect(prompt).toContain("Handle empty carts");
-    expect(prompt).toContain("PM: Check mobile too");
-    if (action === "requirements") {
-      expect(prompt).not.toContain("complete_clickup_estimation");
-      expect(prompt).not.toContain("Implement the agreed scope");
-    }
-    if (action === "estimate") expect(prompt).not.toContain("Implement the agreed scope");
-  },
-);
+it("prepares a linked implementation draft with a skill and compact context", async () => {
+  const mode = "default";
+  await mount();
+  expect(renderer.root.findByType("select").props.value).toBe("repo");
+  expect(renderer.root.findAllByType("option")).toHaveLength(1);
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).toHaveBeenCalledWith(
+    { environmentId: EnvironmentId.make("test"), projectId: ProjectId.make("repo") },
+    { envMode: "worktree" },
+  );
+  expect(mocks.setInteractionMode).toHaveBeenCalledWith("draft", mode);
+  expect(mocks.setDraftThreadContext).toHaveBeenCalledWith("draft", {
+    clickUpTask: { taskId: "task", workspaceId: "42", name: "Fix checkout" },
+    environmentSelection: "manual",
+    interactionMode: mode,
+  });
+  const prompt = mocks.setPrompt.mock.calls[0]?.[1] as string;
+  expect(prompt).toContain("$studio-task-workflow Start task task: Fix checkout");
+  expect(prompt).toContain('mode "implement"');
+  expect(prompt).toContain('"research":null');
+  expect(prompt).toContain('"id":"repo"');
+  expect(prompt).not.toContain("Handle empty carts");
+  expect(prompt).not.toContain("PM: Check mobile too");
+});
 it("does not write draft context after launch fails", async () => {
   mocks.newThread.mockRejectedValue(new Error("Unavailable"));
-  await mount("implement");
+  await mount();
   await act(async () => prepare().props.onClick());
   expect(mocks.setPrompt).not.toHaveBeenCalled();
   expect(mocks.setDraftThreadContext).not.toHaveBeenCalled();
@@ -121,18 +108,9 @@ it("does not write draft context after launch fails", async () => {
   );
 });
 
-it("blocks implementation for no agent tasks but permits requirements review", async () => {
+it("blocks implementation for no agent tasks", async () => {
   const tagged = { ...details, task: { ...details.task, tags: ["no agent"] } };
-  await mount("implement", tagged);
-  expect(prepare().props.disabled).toBe(true);
-  await act(async () => prepare().props.onClick());
-  expect(mocks.newThread).not.toHaveBeenCalled();
-  await act(async () => renderer.unmount());
-  await mount("requirements", tagged);
-  expect(prepare().props.disabled).toBe(false);
-});
-it("does not prepare an estimation draft once an estimate exists", async () => {
-  await mount("estimate", { ...details, task: { ...details.task, timeEstimate: 60000 } });
+  await mount(tagged);
   expect(prepare().props.disabled).toBe(true);
   await act(async () => prepare().props.onClick());
   expect(mocks.newThread).not.toHaveBeenCalled();

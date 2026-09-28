@@ -12,18 +12,16 @@ import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useProjects } from "../../state/entities";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { buildClickUpTaskPrompt, type ClickUpTaskAction } from "./taskPrompt";
+import { buildClickUpTaskPrompt } from "./taskPrompt";
 import { ClickUpWorkflowModelPicker } from "./ClickUpWorkflowModels";
 import { resolveClickUpMapping } from "./projectMappings";
 
 export function ClickUpTaskLauncher({
   environmentId,
   details,
-  action,
 }: {
   environmentId: EnvironmentId;
   details: ClickUpTaskDetails;
-  action: ClickUpTaskAction;
 }) {
   const projects = useProjects().filter((project) => project.environmentId === environmentId);
   const mappings = useEnvironmentSettings(
@@ -35,10 +33,7 @@ export function ClickUpTaskLauncher({
     (settings) => settings.clickUpWorkflowModels,
   );
   const [models, setModels] = useState<ClickUpWorkflowModels | null>(null);
-  const blocked =
-    action === "implement" &&
-    details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
-  const alreadyEstimated = action === "estimate" && details.task.timeEstimate != null;
+  const blocked = details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
   const mapping = resolveClickUpMapping(details.task, mappings);
   const mappedProjects = projects.filter((project) => mapping?.projectIds.includes(project.id));
   const [showAllRepositories, setShowAllRepositories] = useState(false);
@@ -53,7 +48,7 @@ export function ClickUpTaskLauncher({
   );
   const launching = useRef(false);
   async function prepareThread() {
-    if (!selectedProject || launching.current || blocked || alreadyEstimated) return;
+    if (!selectedProject || launching.current || blocked) return;
     launching.current = true;
     setBusy(true);
     setError(null);
@@ -76,7 +71,7 @@ export function ClickUpTaskLauncher({
       });
       store.setPrompt(
         draft.draftId,
-        buildClickUpTaskPrompt(details, action, {
+        buildClickUpTaskPrompt(details, {
           models: models ?? defaults,
           repositories: [
             ...new Map(
@@ -122,7 +117,7 @@ export function ClickUpTaskLauncher({
       </div>
       <Button
         size="sm"
-        disabled={!selectedProject || busy || blocked || alreadyEstimated}
+        disabled={!selectedProject || busy || blocked}
         onClick={() => void prepareThread()}
       >
         {busy ? "Preparing…" : "Prepare thread"}
@@ -161,19 +156,9 @@ export function ClickUpTaskLauncher({
           Remove the no agent tag to allow implementation.
         </p>
       )}
-      {alreadyEstimated && (
-        <p role="status" className="w-full text-sm text-muted-foreground">
-          This task already has an estimate.
-        </p>
-      )}
       <p className="w-full text-xs text-muted-foreground">
         Review the task request, model and permissions in the thread, then send it to start.
       </p>
-      {action === "requirements" && (
-        <p className="w-full text-xs text-muted-foreground">
-          Reviews requirements only. Only actionable findings are posted to ClickUp.
-        </p>
-      )}
       {!projects.length && (
         <p className="text-xs text-muted-foreground">Add a project to start a coding thread.</p>
       )}
