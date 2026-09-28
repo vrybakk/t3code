@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 
-export function parseClickUpTaskId(value: string): string | null {
+function parseClickUpTaskId(value: string): string | null {
   const text = value.trim();
   if (/^[a-zA-Z0-9_-]{1,128}$/.test(text)) return text;
   try {
