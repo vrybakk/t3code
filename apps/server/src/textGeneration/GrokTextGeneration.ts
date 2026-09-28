@@ -1,3 +1,4 @@
+import { TaskAnalysis } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -54,7 +55,8 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateTaskAnalysis";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -240,6 +242,17 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       };
     });
 
+  const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
+    input,
+  ) =>
+    runGrokJson({
+      operation: "generateTaskAnalysis",
+      cwd: input.cwd,
+      prompt: input.prompt,
+      outputSchemaJson: TaskAnalysis,
+      modelSelection: input.modelSelection,
+    });
+
   const generateThreadTitle: TextGeneration.TextGeneration["Service"]["generateThreadTitle"] =
     Effect.fn("GrokTextGeneration.generateThreadTitle")(function* (input) {
       const { prompt, outputSchema } = buildThreadTitlePrompt({
@@ -268,5 +281,6 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateTaskAnalysis,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

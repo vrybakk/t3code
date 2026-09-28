@@ -1,3 +1,4 @@
+import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
 import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpWorkflowStore from "./clickup/ClickUpWorkflowStore.ts";
 import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
@@ -348,14 +349,16 @@ const PullRequestServiceLive = PullRequestService.layer.pipe(
   Layer.provide(SourceControlRateLimit.layer),
 );
 
+const TextGenerationLayerLive = TextGeneration.layer.pipe(
+  Layer.provide(SourceControlProviderRegistryLayerLive),
+);
+
 const GitManagerLayerLive = GitManager.layer.pipe(
   Layer.provideMerge(ProjectSetupScriptRunner.layer.pipe(Layer.provide(ServerSettingsLayerLive))),
   Layer.provideMerge(WorktreeSetupTracker.layer),
   Layer.provideMerge(GitVcsDriver.layer),
   Layer.provideMerge(SourceControlProviderRegistryLayerLive),
-  Layer.provideMerge(
-    TextGeneration.layer.pipe(Layer.provide(SourceControlProviderRegistryLayerLive)),
-  ),
+  Layer.provideMerge(TextGenerationLayerLive),
 );
 
 const GitLayerLive = Layer.empty.pipe(
@@ -602,6 +605,7 @@ export const makeRoutesLayer = Layer.mergeAll(
 ).pipe(
   // Both transports consume the same service instance, so caches single-flight across clients
   // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
+  Layer.provide(ClickUpTaskAnalysis.layer.pipe(Layer.provide(TextGenerationLayerLive))),
   Layer.provide(ClickUpWorkflow.layer),
   Layer.provide(ClickUpWorkflowStore.layer),
   Layer.provide(PullRequestServiceLive),
