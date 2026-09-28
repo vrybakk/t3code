@@ -127,10 +127,7 @@ it("prepares a linked implementation draft with a skill and compact context", as
     interactionMode: mode,
   });
   const prompt = mocks.setPrompt.mock.calls[0]?.[1] as string;
-  expect(prompt).toContain("$studio-task-workflow Start task task: Fix checkout");
-  expect(prompt).toContain('mode "implement"');
-  expect(prompt).toContain('"research":null');
-  expect(prompt).toContain('"id":"repo"');
+  expect(prompt).toBe("$studio-task-workflow Start task: Fix checkout");
   expect(prompt).not.toContain("Handle empty carts");
   expect(prompt).not.toContain("PM: Check mobile too");
 });
@@ -158,8 +155,7 @@ it("remembers a manually selected repository for the next task in the same locat
     { envMode: "worktree" },
   );
   const prompt = mocks.setPrompt.mock.calls[0]?.[1] as string;
-  expect(prompt).toContain('"id":"repo"');
-  expect(prompt).toContain('"id":"web"');
+  expect(prompt).toBe("$studio-task-workflow Start task: Fix checkout");
 });
 
 it("preselects a project without a saved mapping while keeping manual selection available", async () => {
@@ -232,7 +228,7 @@ it("uses verified nested repositories without creating a worktree at the parent 
     { environmentId: "test", projectId: "repo" },
     { envMode: "local" },
   );
-  expect(mocks.setPrompt.mock.calls[0]?.[1]).toContain('"cwd":"/workspace/api"');
+  expect(mocks.setPrompt.mock.calls[0]?.[1]).toBe("$studio-task-workflow Start task: Fix checkout");
 });
 it.each(["running", "failed", "cancelled"])(
   "does not use a nested checkout from a %s clone",
@@ -261,5 +257,5 @@ it("keeps worktree mode when discovery refreshes an existing Git root", async ()
     { environmentId: "test", projectId: "repo" },
     { envMode: "worktree" },
   );
-  expect(mocks.setPrompt.mock.calls[0]?.[1].match(/"cwd":"\/workspace"/g)).toHaveLength(1);
+  expect(mocks.setPrompt.mock.calls[0]?.[1]).not.toContain("/workspace");
 });

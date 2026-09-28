@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ProviderInstanceId } from "@t3tools/contracts";
 import { buildClickUpTaskPrompt, safeClickUpAttachmentUrl } from "./taskPrompt";
 
 describe("ClickUp task context", () => {
@@ -17,9 +16,7 @@ describe("ClickUp task context", () => {
       commentsMayHaveMore: true,
       attachments: [{ name: "Recording", url: "https://attachments.example.test/video.mp4" }],
     });
-    expect(prompt).toContain("$studio-task-workflow Start task abc: Checkout fix");
-    expect(prompt).toContain('mode "implement"');
-    expect(prompt).toContain("get_linked_clickup_task");
+    expect(prompt).toBe("$studio-task-workflow Start task: Checkout fix");
     expect(prompt).not.toContain("Handle an empty cart.");
     expect(prompt).not.toContain("Verify the mobile layout.");
     expect(prompt).not.toContain("attachments.example.test");
@@ -32,37 +29,5 @@ describe("ClickUp task context", () => {
     expect(safeClickUpAttachmentUrl("https://attachments.example.test/a.pdf")).toBe(
       "https://attachments.example.test/a.pdf",
     );
-  });
-
-  it("preserves global research and review preferences while ignoring a legacy implementation model", () => {
-    const selected = (model: string) => ({ instanceId: ProviderInstanceId.make("codex"), model });
-    const prompt = buildClickUpTaskPrompt(
-      {
-        task: {
-          taskId: "task",
-          workspaceId: "42",
-          name: "Fix",
-          status: "open",
-          listName: "Sprint",
-          description: "",
-        },
-        comments: [],
-        commentsMayHaveMore: false,
-        attachments: [],
-      },
-      {
-        models: {
-          research: selected("research-model"),
-          implementation: selected("legacy-model"),
-          review: selected("review-model"),
-        },
-        repositories: [],
-      },
-    );
-    expect(prompt).toContain("research-model");
-    expect(prompt).toContain("review-model");
-    expect(prompt).not.toContain("legacy-model");
-    expect(prompt).not.toContain('"implementation"');
-    expect(prompt).toContain("Implementation uses this thread's selected model and effort.");
   });
 });

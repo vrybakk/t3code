@@ -4,7 +4,6 @@ import * as Schema from "effect/Schema";
 import { useRef, useState } from "react";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
-import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useClickUpRepositories } from "./useClickUpRepositories";
 import { ClickUpRepositoryClone } from "./ClickUpRepositoryClone";
@@ -41,10 +40,6 @@ export function ClickUpTaskLauncher({
   } = useClickUpRepositories(details.task, environmentId);
   const repositoriesUnavailable =
     checking || discoveryFailed || missing.length > 0 || unavailableLocalIds.length > 0;
-  const defaults = useEnvironmentSettings(
-    environmentId,
-    (settings) => settings.clickUpWorkflowModels,
-  );
   const blocked = details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
   const [showAllRepositories, setShowAllRepositories] = useState(false);
   const [projectId, setProjectId] = useLocalStorage(
@@ -97,29 +92,7 @@ export function ClickUpTaskLauncher({
         environmentSelection: "manual",
         interactionMode,
       });
-      store.setPrompt(
-        draft.draftId,
-        buildClickUpTaskPrompt(details, {
-          models: defaults,
-          repositories: [
-            ...new Map(
-              [...mappedProjects, selectedProject].map((project) => [project.id, project]),
-            ).values(),
-          ].flatMap((project) => [
-            { id: project.id, title: project.title, cwd: project.workspaceRoot },
-            ...localCheckouts
-              .filter(
-                (checkout) =>
-                  checkout.projectId === project.id && checkout.cwd !== project.workspaceRoot,
-              )
-              .map((checkout) => ({
-                id: project.id,
-                title: checkout.cwd.split(/[\\/]/).at(-1) ?? project.title,
-                cwd: checkout.cwd,
-              })),
-          ]),
-        }),
-      );
+      store.setPrompt(draft.draftId, buildClickUpTaskPrompt(details));
     } catch {
       setError("Could not prepare the coding thread. Try again.");
     } finally {
