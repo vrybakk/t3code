@@ -56,7 +56,7 @@ export function savedGithubRepositoryUrl(remoteUrl: string): string | null {
   return githubRepositoryName(url) ? url : null;
 }
 
-interface RepositoryProject {
+export interface RepositoryProject {
   id: ProjectId;
   title: string;
   repositoryIdentity?: RepositoryIdentity | null | undefined;

@@ -51,3 +51,30 @@ it("preserves unsaved model choices and exposes the actual settings failure", as
   expect(renderer.root.findByType("input").props.value).toEqual(models);
   expect(save().props.disabled).toBe(false);
 });
+
+it("clears a legacy implementation override when saving global research and review preferences", async () => {
+  state.update.mockResolvedValue(AsyncResult.success(undefined));
+  await act(async () => {
+    renderer = create(<ClickUpWorkflowSettings environmentId={EnvironmentId.make("test")} />);
+  });
+  const selection = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-6-sol" };
+  await act(async () =>
+    renderer.root.findByType("input").props.onChange({
+      research: selection,
+      implementation: selection,
+      review: null,
+    }),
+  );
+  await act(async () =>
+    renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Save defaults"))!
+      .props.onClick(),
+  );
+  expect(state.update).toHaveBeenCalledWith({
+    environmentId: "test",
+    input: {
+      patch: { clickUpWorkflowModels: { research: selection, implementation: null, review: null } },
+    },
+  });
+});

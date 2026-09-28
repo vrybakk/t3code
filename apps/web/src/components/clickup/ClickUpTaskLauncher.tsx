@@ -1,20 +1,22 @@
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import type {
-  ClickUpTaskDetails,
-  ClickUpWorkflowModels,
-  EnvironmentId,
-  ProjectId,
-} from "@t3tools/contracts";
+import { ProjectId, type ClickUpTaskDetails, type EnvironmentId } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { useRef, useState } from "react";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useClickUpRepositories } from "./useClickUpRepositories";
 import { ClickUpLinkedRepositories } from "./ClickUpLinkedRepositories";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { buildClickUpTaskPrompt } from "./taskPrompt";
-import { ClickUpWorkflowModelPicker } from "./ClickUpWorkflowModels";
+import {
+  clickUpLaunchProjectStorageKey,
+  resolveClickUpLaunchProject,
+} from "./taskProjectSelection";
+
+const SavedProjectId = Schema.NullOr(ProjectId);
 
 export function ClickUpTaskLauncher({
   environmentId,
@@ -35,17 +37,28 @@ export function ClickUpTaskLauncher({
     environmentId,
     (settings) => settings.clickUpWorkflowModels,
   );
-  const [models, setModels] = useState<ClickUpWorkflowModels | null>(null);
   const blocked = details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
   const [showAllRepositories, setShowAllRepositories] = useState(false);
-  const availableProjects = mapping && !showAllRepositories ? mappedProjects : projects;
-  const [projectId, setProjectId] = useState<ProjectId | null>(null);
+  const [projectId, setProjectId] = useLocalStorage(
+    clickUpLaunchProjectStorageKey(details.task, environmentId),
+    null,
+    SavedProjectId,
+  );
+  const availableProjects =
+    mapping && !showAllRepositories
+      ? projects.filter(
+          (project) =>
+            project.id === projectId || mappedProjects.some((mapped) => mapped.id === project.id),
+        )
+      : projects;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const newThread = useNewThreadHandler();
-  const selectedProject = availableProjects.find(
-    (project) =>
-      project.id === (projectId ?? (mappedProjects.length === 1 ? mappedProjects[0]?.id : null)),
+  const selectedProject = resolveClickUpLaunchProject(
+    details.task,
+    availableProjects,
+    mappedProjects,
+    projectId,
   );
   const launching = useRef(false);
   async function prepareThread() {
@@ -73,7 +86,7 @@ export function ClickUpTaskLauncher({
       store.setPrompt(
         draft.draftId,
         buildClickUpTaskPrompt(details, {
-          models: models ?? defaults,
+          models: defaults,
           repositories: [
             ...new Map(
               [...mappedProjects, selectedProject].map((project) => [project.id, project]),
@@ -146,20 +159,6 @@ export function ClickUpTaskLauncher({
           <ClickUpLinkedRepositories task={details.task} environmentId={environmentId} />
         </div>
       )}
-      <details className="w-full space-y-3">
-        <summary className="cursor-pointer text-xs text-muted-foreground">Workflow models</summary>
-        <ClickUpWorkflowModelPicker
-          environmentId={environmentId}
-          value={models ?? defaults}
-          onChange={setModels}
-          disabled={busy}
-        />
-        {models && (
-          <Button size="sm" variant="ghost" onClick={() => setModels(null)}>
-            Use environment defaults
-          </Button>
-        )}
-      </details>
       {blocked && (
         <p role="alert" className="w-full text-sm text-muted-foreground">
           Remove the no agent tag to allow implementation.

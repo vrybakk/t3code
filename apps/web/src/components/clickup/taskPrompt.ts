@@ -14,7 +14,8 @@ export function buildClickUpTaskPrompt(
     `Load get_studio_task_workflow with mode "implement", then get_linked_clickup_task.`,
     ...(workflow
       ? [
-          `Workflow models (null inherits the lead model): ${JSON.stringify(workflow.models)}`,
+          `Workflow models (null inherits the lead model): ${JSON.stringify({ research: workflow.models.research, review: workflow.models.review })}`,
+          "Implementation uses this thread's selected model and effort.",
           `Repository candidates: ${JSON.stringify(workflow.repositories)}`,
         ]
       : []),

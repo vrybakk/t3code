@@ -12,7 +12,7 @@ Parallel tasks need distinct worktrees, ports and browser sessions where support
 
 ## Roles
 
-The launch request supplies research, implementation and review model preferences. A null preference means use the lead agent's selected model and effort. Respect explicit preferences; do not quietly substitute another model or pretend a provider can spawn an unsupported one. Ask the developer when the runtime cannot honor the setup.
+The launch request supplies research and review model preferences from Settings. A null preference means use the lead agent's selected model and effort. Implementation uses the thread's selected model and effort, including for delegated implementation; ignore legacy implementation preferences in older launch requests. Respect explicit research and review preferences; do not quietly substitute another model or pretend a provider can spawn an unsupported one. Ask the developer when the runtime cannot honor the setup.
 
 The lead decides useful delegation based on complexity, repository boundaries and available capacity. Give each agent the relevant scope, owned files/repository, acceptance criteria and expected evidence. Independent investigations or disjoint implementation work may run concurrently. Dependent work waits for its prerequisite. Do not use a fixed number of agents for every task.
 

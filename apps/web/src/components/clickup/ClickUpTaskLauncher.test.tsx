@@ -7,11 +7,13 @@ import {
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
+import { createMemoryStorage } from "../../lib/storage";
 
 const mocks = vi.hoisted(() => ({
   newThread: vi.fn(),
   repositories: {} as Record<string, { remoteUrl: string }[]>,
   clones: [] as { projectId: string; phase: string }[],
+  mappings: {} as Record<string, string[]>,
   setPrompt: vi.fn(),
   setInteractionMode: vi.fn(),
   setDraftThreadContext: vi.fn(),
@@ -22,13 +24,14 @@ vi.mock("../../hooks/useSettings", () => ({
   useEnvironmentSettings: (_: unknown, selector: (settings: unknown) => unknown) =>
     selector({
       ...DEFAULT_SERVER_SETTINGS,
-      clickUpProjectMappings: { "42:list::list": ["repo"] },
+      clickUpProjectMappings: mocks.mappings,
       clickUpRepositoryMappings: mocks.repositories,
     }),
 }));
 vi.mock("../../state/entities", () => ({
   useProjects: () => [
     { id: "repo", environmentId: "test", title: "API" },
+    { id: "web", environmentId: "test", title: "Website" },
     { id: "other", environmentId: "remote", title: "Other environment" },
   ],
 }));
@@ -65,6 +68,11 @@ let renderer: ReactTestRenderer;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.clearAllMocks();
+  vi.stubGlobal(
+    "window",
+    Object.assign(new EventTarget(), { localStorage: createMemoryStorage() }),
+  );
+  mocks.mappings = { "42:list::list": ["repo"] };
   mocks.repositories = {};
   mocks.clones = [];
   mocks.newThread.mockResolvedValue({ draftId: "draft" });
@@ -117,6 +125,52 @@ it("does not write draft context after launch fails", async () => {
   expect(mocks.setDraftThreadContext).not.toHaveBeenCalled();
   expect(renderer.root.findByProps({ role: "alert" }).children.join("")).toContain(
     "Could not prepare",
+  );
+});
+
+it("remembers a manually selected repository for the next task in the same location", async () => {
+  mocks.mappings = { "42:list::list": ["repo", "web"] };
+  await mount();
+  expect(renderer.root.findByType("select").props.value).toBe("repo");
+  await act(async () => renderer.root.findByType("select").props.onValueChange("web"));
+  await act(async () => renderer.unmount());
+  await mount({ ...details, task: { ...details.task, taskId: "next-task" } });
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).toHaveBeenCalledWith(
+    { environmentId: "test", projectId: "web" },
+    { envMode: "worktree" },
+  );
+  const prompt = mocks.setPrompt.mock.calls[0]?.[1] as string;
+  expect(prompt).toContain('"id":"repo"');
+  expect(prompt).toContain('"id":"web"');
+});
+
+it("preselects a project without a saved mapping while keeping manual selection available", async () => {
+  mocks.mappings = {};
+  await mount();
+  expect(renderer.root.findByType("select").props.value).toBe("repo");
+  await act(async () => renderer.root.findByType("select").props.onValueChange("web"));
+  await act(async () => renderer.unmount());
+  await mount({ ...details, task: { ...details.task, taskId: "next-task" } });
+  expect(renderer.root.findByType("select").props.value).toBe("web");
+});
+
+it("restores a deliberate choice outside the linked repositories when the dialog reopens", async () => {
+  await mount();
+  await act(async () =>
+    renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Show all repositories"))!
+      .props.onClick(),
+  );
+  await act(async () => renderer.root.findByType("select").props.onValueChange("web"));
+  await act(async () => renderer.unmount());
+  await mount({ ...details, task: { ...details.task, taskId: "next-task" } });
+  expect(renderer.root.findByType("select").props.value).toBe("web");
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).toHaveBeenCalledWith(
+    { environmentId: "test", projectId: "web" },
+    { envMode: "worktree" },
   );
 });
 
