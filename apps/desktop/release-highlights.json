@@ -3,5 +3,16 @@
   "158b211c7eeab9d7a6b1893b8a7353dd1bae636a": "Report filters stay in place when switching views.",
   "d09416209f239edbce98b834ed7d2a41a9187b22": "See which conversations are running directly in project groups.",
   "08cfb461ad4fd5349f641dff1253347bb55b5abc": "Completed conversations now show a Done indicator in project groups.",
-  "2f91c2f80c165e52f7bff0727adbeb0005b99831": "Add time entries from Overview and browse activity in Reports."
+  "2f91c2f80c165e52f7bff0727adbeb0005b99831": "Add time entries from Overview and browse activity in Reports.",
+  "d15210cd3da79f9a1a495a6309d912d76362a046": "Usage summaries stay aligned when some records have no price.",
+  "94f92a7a386a26c98892b24fabdd0ea9fa804ce3": "Stopping Claude gives active turns time to cancel before the session closes.",
+  "de251fc2971a884cb5b1305ba4daf309dc8cccb0": "Onboarding can continue when importing conversation history is incomplete.",
+  "ab099178a7b7f9728843e90fc95ed90bb61d710d": "Environment status tooltips resize as connection status changes.",
+  "cb97415948cc2c0662a5504ccfe7e97981825ed5": "Agents can use native simulator and Android commands alongside device tools.",
+  "7dfe9f0b7b7d420a8f455c58891d774cb0e5a4fe": "Run ClickUp requirements checks and estimates in the background.",
+  "2d1e0d7a484948303dfd2bd0290d8f08fe973054": "Save ClickUp OAuth setup for desktop connections.",
+  "feec0e4954869095e594925d416489f57cc6cdbb": "Save ClickUp OAuth setup for desktop connections.",
+  "706f7ac371b7e86a260e15d9623c47632c283d21": "See sprint tags and clearer day headings in ClickUp tasks.",
+  "06ff35efa30e982de8c0f06fc989364bf8a4b61d": "Spot mentions of your connected ClickUp account in task comments.",
+  "c829951debbd67a0f981237082fac9330c33a3b1": "Remember task repositories and set them up from ClickUp."
 }

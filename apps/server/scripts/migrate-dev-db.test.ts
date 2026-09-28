@@ -6,6 +6,7 @@ import * as Path from "effect/Path";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { runMigrations } from "../src/persistence/Migrations.ts";
+import migrateAutoSettleDisabledAt from "../src/persistence/Migrations/054_ProjectionThreadsAutoSettleDisabledAt.ts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { runMigrateDevDb } from "./migrate-dev-db.ts";
 
@@ -129,6 +130,46 @@ it.layer(NodeServices.layer)("migrate-dev-db", (it) => {
         assert.equal(error.slot, 1);
         assert.equal(error.appliedName, "SomebodyElsesMigration");
       }
+    }),
+  );
+
+  it.effect("accepts the recognized official slot 54 after migrating the cloned database", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const sourceDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-official-" });
+      const destDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "migrate-dev-db-official-dest-",
+      });
+      const source = path.join(sourceDir, "state.sqlite");
+      yield* withDatabase(
+        source,
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient;
+          yield* runMigrations({ toMigrationInclusive: 53 });
+          yield* migrateAutoSettleDisabledAt;
+          yield* sql`INSERT INTO effect_sql_migrations (migration_id, name)
+          VALUES (54, 'ProjectionThreadsAutoSettleDisabledAt')`;
+        }),
+      );
+      const result = yield* runMigrateDevDb(
+        { baseDir: destDir, source, projects: 5, threadsPerProject: 10 },
+        { sharedHome: sourceDir },
+      );
+      const history = yield* withDatabase(
+        result.databasePath,
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient;
+          return yield* sql`SELECT migration_id, name FROM effect_sql_migrations WHERE migration_id >= 54 ORDER BY migration_id`;
+        }),
+      );
+      assert.deepEqual(history, [
+        { migration_id: 54, name: "ProjectionThreadsAutoSettleDisabledAt" },
+        { migration_id: 55, name: "WorkTrackingReportSnapshots" },
+        { migration_id: 56, name: "ClickUpThreadTasks" },
+        { migration_id: 57, name: "ClickUpWorkflow" },
+        { migration_id: 58, name: "ProjectionThreadsAutoSettleDisabledAt" },
+      ]);
     }),
   );
 

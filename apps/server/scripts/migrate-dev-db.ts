@@ -342,6 +342,15 @@ const verifyMigrationSlots = Effect.fn("verifyMigrationSlots")(function* () {
   const appliedById = new Map(applied.map((row) => [Number(row.migration_id), row.name]));
   for (const [slot, codeName] of migrationManifest) {
     const appliedName = appliedById.get(slot);
+    // Migration 55 restores Nerd's ledger for official installs without rewriting their slot 54.
+    if (
+      slot === 54 &&
+      codeName === "WorkTracking" &&
+      appliedName === "ProjectionThreadsAutoSettleDisabledAt" &&
+      appliedById.get(55) === "WorkTrackingReportSnapshots" &&
+      appliedById.get(58) === "ProjectionThreadsAutoSettleDisabledAt"
+    )
+      continue;
     if (appliedName !== undefined && appliedName !== codeName) {
       return yield* new MigrateDevDbSlotCollisionError({ slot, codeName, appliedName });
     }
