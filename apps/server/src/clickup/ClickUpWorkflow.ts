@@ -194,7 +194,8 @@ export const layer = Layer.effect(
         );
       if (
         found.status === "uncertain" ||
-        (found.status === "submitted" && found.destination === "qa")
+        (found.status === "submitted" &&
+          (found.destination === "qa" || !found.taskScopeFingerprint))
       )
         return found;
       const checkScope = (fingerprint: string) =>
@@ -206,7 +207,7 @@ export const layer = Layer.effect(
               ),
             );
       let receipt: ClickUpHandoff = Object.assign({}, found, {
-        status: "partial" as const,
+        status: found.status === "submitted" ? ("submitted" as const) : ("partial" as const),
         error: null,
       });
       const save = () => store.save(task, receipt);
@@ -225,13 +226,16 @@ export const layer = Layer.effect(
               "A PR changed after review. Review the new head and prepare a new handoff.",
             );
         }
+        const initialTargetStatus = allInitiallyMerged ? yield* qaStatus(task) : "Code Review";
         const initialStatus = taskDetails.task.status.trim().toLowerCase();
         if (!["in progress", "code review"].includes(initialStatus)) {
-          if (!allInitiallyMerged || initialStatus !== (yield* qaStatus(task)).trim().toLowerCase())
+          if (!allInitiallyMerged || initialStatus !== initialTargetStatus.trim().toLowerCase())
             return yield* failure(
               "Submit requires In Progress or Code Review, or the verified merged task's QA status. Review the current task status before continuing.",
             );
         }
+        receipt = Object.assign({}, receipt, { status: "partial" as const });
+        yield* save();
         for (let index = 0; index < receipt.pullRequests.length; index++) {
           const pr = receipt.pullRequests[index]!;
           let live = yield* refreshHandoffPullRequest(prs, pr);

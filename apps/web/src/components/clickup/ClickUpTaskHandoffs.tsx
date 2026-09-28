@@ -101,7 +101,10 @@ function HandoffCard({
   const canSubmit =
     handoff.status === "pending" ||
     handoff.status === "partial" ||
-    (supportsMergedHandoff && handoff.status === "submitted" && handoff.destination !== "qa");
+    (supportsMergedHandoff &&
+      handoff.status === "submitted" &&
+      handoff.destination !== "qa" &&
+      !!handoff.taskScopeFingerprint);
   async function send() {
     if (!checked || !canSubmit || sending.current || unconfirmed) return;
     sending.current = true;

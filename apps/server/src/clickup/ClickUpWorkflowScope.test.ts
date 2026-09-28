@@ -94,3 +94,30 @@ it.effect("reads stored handoffs without fetching comments and task metadata", (
     assert.equal(state.detailReads, 0);
   }).pipe(Effect.provide(database)),
 );
+
+it.effect("preserves completed receipts when merge reconciliation preflight fails", () =>
+  Effect.gen(function* () {
+    const { service, state, sql } = yield* harness();
+    const prepared = yield* service.prepare(task, threadId, input);
+    const submitted = yield* service.submit({ ...task, handoffId: prepared.id });
+    assert.equal(submitted.status, "submitted");
+    const writes = [...state.writes];
+    const comments = [...state.comments];
+    for (const reason of ["scope", "head", "status", "qa", "unlinked"] as const) {
+      state.description = reason === "scope" ? "New acceptance criteria" : "";
+      state.head = reason === "head" ? "new-head" : "abc";
+      state.status = reason === "status" ? "Open" : "Code Review";
+      state.prState = reason === "qa" ? "merged" : "open";
+      state.qaStatuses = reason === "qa" ? [] : ["QA Testing"];
+      if (reason === "unlinked") yield* sql`DELETE FROM projection_thread_pull_requests`;
+      const result = yield* service.submit({ ...task, handoffId: prepared.id });
+      assert.equal(result.status, "submitted");
+      assert.equal(result.destination, "code-review");
+      assert.isNotNull(result.error);
+      assert.deepEqual(result.pullRequests, submitted.pullRequests);
+      assert.deepEqual((yield* service.read(task)).handoffs[0], result);
+      assert.deepEqual(state.writes, writes);
+      assert.deepEqual(state.comments, comments);
+    }
+  }).pipe(Effect.provide(database)),
+);

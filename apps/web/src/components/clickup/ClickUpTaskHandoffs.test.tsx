@@ -18,6 +18,10 @@ vi.mock("../../state/server", () => ({
   },
 }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.submit }));
+vi.mock("../../state/entities", () => ({
+  useServerConfigs: () =>
+    new Map([[environmentId, { environment: { capabilities: { clickUpMergedHandoffs: true } } }]]),
+}));
 vi.mock("../../rpc/atomRegistry", () => ({ appAtomRegistry: { refresh: state.refresh } }));
 vi.mock("@tanstack/react-router", () => ({ Link: "a" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
@@ -63,7 +67,7 @@ async function mount() {
 function submitButton() {
   return renderer.root
     .findAllByType("button")
-    .find((button) => button.children.includes("Submit for code review"))!;
+    .find((button) => button.children.includes("Submit handoff"))!;
 }
 it("requires the developer checkpoint and sends only the selected handoff", async () => {
   await mount();
@@ -100,3 +104,20 @@ it.each(["uncertain", "submitting", "submitted"] as const)(
     expect(state.submit).not.toHaveBeenCalled();
   },
 );
+
+it("offers approved merge reconciliation only for scope-verifiable submitted handoffs", async () => {
+  state.result = AsyncResult.success({
+    handoffs: [{ ...handoff, status: "submitted", taskScopeFingerprint: "reviewed-scope" }],
+  });
+  await mount();
+  const reconcile = renderer.root
+    .findAllByType("button")
+    .find((button) => button.children.includes("Check merge and send to QA"))!;
+  expect(reconcile.props.disabled).toBe(true);
+  await act(async () => renderer.root.findByType("input").props.onCheckedChange(true));
+  await act(async () => reconcile.props.onClick());
+  expect(state.submit).toHaveBeenCalledWith({
+    environmentId,
+    input: { ...input, handoffId: handoff.id },
+  });
+});
