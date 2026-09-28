@@ -1,8 +1,15 @@
-import type { ClickUpTask, EnvironmentId } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import * as Option from "effect/Option";
+import { Atom, AsyncResult } from "effect/unstable/reactivity";
+import type { ClickUpLocalRepository, ClickUpTask, EnvironmentId } from "@t3tools/contracts";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
-import { useProjects } from "../../state/entities";
+import { appAtomRegistry } from "../../rpc/atomRegistry";
+import { serverEnvironment } from "../../state/server";
+import { useProjects, useServerConfigs } from "../../state/entities";
 import { useEnvironmentProjectClones } from "../../state/projectClones";
 import { resolveClickUpMapping, resolveClickUpRepositories } from "./projectMappings";
+
+const inactiveCheckouts = Atom.make(AsyncResult.initial<ReadonlyArray<ClickUpLocalRepository>>());
 
 export function useClickUpRepositories(task: ClickUpTask, environmentId: EnvironmentId) {
   const mappings = useEnvironmentSettings(
@@ -19,7 +26,36 @@ export function useClickUpRepositories(task: ClickUpTask, environmentId: Environ
     (project) => !clones.some((clone) => clone.projectId === project.id && clone.phase !== "done"),
   );
   const mapping = resolveClickUpMapping(task, mappings, repositories);
-  const resolved = resolveClickUpRepositories(mapping, projects);
+  const supportsDiscovery =
+    useServerConfigs().get(environmentId)?.environment.capabilities.clickUpLocalRepositories ===
+    true;
+  const roots = projects.filter(
+    (project) =>
+      !project.repositoryIdentity &&
+      (mapping?.projectIds.includes(project.id) ||
+        mapping?.repositories.some((link) => link.projectId === project.id)),
+  );
+  const needsDiscovery =
+    supportsDiscovery && roots.length > 0 && (mapping?.repositories.length ?? 0) > 0;
+  const checkoutQuery = needsDiscovery
+    ? serverEnvironment.clickUpLocalRepositories({
+        environmentId,
+        input: {
+          projectIds: roots.map((project) => project.id),
+          remoteUrls: mapping!.repositories.map((link) => link.remoteUrl),
+        },
+      })
+    : inactiveCheckouts;
+  const checkoutResult = useAtomValue(checkoutQuery);
+  const localCheckouts = (Option.getOrNull(AsyncResult.value(checkoutResult)) ?? []).filter(
+    (checkout) =>
+      !clones.some(
+        (clone) =>
+          clone.phase !== "done" &&
+          (clone.projectId === checkout.projectId || clone.destinationPath === checkout.cwd),
+      ),
+  );
+  const resolved = resolveClickUpRepositories(mapping, projects, localCheckouts);
   const boundIds = new Set(
     mapping?.repositories.flatMap((link) => (link.projectId ? [link.projectId] : [])) ?? [],
   );
@@ -28,6 +64,10 @@ export function useClickUpRepositories(task: ClickUpTask, environmentId: Environ
   );
   return {
     mapping,
+    localCheckouts,
+    checking: needsDiscovery && AsyncResult.isInitial(checkoutResult),
+    discoveryFailed: needsDiscovery && AsyncResult.isFailure(checkoutResult),
+    retryDiscovery: () => appAtomRegistry.refresh(checkoutQuery),
     mappedProjects: resolved.projects,
     missing: resolved.missing,
     repositories,

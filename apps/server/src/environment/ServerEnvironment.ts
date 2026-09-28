@@ -223,6 +223,7 @@ export const make = Effect.gen(function* () {
       inlineMessageContext: true,
       clickUpTasks: true,
       clickUpRepositorySetup: true,
+      clickUpLocalRepositories: true,
       clickUpOAuthConfiguration: true,
       requiredWorktreeBootstrap: true,
       gitButlerWorkspace: true,

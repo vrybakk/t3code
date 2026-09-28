@@ -55,6 +55,9 @@ destination folder before downloading. Nerd remembers the location and waits for
 to finish before preparing task work. Reopen existing mappings and save their links once to
 retain their repository URLs too. Mappings belong to the selected environment; other developers'
 computers are not configured automatically.
+If a linked workspace contains existing repository folders, Nerd checks their remotes before
+offering a download. Tasks started from such a parent folder use a local thread with those
+repository paths in the prepared request.
 
 Use **Check requirements** or **Estimate task** from the sprint table or task page to run
 background analysis with your environment's default text-generation model. Results appear in

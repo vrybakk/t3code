@@ -3,7 +3,9 @@ import {
   EnvironmentId,
   ProjectId,
   type ClickUpTaskDetails,
+  type ClickUpLocalRepository,
 } from "@t3tools/contracts";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -11,13 +13,24 @@ import { createMemoryStorage } from "../../lib/storage";
 
 const mocks = vi.hoisted(() => ({
   newThread: vi.fn(),
+  checkouts: [] as ClickUpLocalRepository[],
+  checking: false,
   repositories: {} as Record<string, { remoteUrl: string }[]>,
-  clones: [] as { projectId: string; phase: string }[],
+  clones: [] as { projectId: string; phase: string; destinationPath?: string }[],
   mappings: {} as Record<string, string[]>,
   setPrompt: vi.fn(),
   setInteractionMode: vi.fn(),
   setDraftThreadContext: vi.fn(),
 }));
+vi.mock("@effect/atom-react", () => ({
+  useAtomValue: () =>
+    mocks.checking ? AsyncResult.initial() : AsyncResult.success(mocks.checkouts),
+}));
+vi.mock("../../state/server", () => ({ serverEnvironment: { clickUpLocalRepositories: vi.fn() } }));
+vi.mock("../../rpc/atomRegistry", () => ({ appAtomRegistry: { refresh: vi.fn() } }));
+vi.mock("./ClickUpRepositoryMappings", () => ({ ClickUpRepositoryMappings: "manage-links" }));
+vi.mock("./ClickUpRepositoryClone", () => ({ ClickUpRepositoryClone: "clone-repo" }));
+vi.mock("../ui/spinner", () => ({ Spinner: "svg" }));
 vi.mock("../../composerDraftStore", () => ({ useComposerDraftStore: { getState: () => mocks } }));
 vi.mock("../../hooks/useHandleNewThread", () => ({ useNewThreadHandler: () => mocks.newThread }));
 vi.mock("../../hooks/useSettings", () => ({
@@ -29,8 +42,10 @@ vi.mock("../../hooks/useSettings", () => ({
     }),
 }));
 vi.mock("../../state/entities", () => ({
+  useServerConfigs: () =>
+    new Map([["test", { environment: { capabilities: { clickUpLocalRepositories: true } } }]]),
   useProjects: () => [
-    { id: "repo", environmentId: "test", title: "API" },
+    { id: "repo", environmentId: "test", title: "API", workspaceRoot: "/workspace" },
     { id: "web", environmentId: "test", title: "Website" },
     { id: "other", environmentId: "remote", title: "Other environment" },
   ],
@@ -75,6 +90,8 @@ beforeEach(() => {
   mocks.mappings = { "42:list::list": ["repo"] };
   mocks.repositories = {};
   mocks.clones = [];
+  mocks.checkouts = [];
+  mocks.checking = false;
   mocks.newThread.mockResolvedValue({ draftId: "draft" });
 });
 afterEach(async () => {
@@ -199,3 +216,50 @@ it.each(["running", "failed", "cancelled"])(
     expect(mocks.newThread).not.toHaveBeenCalled();
   },
 );
+
+const nestedRepository = {
+  projectId: ProjectId.make("repo"),
+  remoteUrl: "https://github.com/company/api",
+  cwd: "/workspace/api",
+};
+it("uses verified nested repositories without creating a worktree at the parent folder", async () => {
+  mocks.repositories = { "42:list::list": [{ remoteUrl: nestedRepository.remoteUrl }] };
+  mocks.checkouts = [nestedRepository];
+  await mount();
+  expect(prepare().props.disabled).toBe(false);
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).toHaveBeenCalledWith(
+    { environmentId: "test", projectId: "repo" },
+    { envMode: "local" },
+  );
+  expect(mocks.setPrompt.mock.calls[0]?.[1]).toContain('"cwd":"/workspace/api"');
+});
+it.each(["running", "failed", "cancelled"])(
+  "does not use a nested checkout from a %s clone",
+  async (phase) => {
+    mocks.repositories = { "42:list::list": [{ remoteUrl: nestedRepository.remoteUrl }] };
+    mocks.checkouts = [nestedRepository];
+    mocks.clones = [{ projectId: "child", destinationPath: nestedRepository.cwd, phase }];
+    await mount();
+    expect(prepare().props.disabled).toBe(true);
+  },
+);
+it("waits for the existing checkout check before enabling preparation", async () => {
+  mocks.repositories = { "42:list::list": [{ remoteUrl: nestedRepository.remoteUrl }] };
+  mocks.checking = true;
+  await mount();
+  expect(prepare().props.disabled).toBe(true);
+});
+
+it("keeps worktree mode when discovery refreshes an existing Git root", async () => {
+  mocks.repositories = { "42:list::list": [{ remoteUrl: nestedRepository.remoteUrl }] };
+  mocks.checkouts = [{ ...nestedRepository, cwd: "/workspace" }];
+  await mount();
+  expect(prepare().props.disabled).toBe(false);
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).toHaveBeenCalledWith(
+    { environmentId: "test", projectId: "repo" },
+    { envMode: "worktree" },
+  );
+  expect(mocks.setPrompt.mock.calls[0]?.[1].match(/"cwd":"\/workspace"/g)).toHaveLength(1);
+});

@@ -1,6 +1,7 @@
 import { normalizeGitRemoteUrl } from "@t3tools/shared/git";
 import type {
   ClickUpRepositoryLink,
+  ClickUpLocalRepository,
   ClickUpTask,
   ClickUpTaskSource,
   ProjectId,
@@ -65,6 +66,7 @@ export interface RepositoryProject {
 export function resolveClickUpRepositories<T extends RepositoryProject>(
   mapping: ReturnType<typeof resolveClickUpMapping>,
   projects: ReadonlyArray<T>,
+  localCheckouts: ReadonlyArray<ClickUpLocalRepository> = [],
 ) {
   const boundIds = new Set(
     mapping?.repositories.flatMap((link) => (link.projectId ? [link.projectId] : [])) ?? [],
@@ -81,7 +83,17 @@ export function resolveClickUpRepositories<T extends RepositoryProject>(
           repositoryKey(repository.remoteUrl),
     );
     const project =
-      matches.find((candidate) => candidate.id === repository.projectId) ?? matches[0];
+      matches.find((candidate) => candidate.id === repository.projectId) ??
+      matches[0] ??
+      projects.find(
+        (candidate) =>
+          (mapping?.projectIds.includes(candidate.id) || repository.projectId === candidate.id) &&
+          localCheckouts.some(
+            (checkout) =>
+              checkout.projectId === candidate.id &&
+              repositoryKey(checkout.remoteUrl) === repositoryKey(repository.remoteUrl),
+          ),
+      );
     if (project) local.push(project);
     else missing.push(repository);
   }

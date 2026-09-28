@@ -45,6 +45,7 @@ export function ClickUpRepositoryMappings({
     environmentId,
     (settings) => settings.clickUpRepositoryMappings,
   );
+  const linked = resolveClickUpMapping(task, mappings, repositories);
   const supportsSetup =
     useServerConfigs().get(environmentId)?.environment.capabilities.clickUpRepositorySetup === true;
   const projects = useProjects().filter((project) => project.environmentId === environmentId);
@@ -119,7 +120,7 @@ export function ClickUpRepositoryMappings({
     <>
       <Button
         size="sm"
-        variant="outline"
+        variant={linked ? "ghost" : "outline"}
         disabled={!sources.length}
         onClick={() => {
           const mapped = resolveClickUpMapping(task, mappings, repositories)?.sources[0];
@@ -127,7 +128,7 @@ export function ClickUpRepositoryMappings({
           setOpen(true);
         }}
       >
-        Link repositories
+        {linked ? "Manage links" : "Link repositories"}
       </Button>
       <Dialog
         open={open}
