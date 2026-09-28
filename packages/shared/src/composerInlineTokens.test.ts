@@ -3,6 +3,20 @@ import { describe, expect, it } from "vite-plus/test";
 import { collectComposerInlineTokens } from "./composerInlineTokens.ts";
 
 describe("collectComposerInlineTokens", () => {
+  it.each([
+    ["@src/Checkout.tsx", "src/Checkout.tsx"],
+    ['@"src/My Checkout.tsx"', "src/My Checkout.tsx"],
+    ["@README.md", "README.md"],
+  ])("preserves historical file reference %s", (source, path) => {
+    const [token] = collectComposerInlineTokens(`${source} `);
+    expect(token).toMatchObject({ type: "mention", source, start: 0, end: source.length });
+    expect(token?.value).toBe(path);
+  });
+
+  it("leaves bare task searches as text", () => {
+    expect(collectComposerInlineTokens("Find @checkout and @869task next ")).toEqual([]);
+  });
+
   it("collects file links, mentions, and skills with source ranges", () => {
     const text = "Use $ui and inspect [Chat.tsx](src/Chat.tsx) with ~AGENTS.md please";
 
