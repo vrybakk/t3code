@@ -1,8 +1,14 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { ClickUpTask, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
+import type {
+  ClickUpTask,
+  ClickUpTaskInput,
+  EnvironmentId,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
+import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { CalculatorIcon, ListChecksIcon, PlayIcon } from "lucide-react";
+import { CalculatorIcon, EyeIcon, ListChecksIcon, PlayIcon } from "lucide-react";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
@@ -46,10 +52,12 @@ const actions = {
 export function ClickUpTaskActionButtons({
   task,
   compact = false,
+  runningThread,
   onSelect,
 }: {
   task: Pick<ClickUpTask, "name" | "timeEstimate" | "tags">;
   compact?: boolean;
+  runningThread?: ScopedThreadRef | undefined;
   onSelect: (action: ClickUpTaskAction) => void;
 }) {
   return (
@@ -63,6 +71,26 @@ export function ClickUpTaskActionButtons({
     >
       {(Object.keys(actions) as ClickUpTaskAction[]).map((action) => {
         if (action === "estimate" && task.timeEstimate != null) return null;
+        if (action === "implement" && runningThread) {
+          return (
+            <Tooltip key={action}>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size={compact ? "icon-sm" : "default"}
+                    variant="outline"
+                    aria-label={`See running thread: ${task.name}`}
+                    render={<Link to="/$environmentId/$threadId" params={runningThread} />}
+                  />
+                }
+              >
+                <EyeIcon className="size-3.5" />
+                {!compact && "See"}
+              </TooltipTrigger>
+              <TooltipPopup>See running thread</TooltipPopup>
+            </Tooltip>
+          );
+        }
         const blocked =
           action === "implement" &&
           task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");

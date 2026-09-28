@@ -2,6 +2,8 @@ import type { ClickUpTask, EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { FlagIcon, TagIcon } from "lucide-react";
 import { Fragment, useState } from "react";
+import { useThreadShells } from "../../state/entities";
+import { resolveSidebarThreadStatus } from "../Sidebar.logic";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
@@ -11,6 +13,7 @@ import { ClickUpProjectBadge } from "./ClickUpProjectBadge";
 import { ClickUpTaskActionButtons, ClickUpTaskActionDialog } from "./ClickUpTaskActions";
 import type { ClickUpTaskAction } from "./taskPrompt";
 import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
+import { ClickUpSprintTaskActions } from "./ClickUpSprintTaskActions";
 
 export function ClickUpSprintTable({
   environmentId,
@@ -27,6 +30,17 @@ export function ClickUpSprintTable({
   showAll: boolean;
   groups: ReadonlyArray<{ label: string | null; tasks: ReadonlyArray<ClickUpTask> }>;
 }) {
+  const threads = useThreadShells();
+  const runningThreadIds = new Set(
+    threads
+      .filter(
+        (thread) =>
+          thread.environmentId === environmentId &&
+          thread.archivedAt === null &&
+          resolveSidebarThreadStatus(thread) === "working",
+      )
+      .map((thread) => thread.id),
+  );
   const [selection, setSelection] = useState<{
     task: ClickUpTask;
     action: ClickUpTaskAction;
@@ -145,11 +159,22 @@ export function ClickUpSprintTable({
                     </TableCell>
                     <TableCell>
                       <div className="mr-3">
-                        <ClickUpTaskActionButtons
-                          compact
-                          task={task}
-                          onSelect={(action) => setSelection({ task, action })}
-                        />
+                        {runningThreadIds.size > 0 ? (
+                          <ClickUpSprintTaskActions
+                            environmentId={environmentId}
+                            workspaceId={workspaceId}
+                            userId={userId}
+                            task={task}
+                            runningThreadIds={runningThreadIds}
+                            onSelect={(action) => setSelection({ task, action })}
+                          />
+                        ) : (
+                          <ClickUpTaskActionButtons
+                            compact
+                            task={task}
+                            onSelect={(action) => setSelection({ task, action })}
+                          />
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
