@@ -127,41 +127,47 @@ export function ClickUpTaskActionDialog({
       }}
     >
       <DialogPopup>
-        <DialogHeader>
-          <DialogTitle>{actions[action].label}</DialogTitle>
-          <DialogDescription>{actions[action].description}</DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
-          <p className="text-sm font-medium">{taskName}</p>
-          {action !== "implement" ? (
-            <ClickUpBackgroundAction
-              key={`${environmentId}:${input.userId}:${input.taskId}:${action}`}
-              environmentId={environmentId}
-              input={{ ...input, action }}
-              taskName={taskName}
-            />
-          ) : AsyncResult.isFailure(result) ? (
-            <div className="space-y-2">
-              <p role="alert" className="text-sm text-destructive">
-                Could not load task context.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={result.waiting}
-                onClick={() => appAtomRegistry.refresh(query)}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : !details ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading task context…
-            </p>
-          ) : (
-            <ClickUpTaskLauncher environmentId={environmentId} details={details} />
-          )}
-        </DialogPanel>
+        {action !== "implement" ? (
+          <ClickUpBackgroundAction
+            key={`${environmentId}:${input.userId}:${input.workspaceId}:${input.taskId}:${action}`}
+            environmentId={environmentId}
+            input={{ ...input, action }}
+            taskName={taskName}
+            listName={details?.task.listName}
+            onClose={onClose}
+          />
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>{actions[action].label}</DialogTitle>
+              <DialogDescription>{actions[action].description}</DialogDescription>
+            </DialogHeader>
+            <DialogPanel>
+              <p className="text-sm font-medium">{taskName}</p>
+              {AsyncResult.isFailure(result) ? (
+                <div className="space-y-2">
+                  <p role="alert" className="text-sm text-destructive">
+                    Could not load task context.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={result.waiting}
+                    onClick={() => appAtomRegistry.refresh(query)}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : !details ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Loading task context…
+                </p>
+              ) : (
+                <ClickUpTaskLauncher environmentId={environmentId} details={details} />
+              )}
+            </DialogPanel>
+          </>
+        )}
       </DialogPopup>
     </Dialog>
   );

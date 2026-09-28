@@ -61,7 +61,9 @@ repository paths in the prepared request.
 
 Use **Check requirements** or **Estimate task** from the sprint table or task page to run
 background analysis with your environment's default text-generation model. Results appear in
-the action dialog and a completion notification; you can close the dialog while it runs.
+the action dialog; you can close it while analysis runs. Enable notifications in **Settings → General**
+to receive task alerts while Nerd is open. Clicking an alert opens the task. Task analysis uses the same
+sound and in-app notification preferences as threads.
 Reopening shows the same run or its last result for this app session. Use **Run again** for a fresh analysis.
 These actions use the task description and supplied comments. They do not inspect repository
 code or attachment contents, and report missing information when the context is insufficient.
