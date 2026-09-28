@@ -43,6 +43,11 @@ export function ClickUpTaskActivity({
     Schema.Boolean,
   );
   const activityContentId = useId();
+  const connection = useAtomValue(
+    serverEnvironment.clickUpConnection({ environmentId, input: {} }),
+  );
+  const user = Option.getOrNull(AsyncResult.value(connection))?.user;
+  const username = user?.id === input.userId ? user.username : undefined;
   const [cursors, setCursors] = useState<ClickUpCommentCursor[]>([]);
   const [fetchComments, setFetchComments] = useState(false);
   const cursor = cursors.at(-1);
@@ -159,6 +164,7 @@ export function ClickUpTaskActivity({
                   <ClickUpCommentThread
                     key={comment.id}
                     comment={comment}
+                    username={username}
                     environmentId={environmentId}
                     input={input}
                     cursor={cursor}
