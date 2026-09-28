@@ -1,8 +1,20 @@
 # Configure the ClickUp integration
 
-Create an OAuth app from ClickUp's workspace administration settings. Use ClickUp's
-[authentication guide](https://developer.clickup.com/docs/authentication). Configure these values
-in the environment server's process environment:
+Create an OAuth app from ClickUp's workspace administration settings using its
+[authentication guide](https://developer.clickup.com/docs/authentication). In Nerd, open
+**Settings → Integrations → ClickUp → Configure OAuth app** on the developer's environment.
+Enter the client ID, client secret, and the exact redirect URL registered in ClickUp.
+For the Mac app, use `http://localhost:6326/api/integrations/clickup/callback`.
+
+Saved configuration lives in the environment's permission-protected secret store, outside the
+application bundle, and survives application updates. Only clients with `access:write` can read
+configuration metadata or change it. The secret is never returned to the UI; leave it blank to
+retain it when editing the same client ID. Changes take effect immediately and cancel any pending
+sign-in. Disconnecting the account retains the app configuration. Removing saved configuration
+does not disconnect the account and restores any environment-variable configuration.
+
+For deployments provisioned through process environment variables, these remain supported when
+no configuration is saved in Nerd:
 
 | Variable                       | Value                                                         |
 | ------------------------------ | ------------------------------------------------------------- |
@@ -10,11 +22,14 @@ in the environment server's process environment:
 | `T3CODE_CLICKUP_CLIENT_SECRET` | OAuth client secret, kept on the server                       |
 | `T3CODE_CLICKUP_REDIRECT_URI`  | Registered URL ending in `/api/integrations/clickup/callback` |
 
-Never include the secret in a frontend build, commit it, or share it through chat. Each pilot
-environment must receive its configuration through the studio's existing secret provisioning.
-Restart the environment server after configuration, then connect the user's account from
-Settings → Integrations. Configure each server separately; changing the desktop app does not
-configure a remote server.
+Never include the secret in a frontend build, commit it, or share it through chat. Provision it
+once on each developer's machine through the studio's existing secret-sharing process.
+Environment-variable changes require a server restart. Configure each server separately;
+changing the desktop app does not configure a remote server.
+
+During Mac sign-in, Nerd temporarily listens on the registered callback port on loopback only.
+Close any development server using that port before connecting. Nerd never changes the registered
+port silently. The listener closes after the callback, cancellation, or the ten-minute timeout.
 
 For development, register the callback on the actual web origin printed by the dev runner, for
 example `http://localhost:<web-port>/api/integrations/clickup/callback`. Vite proxies `/api` to the

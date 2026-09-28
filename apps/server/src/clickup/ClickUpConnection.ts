@@ -2,11 +2,12 @@ import {
   AuthAccessWriteScope,
   type AuthSessionId,
   ClickUpError,
+  type ClickUpOAuthConfig,
+  type ClickUpSaveOAuthConfigInput,
   type ClickUpConnection as Connection,
 } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
 import * as Clock from "effect/Clock";
-import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -15,12 +16,14 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import { ServerSecretStore } from "../auth/ServerSecretStore.ts";
 import { SessionStore } from "../auth/SessionStore.ts";
 import { ApiUser, ApiWorkspace, ClickUpApi, decodeResponse } from "./ClickUpApi.ts";
+
+import { makeOAuthConfig } from "./ClickUpOAuthConfig.ts";
+import { ClickUpCallbackListener } from "./ClickUpCallbackListener.ts";
 
 const Token = Schema.Struct({ access_token: Schema.String });
 const SECRET_NAME = "clickup-access-token";
@@ -29,6 +32,11 @@ const failure = (message: string) => new ClickUpError({ message });
 export class ClickUpConnection extends Context.Service<
   ClickUpConnection,
   {
+    readonly oauthConfig: Effect.Effect<ClickUpOAuthConfig, ClickUpError>;
+    readonly saveOAuthConfig: (
+      input: ClickUpSaveOAuthConfigInput,
+    ) => Effect.Effect<ClickUpOAuthConfig, ClickUpError>;
+    readonly clearOAuthConfig: Effect.Effect<ClickUpOAuthConfig, ClickUpError>;
     readonly status: Effect.Effect<Connection, ClickUpError>;
     readonly account: Effect.Effect<{ token: string; connection: Connection }, ClickUpError>;
     readonly begin: (
@@ -50,20 +58,16 @@ export const layer = Layer.effect(
     const sessions = yield* SessionStore;
     const api = yield* ClickUpApi;
     const crypto = yield* Crypto.Crypto;
-    const clientId = yield* Config.String("T3CODE_CLICKUP_CLIENT_ID").pipe(Config.withDefault(""));
-    const clientSecret = yield* Config.Redacted("T3CODE_CLICKUP_CLIENT_SECRET").pipe(
-      Config.withDefault(Redacted.make("")),
-    );
-    const redirectUri = yield* Config.String("T3CODE_CLICKUP_REDIRECT_URI").pipe(
-      Config.withDefault(""),
-    );
-    const configured = Boolean(clientId && Redacted.value(clientSecret) && redirectUri);
+    const config = yield* makeOAuthConfig;
+    const listener = yield* ClickUpCallbackListener;
     const gate = yield* Semaphore.make(1);
     let pending: {
       state: string;
       sessionId: AuthSessionId;
       expiresAt: number;
       returnToApp: boolean;
+      clientId: string;
+      clientSecret: string;
     } | null = null;
 
     const readToken = secrets.get(SECRET_NAME).pipe(
@@ -86,7 +90,7 @@ export const layer = Layer.effect(
         .request("team", { token: accessToken })
         .pipe(Effect.flatMap(decodeResponse(Schema.Struct({ teams: Schema.Array(ApiWorkspace) }))));
       return {
-        configured,
+        configured: (yield* config.read).source !== "none",
         user: {
           id: user.user.id,
           username: user.user.username ?? String(user.user.id),
@@ -103,7 +107,14 @@ export const layer = Layer.effect(
     const status = readToken.pipe(
       Effect.flatMap(
         Option.match({
-          onNone: () => Effect.succeed<Connection>({ configured, user: null, workspaces: [] }),
+          onNone: () =>
+            config.read.pipe(
+              Effect.map((value): Connection => ({
+                configured: value.source !== "none",
+                user: null,
+                workspaces: [],
+              })),
+            ),
           onSome: (token) => Cache.get(accounts, token),
         }),
       ),
@@ -139,16 +150,36 @@ export const layer = Layer.effect(
       sessionId: AuthSessionId,
       returnToApp = false,
     ) {
-      if (!configured)
+      const credentials = yield* config.read;
+      if (credentials.source === "none")
         return yield* failure("ClickUp OAuth is not configured on this environment.");
       const state = yield* crypto.randomUUIDv4.pipe(
         Effect.mapError(() => failure("Could not start ClickUp authorization.")),
       );
       const now = yield* Clock.currentTimeMillis;
-      pending = { state, sessionId, expiresAt: now + 10 * 60_000, returnToApp };
+      yield* listener.stop;
+      pending = {
+        state,
+        sessionId,
+        expiresAt: now + 10 * 60_000,
+        returnToApp,
+        clientId: credentials.clientId,
+        clientSecret: credentials.clientSecret,
+      };
+      yield* listener
+        .start(credentials.redirectUri, state, (state, code) =>
+          complete(state, code).pipe(gate.withPermit),
+        )
+        .pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              pending = null;
+            }),
+          ),
+        );
       const url = new URL("https://app.clickup.com/api");
-      url.searchParams.set("client_id", clientId);
-      url.searchParams.set("redirect_uri", redirectUri);
+      url.searchParams.set("client_id", credentials.clientId);
+      url.searchParams.set("redirect_uri", credentials.redirectUri);
       url.searchParams.set("state", state);
       return { url: url.toString() };
     });
@@ -168,7 +199,7 @@ export const layer = Layer.effect(
       yield* verifyInitiator(flow.sessionId);
       const result = yield* api
         .request("oauth/token", {
-          body: { client_id: clientId, client_secret: Redacted.value(clientSecret), code },
+          body: { client_id: flow.clientId, client_secret: flow.clientSecret, code },
         })
         .pipe(Effect.flatMap(decodeResponse(Token)));
       yield* readAccount(result.access_token);
@@ -182,12 +213,28 @@ export const layer = Layer.effect(
 
     const disconnect = Effect.gen(function* () {
       pending = null;
+      yield* listener.stop;
       yield* Cache.invalidateAll(accounts);
       yield* secrets
         .remove(SECRET_NAME)
         .pipe(Effect.mapError(() => failure("Could not remove the ClickUp connection.")));
     });
+    const invalidateConfiguration = Effect.gen(function* () {
+      pending = null;
+      yield* listener.stop;
+      yield* Cache.invalidateAll(accounts);
+    });
     return ClickUpConnection.of({
+      oauthConfig: config.metadata.pipe(gate.withPermit),
+      saveOAuthConfig: (input) =>
+        config.save(input).pipe(
+          Effect.tap(() => invalidateConfiguration),
+          gate.withPermit,
+        ),
+      clearOAuthConfig: config.clear.pipe(
+        Effect.tap(() => invalidateConfiguration),
+        gate.withPermit,
+      ),
       status,
       account,
       begin: (id, returnToApp) => begin(id, returnToApp).pipe(gate.withPermit),

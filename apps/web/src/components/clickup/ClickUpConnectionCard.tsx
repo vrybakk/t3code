@@ -110,7 +110,7 @@ export function ClickUpConnectionCard({ environmentId }: { environmentId: Enviro
             : data?.user
               ? `Connected as ${data.user.username}`
               : data?.configured === false
-                ? "Your CTO needs to configure ClickUp for this environment before you can connect."
+                ? "Configure the ClickUp OAuth app in Settings → Integrations before connecting."
                 : signingIn
                   ? "Finish signing in to ClickUp in your browser. Nerd will connect automatically."
                   : result.waiting

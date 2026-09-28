@@ -1,8 +1,11 @@
 # ClickUp tasks
 
 Connect your own ClickUp account in **Settings → Integrations → ClickUp**. Select the environment
-that owns your projects first. Your CTO must configure the integration on that environment before
-sign-in is available. After authorizing ClickUp, return to Nerd. Your connection updates automatically.
+that owns your projects first. For first-time setup, use **Configure OAuth app** and enter the
+client ID, secret, and registered redirect URL supplied by your CTO. This is needed once per
+machine and survives app updates. The secret stays hidden after saving; leave its field blank
+when editing other settings to keep it. Then connect your own account. After authorizing ClickUp,
+return to Nerd. Your connection updates automatically.
 
 Open **Tasks** from the sidebar or command palette and select the Nerd studio workspace.
 The sprint sidebar shows three previous sprints, the active sprint, and the next sprint when
