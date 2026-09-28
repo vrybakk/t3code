@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { ArrowLeftIcon, Settings2Icon } from "lucide-react";
+import type { ReactNode } from "react";
 import { isElectron } from "../../env";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
@@ -17,31 +18,71 @@ import { ClickUpTaskWorkspace } from "./ClickUpTaskWorkspace";
 
 export function ClickUpPage() {
   const search = useSearch({ from: "/tasks" });
-  const navigate = useNavigate({ from: "/tasks" });
   const primaryId = usePrimaryEnvironmentId();
   const { environments } = useEnvironments();
   const environmentId = search.environmentId ?? primaryId;
   const environment = environments.find((candidate) => candidate.environmentId === environmentId);
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden">
-      <WorkspacePageHeader electron={isElectron} className="border-b border-border">
-        {search.taskId ? (
-          <Link
-            to="/tasks"
-            search={({ taskId: _taskId, ...rest }) => rest}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeftIcon className="size-4" /> Tasks
-          </Link>
-        ) : (
-          <h1 className="text-sm font-medium">Tasks</h1>
-        )}
-        {search.taskId && (
-          <span className="truncate text-xs text-muted-foreground">/ {search.taskId}</span>
-        )}
-        <div className="ml-auto w-52 max-w-[50%]">
+      {!environmentId || environment?.connection.phase !== "connected" ? (
+        <>
+          <TasksHeader environmentId={environmentId} />
+          <p className="p-8 text-sm text-muted-foreground">
+            Connect to an environment to see its ClickUp tasks.
+          </p>
+        </>
+      ) : environment.serverConfig?.environment.capabilities.clickUpTasks !== true ? (
+        <>
+          <TasksHeader environmentId={environmentId} />
+          <p className="p-8 text-sm text-muted-foreground">
+            Update this environment to use ClickUp tasks.
+          </p>
+        </>
+      ) : (
+        <ConnectedTasks key={environmentId} environmentId={environmentId} />
+      )}
+    </SidebarInset>
+  );
+}
+
+/** Page top bar; `controls` follow the title and `actions` sit before the environment picker. */
+function TasksHeader({
+  environmentId,
+  controls,
+  actions,
+}: {
+  environmentId: EnvironmentId | null | undefined;
+  controls?: ReactNode;
+  actions?: ReactNode;
+}) {
+  const search = useSearch({ from: "/tasks" });
+  const navigate = useNavigate({ from: "/tasks" });
+  const { environments } = useEnvironments();
+  return (
+    <WorkspacePageHeader
+      electron={isElectron}
+      className="h-auto flex-wrap border-b border-border py-1"
+    >
+      {search.taskId ? (
+        <Link
+          to="/tasks"
+          search={({ taskId: _taskId, ...rest }) => rest}
+          className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-4" /> Tasks
+        </Link>
+      ) : (
+        <h1 className="shrink-0 text-sm font-medium">Tasks</h1>
+      )}
+      {search.taskId && (
+        <span className="truncate text-xs text-muted-foreground">/ {search.taskId}</span>
+      )}
+      {controls}
+      <div className="ml-auto flex min-w-0 flex-wrap items-center gap-3">
+        {actions}
+        <div className="w-52 min-w-36 max-w-[40vw] shrink-0">
           <Select
-            value={environmentId}
+            value={environmentId ?? null}
             onValueChange={(value) => {
               if (value) void navigate({ search: { environmentId: value as EnvironmentId } });
             }}
@@ -59,19 +100,8 @@ export function ClickUpPage() {
             </SelectPopup>
           </Select>
         </div>
-      </WorkspacePageHeader>
-      {!environmentId || environment?.connection.phase !== "connected" ? (
-        <p className="p-8 text-sm text-muted-foreground">
-          Connect to an environment to see its ClickUp tasks.
-        </p>
-      ) : environment.serverConfig?.environment.capabilities.clickUpTasks !== true ? (
-        <p className="p-8 text-sm text-muted-foreground">
-          Update this environment to use ClickUp tasks.
-        </p>
-      ) : (
-        <ConnectedTasks key={environmentId} environmentId={environmentId} />
-      )}
-    </SidebarInset>
+      </div>
+    </WorkspacePageHeader>
   );
 }
 
@@ -86,43 +116,52 @@ function ConnectedTasks({ environmentId }: { environmentId: EnvironmentId }) {
     : account?.workspaces[0]?.id;
   return (
     <>
-      {!search.taskId && (
-        <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
-          <div className="w-56 max-w-[60%]">
-            <Select
-              value={workspaceId ?? null}
-              onValueChange={(value) => {
-                if (value) void navigate({ search: { environmentId, workspaceId: value } });
-              }}
-              items={(account?.workspaces ?? []).map((item) => ({
-                value: item.id,
-                label: item.name,
-              }))}
+      <TasksHeader
+        environmentId={environmentId}
+        controls={
+          !search.taskId && (
+            <>
+              <div className="w-48 shrink-0">
+                <Select
+                  value={workspaceId ?? null}
+                  onValueChange={(value) => {
+                    if (value) void navigate({ search: { environmentId, workspaceId: value } });
+                  }}
+                  items={(account?.workspaces ?? []).map((item) => ({
+                    value: item.id,
+                    label: item.name,
+                  }))}
+                >
+                  <SelectTrigger aria-label="ClickUp workspace">
+                    <SelectValue placeholder="ClickUp workspace" />
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {account?.workspaces.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </div>
+              <span className="hidden truncate text-xs text-muted-foreground md:block">
+                {account?.user?.username}
+              </span>
+            </>
+          )
+        }
+        actions={
+          !search.taskId && (
+            <Link
+              to="/settings/integrations"
+              search={{ machine: environmentId }}
+              className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
             >
-              <SelectTrigger aria-label="ClickUp workspace">
-                <SelectValue placeholder="ClickUp workspace" />
-              </SelectTrigger>
-              <SelectPopup>
-                {account?.workspaces.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-          </div>
-          <span className="hidden truncate text-xs text-muted-foreground sm:block">
-            {account?.user?.username}
-          </span>
-          <Link
-            to="/settings/integrations"
-            search={{ machine: environmentId }}
-            className="ml-auto flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <Settings2Icon className="size-4" /> Connection
-          </Link>
-        </div>
-      )}
+              <Settings2Icon className="size-4" /> Connection
+            </Link>
+          )
+        }
+      />
       {AsyncResult.isFailure(result) ? (
         <div className="space-y-3 p-8">
           <p role="alert" className="text-sm text-destructive">

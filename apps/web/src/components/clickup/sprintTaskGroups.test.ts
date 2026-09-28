@@ -106,6 +106,26 @@ describe("sprint task ordering", () => {
     expect(groups.deliveryCount).toBe(5);
   });
 
+  it("leads each group with critical tasks by priority without moving them between groups", () => {
+    const critical = (id: string, status: string, priority: string | null): ClickUpTask => ({
+      ...task(id, status, priority),
+      tags: ["frontend", " Critical "],
+    });
+    const groups = groupSprintTasks([
+      task("urgent", "to do", "urgent"),
+      critical("critical-low", "to do", "low"),
+      critical("critical-high", "in progress", "high"),
+      { ...critical("critical-overdue", "in progress", null), dueDate: "1" },
+      task("review-urgent", "code review", "urgent"),
+      critical("critical-review", "code review", "low"),
+    ]);
+    expect(groups.days.map((group) => group.tasks.map((task) => task.taskId))).toEqual([
+      ["critical-overdue"],
+      ["critical-high", "critical-low", "urgent"],
+    ]);
+    expect(groups.review.map((task) => task.taskId)).toEqual(["critical-review", "review-urgent"]);
+  });
+
   it("keeps other statuses visible, preserves equal-priority order, and omits empty groups", () => {
     const groups = groupSprintTasks([
       task("a", "ready", "high"),

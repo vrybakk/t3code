@@ -12,6 +12,8 @@ import { Button } from "../ui/button";
 import { Command, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
+import { taskColor } from "./taskFormatting";
 
 interface Props {
   environmentId: EnvironmentId;
@@ -34,6 +36,24 @@ export function ClickUpStatusPicker(
         </TooltipPopup>
       </Tooltip>
       <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
+    </TaskEditor>
+  );
+}
+
+export function ClickUpStatusIconPicker(
+  props: Props & { status: string; color?: string | null | undefined; taskType: string },
+) {
+  return (
+    <TaskEditor
+      {...props}
+      kind="status"
+      tooltip={
+        <>
+          {props.taskType} · <span className="uppercase">{props.status}</span>
+        </>
+      }
+    >
+      <ClickUpTaskTypeIcon name={props.taskType} color={props.color} />
     </TaskEditor>
   );
 }
@@ -61,26 +81,39 @@ export function ClickUpTagsPicker(props: Props & { tags: ReadonlyArray<string> }
 function TaskEditor({
   kind,
   children,
+  tooltip,
   ...props
 }: Props & {
   kind: "status" | "tags";
   children: React.ReactNode;
+  /** Renders an icon-only trigger that explains itself on hover. */
+  tooltip?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const button = tooltip ? (
+    <Button variant="ghost" size="icon-xs" />
+  ) : (
+    <Button
+      variant="ghost"
+      size={kind === "tags" ? "sm-multiline" : "xs"}
+      className="max-w-full justify-start"
+    />
+  );
+  const label = `Change ${kind} for ${props.taskName}`;
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="ghost"
-            size={kind === "tags" ? "sm-multiline" : "xs"}
-            className="max-w-full justify-start"
-          />
-        }
-        aria-label={`Change ${kind} for ${props.taskName}`}
-      >
-        {children}
-      </PopoverTrigger>
+      {tooltip ? (
+        <Tooltip disabled={open}>
+          <TooltipTrigger render={<PopoverTrigger render={button} aria-label={label} />}>
+            {children}
+          </TooltipTrigger>
+          <TooltipPopup>{tooltip}</TooltipPopup>
+        </Tooltip>
+      ) : (
+        <PopoverTrigger render={button} aria-label={label}>
+          {children}
+        </PopoverTrigger>
+      )}
       <PopoverPopup align="start" className="w-72" padding="none">
         {open && <EditorOptions {...props} kind={kind} onDone={() => setOpen(false)} />}
       </PopoverPopup>
@@ -207,11 +240,12 @@ function statusGroup(type: string | null): string {
 }
 
 function ColorDot({ color }: { color?: string | null | undefined }) {
+  const tint = taskColor(color);
   return (
     <span
       aria-hidden
       className="size-2 shrink-0 rounded-full bg-muted-foreground"
-      style={color && /^#[0-9a-f]{3,8}$/i.test(color) ? { backgroundColor: color } : undefined}
+      style={tint ? { backgroundColor: tint } : undefined}
     />
   );
 }

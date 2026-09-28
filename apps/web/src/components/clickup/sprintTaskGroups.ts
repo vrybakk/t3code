@@ -8,6 +8,10 @@ function taskPriorityRank(priority: string | null | undefined): number {
   return rank === -1 ? PRIORITIES.length : rank;
 }
 
+function isCritical(task: ClickUpTask): boolean {
+  return task.tags?.some((tag) => tag.trim().toLowerCase() === "critical") ?? false;
+}
+
 function localDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
@@ -32,9 +36,12 @@ function dayLabel(day: number, now: Date): string {
   return day < today ? `Overdue · ${date}` : date;
 }
 
+/** Splits sprint tasks into list sections; each section leads with critical tasks, then priority. */
 export function groupSprintTasks(tasks: ReadonlyArray<ClickUpTask>, now = new Date()) {
   const sorted = tasks.toSorted(
-    (a, b) => taskPriorityRank(a.priority) - taskPriorityRank(b.priority),
+    (a, b) =>
+      Number(isCritical(b)) - Number(isCritical(a)) ||
+      taskPriorityRank(a.priority) - taskPriorityRank(b.priority),
   );
   const statusOf = (task: ClickUpTask) => task.status.trim().toLowerCase();
   const delivery = DELIVERY_STATUSES.map((status) => ({

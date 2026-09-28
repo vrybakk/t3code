@@ -14,9 +14,10 @@ including tasks planned from other project spaces and completed work.
 Sprints initially show tasks assigned to you. Use **Show all** to see the team's tasks;
 your selection is preserved while opening a task and returning to the sprint.
 Active tasks are grouped by due day in your local timezone, earliest first, with a count for each
-day and priority ordering within it. Undated tasks follow the dated groups, then Code Review. QA Testing,
+day. Undated tasks follow the dated groups, then Code Review. QA Testing,
 Staging, and In Production are collapsed below it; expand the section to see those groups
-in that order, each sorted by priority. Tasks without a priority appear last in their group.
+in that order. Within each group, tasks tagged `critical` appear first. Critical and other tasks
+are each sorted by priority, with tasks without a priority last within each set.
 
 Change a task's status from the sprint table or task details. Add or remove tags in task details.
 The choices come from that task's original project list and space, including when it is
