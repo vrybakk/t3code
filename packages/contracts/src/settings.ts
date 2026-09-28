@@ -42,6 +42,12 @@ import {
 } from "./providerInstance.ts";
 import { PullRequestMergeMethod } from "./pullRequest.ts";
 
+export const ClickUpRepositoryLink = Schema.Struct({
+  remoteUrl: TrimmedNonEmptyString,
+  projectId: Schema.optionalKey(ProjectId),
+});
+export type ClickUpRepositoryLink = typeof ClickUpRepositoryLink.Type;
+
 export const ClickUpWorkflowModels = Schema.Struct({
   research: Schema.NullOr(ModelSelection),
   implementation: Schema.NullOr(ModelSelection),
@@ -1138,6 +1144,10 @@ export const ServerSettings = Schema.Struct({
   clickUpProjectMappings: Schema.Record(TrimmedNonEmptyString, Schema.Array(ProjectId)).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
+  clickUpRepositoryMappings: Schema.Record(
+    TrimmedNonEmptyString,
+    Schema.Array(ClickUpRepositoryLink),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   defaultAutoPull: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   defaultProjectScripts: Schema.Array(ProjectScript).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
@@ -1500,6 +1510,9 @@ export const ServerSettingsPatch = Schema.Struct({
   clickUpWorkflowModels: Schema.optionalKey(ClickUpWorkflowModels),
   clickUpProjectMappings: Schema.optionalKey(
     Schema.Record(TrimmedNonEmptyString, Schema.NullOr(Schema.Array(ProjectId))),
+  ),
+  clickUpRepositoryMappings: Schema.optionalKey(
+    Schema.Record(TrimmedNonEmptyString, Schema.NullOr(Schema.Array(ClickUpRepositoryLink))),
   ),
   defaultAutoPull: Schema.optionalKey(Schema.Boolean),
   defaultProjectScripts: Schema.optionalKey(Schema.Array(ProjectScript)),

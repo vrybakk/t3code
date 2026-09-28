@@ -12,7 +12,7 @@ import { Badge } from "../ui/badge";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { safeClickUpAttachmentUrl } from "./taskPrompt";
 import { ClickUpTaskHandoffs } from "./ClickUpTaskHandoffs";
-import { ClickUpRepositoryMappings } from "./ClickUpRepositoryMappings";
+import { ClickUpLinkedRepositories } from "./ClickUpLinkedRepositories";
 
 export function ClickUpTaskWork({
   environmentId,
@@ -49,6 +49,7 @@ export function ClickUpTaskWork({
       <h3 className="flex items-center gap-2 text-sm font-medium">
         Linked work <Badge variant="secondary">Nerd</Badge>
       </h3>
+      <ClickUpLinkedRepositories task={details.task} environmentId={environmentId} />
       {AsyncResult.isFailure(linksResult) ? (
         <p role="alert" className="text-sm text-destructive">
           Could not load linked work. Refresh the task to retry.
@@ -108,7 +109,6 @@ export function ClickUpTaskWork({
         </dl>
       )}
       <ClickUpTaskHandoffs environmentId={environmentId} input={input} />
-      <ClickUpRepositoryMappings task={details.task} environmentId={environmentId} />
     </section>
   );
 }
