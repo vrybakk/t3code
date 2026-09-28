@@ -14,5 +14,18 @@
   "feec0e4954869095e594925d416489f57cc6cdbb": "Save ClickUp OAuth setup for desktop connections.",
   "706f7ac371b7e86a260e15d9623c47632c283d21": "See sprint tags and clearer day headings in ClickUp tasks.",
   "06ff35efa30e982de8c0f06fc989364bf8a4b61d": "Spot mentions of your connected ClickUp account in task comments.",
-  "c829951debbd67a0f981237082fac9330c33a3b1": "Remember task repositories and set them up from ClickUp."
+  "c829951debbd67a0f981237082fac9330c33a3b1": "Remember task repositories and set them up from ClickUp.",
+  "19c213ef421f545ef605d0d0f0ce529f385080d9": "Attach ClickUp tasks with @, search across your workspace, and use ~ for files and folders.",
+  "6f24356c9bbdec5dbfc9006a93d4ff42bdc1b02d": "Show saved sprint tasks immediately when returning to Tasks, then refresh in the background.",
+  "a882862d511f60adef6a0e4937eb35c234e2b6ce": "Automatically archive single-task threads after completion, keeping their history available to reopen.",
+  "4661af57e039b0409cf85e510b29fe97a48a1db2": "Automatically archive a thread when all its linked tasks are completed, preserving its history.",
+  "d8c29711916187f37b032cd500043923c1b90e32": "Sync recorded agent runtime and manual work to ClickUp after handoff, with task allocation and duplicate protection.",
+  "43ec6acec00c9c3bb7317d24b8dacd1fc031a112": "Task estimates now inspect linked code and available attachments, with separate implementation and verification times and clear evidence gaps.",
+  "a06c75b54f1f108192396d519af32f9f602897d0": "See an explicit On or Off state for Keep Awake at the right edge of the sidebar.",
+  "ae6f253cd108159193102830cfbc3a31ae961b8c": "Start tasks with a remembered workspace, existing linked repositories, and a compact composer prompt.",
+  "2daa49c89db00f3632101695d75b65ad3d95a5d7": "Select the Studio Task Workflow directly from the $ skill picker.",
+  "6230dc3b388d70ffbfc1fe5043ec2f7549ea6f54": "Turn the GitButler integration off and on from Settings.",
+  "fcc4575093b776981381218ca29c44be7dd4de95": "See primary and additional linked tasks throughout a conversation.",
+  "82481bf7e9a40435ab49d39a39e3bfce256defa3": "Browse a denser task list with project details in tooltips.",
+  "a364309b12f6ffa934f628a15e3fe60b7ffa50a1": "Review handoffs from the thread and move already-merged work to QA."
 }
