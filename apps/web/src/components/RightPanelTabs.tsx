@@ -17,6 +17,7 @@ import {
   Bot,
   ListTodo,
   ClipboardList,
+  ClipboardCheck,
   Smartphone,
   ChevronDown,
   ChevronLeft,
@@ -127,6 +128,7 @@ interface RightPanelTabsProps {
   onAddPullRequests: () => void;
   onAddTask?: (() => void) | undefined;
   onAddTasks?: (() => void) | undefined;
+  onAddHandoff?: (() => void) | undefined;
   onAddAgents: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
@@ -138,6 +140,7 @@ interface RightPanelTabsProps {
   pullRequestsAvailable: boolean;
   taskAvailable?: boolean | undefined;
   tasksAvailable?: boolean | undefined;
+  handoffAvailable?: boolean | undefined;
   agentsAvailable: boolean;
   deviceAvailable: boolean;
   pullRequestStatusSeeds?: Readonly<Record<string, PullRequestTabStatusSeed>>;
@@ -338,6 +341,7 @@ function RightPanelEmptyState(props: {
   onAddPullRequests: () => void;
   onAddTask?: (() => void) | undefined;
   onAddTasks?: (() => void) | undefined;
+  onAddHandoff?: (() => void) | undefined;
   onAddAgents: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
@@ -349,6 +353,7 @@ function RightPanelEmptyState(props: {
   pullRequestsAvailable: boolean;
   taskAvailable?: boolean | undefined;
   tasksAvailable?: boolean | undefined;
+  handoffAvailable?: boolean | undefined;
   agentsAvailable: boolean;
   deviceAvailable: boolean;
   liveAgentCount: number;
@@ -419,6 +424,15 @@ function RightPanelEmptyState(props: {
       available: props.taskAvailable === true,
       disabledReason: "No task is linked to this thread.",
       onClick: () => props.onAddTask?.(),
+      badgeCount: 0,
+    },
+    {
+      label: "Handoff",
+      icon: ClipboardCheck,
+      shortcut: "H",
+      available: props.handoffAvailable === true,
+      disabledReason: "No primary workflow task is linked.",
+      onClick: () => props.onAddHandoff?.(),
       badgeCount: 0,
     },
     {
@@ -677,6 +691,8 @@ function surfaceTitle(
       return surface.task.name;
     case "tasks":
       return "Linked tasks";
+    case "handoff":
+      return "Handoff";
     case "agents":
       return "Agents";
     case "device":
@@ -768,6 +784,8 @@ function SurfaceIcon({
       return <ClipboardList className="size-3 shrink-0" />;
     case "tasks":
       return <ListTodo className="size-3 shrink-0" />;
+    case "handoff":
+      return <ClipboardCheck className="size-3 shrink-0" />;
     case "agents":
       return <Bot className="size-3 shrink-0" />;
     case "device":
@@ -981,6 +999,15 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       available: props.taskAvailable === true,
       disabledReason: "No task is linked to this thread.",
       onClick: () => props.onAddTask?.(),
+      badgeCount: 0,
+    },
+    {
+      label: "Handoff",
+      icon: ClipboardCheck,
+      shortcut: "H",
+      available: props.handoffAvailable === true,
+      disabledReason: "No primary workflow task is linked.",
+      onClick: () => props.onAddHandoff?.(),
       badgeCount: 0,
     },
     {
@@ -1500,6 +1527,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequests={props.onAddPullRequests}
             onAddTask={props.onAddTask}
             onAddTasks={props.onAddTasks}
+            onAddHandoff={props.onAddHandoff}
+            handoffAvailable={props.handoffAvailable}
             taskAvailable={props.taskAvailable}
             tasksAvailable={props.tasksAvailable}
             onAddAgents={props.onAddAgents}

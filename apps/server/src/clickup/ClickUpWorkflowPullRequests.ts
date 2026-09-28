@@ -14,10 +14,15 @@ export const refreshHandoffPullRequest = Effect.fn("ClickUpWorkflow.refreshPr")(
   const detail = yield* prs
     .detail(ref)
     .pipe(Effect.mapError((error) => new ClickUpError({ message: error.message })));
-  if (detail.provider !== "github" || !detail.headSha || !detail.author || detail.state !== "open")
+  if (
+    detail.provider !== "github" ||
+    !detail.headSha ||
+    !detail.author ||
+    (detail.state !== "open" && detail.state !== "merged")
+  )
     return yield* new ClickUpError({
       message:
-        "Handoffs require open GitHub pull requests with a known author and verifiable head commit.",
+        "Handoffs require open or merged GitHub pull requests with a known author and verifiable head commit.",
     });
   return { ...detail, headSha: detail.headSha };
 });

@@ -4589,7 +4589,8 @@ export default function ChatView(props: ChatViewProps) {
     useRightPanelStore.getState().open(activeThreadRef, "agents");
   }, [activeThreadRef]);
   const linkedTasks = (activeThreadShell ?? activeThread)?.clickUpTasks ?? [];
-  const mainLinkedTask = linkedTasks.find((task) => task.primary) ?? linkedTasks[0];
+  const primaryLinkedTask = linkedTasks.find((task) => task.primary);
+  const mainLinkedTask = primaryLinkedTask ?? linkedTasks[0];
   const supportsTaskLinks = serverConfig?.environment.capabilities.threadTaskLinks === true;
   const addTasksSurface = useCallback(() => {
     if (activeThreadRef && supportsTaskLinks)
@@ -4599,6 +4600,10 @@ export default function ChatView(props: ChatViewProps) {
     if (activeThreadRef && mainLinkedTask)
       useRightPanelStore.getState().openTask(activeThreadRef, mainLinkedTask);
   }, [activeThreadRef, mainLinkedTask]);
+  const addHandoffSurface = useCallback(() => {
+    if (activeThreadRef && primaryLinkedTask && supportsTaskLinks)
+      useRightPanelStore.getState().open(activeThreadRef, "handoff");
+  }, [activeThreadRef, primaryLinkedTask, supportsTaskLinks]);
   const supportsThreadPullRequests =
     serverConfig?.environment.capabilities.threadPullRequests === true;
   const visiblePullRequests = visibleThreadPullRequests(
@@ -9660,6 +9665,16 @@ export default function ChatView(props: ChatViewProps) {
       />
     ) : renderedRightPanelSurface?.kind === "pull-requests" && activeThreadRef ? (
       <ThreadPullRequestsPanel threadRef={activeThreadRef} />
+    ) : renderedRightPanelSurface?.kind === "handoff" &&
+      activeThreadRef &&
+      primaryLinkedTask &&
+      supportsTaskLinks ? (
+      <ThreadTaskDetails
+        key={activeThread.latestTurn?.completedAt ?? "handoff"}
+        environmentId={environmentId}
+        task={primaryLinkedTask}
+        handoffThreadId={activeThreadRef.threadId}
+      />
     ) : renderedRightPanelSurface?.kind === "tasks" && activeThreadRef && supportsTaskLinks ? (
       <ThreadTasksPanel
         key={`${activeThreadRef.environmentId}:${activeThreadRef.threadId}`}
@@ -9854,6 +9869,11 @@ export default function ChatView(props: ChatViewProps) {
               <span className="shrink-0 text-muted-foreground">Task</span>
               <span className="truncate">{mainLinkedTask?.name}</span>
             </Button>
+            {primaryLinkedTask && supportsTaskLinks ? (
+              <Button variant="outline" size="sm" className="shrink-0" onClick={addHandoffSurface}>
+                Review handoff
+              </Button>
+            ) : null}
             {linkedTasks.length > 1 ? (
               <Button variant="ghost" size="sm" className="shrink-0" onClick={addTasksSurface}>
                 Linked tasks ({linkedTasks.length})
@@ -10387,6 +10407,8 @@ export default function ChatView(props: ChatViewProps) {
           onAddPullRequests={addPullRequestsSurface}
           onAddTask={addTaskSurface}
           onAddTasks={addTasksSurface}
+          onAddHandoff={addHandoffSurface}
+          handoffAvailable={isServerThread && supportsTaskLinks && !!primaryLinkedTask}
           taskAvailable={isServerThread && supportsTaskLinks && linkedTasks.length > 0}
           tasksAvailable={isServerThread && supportsTaskLinks}
           onAddAgents={addAgentsSurface}
@@ -10455,6 +10477,8 @@ export default function ChatView(props: ChatViewProps) {
             onAddPullRequests={addPullRequestsSurface}
             onAddTask={addTaskSurface}
             onAddTasks={addTasksSurface}
+            onAddHandoff={addHandoffSurface}
+            handoffAvailable={isServerThread && supportsTaskLinks && !!primaryLinkedTask}
             taskAvailable={isServerThread && supportsTaskLinks && linkedTasks.length > 0}
             tasksAvailable={isServerThread && supportsTaskLinks}
             onAddAgents={addAgentsSurface}

@@ -81,11 +81,17 @@ draft pull requests and a handoff in **Linked work**. The agent asks for help if
 is blocked; continuing without that check requires your explicit approval. Tasks tagged
 **no agent** cannot start implementation, but can still be checked or estimated.
 
-The task link is saved when the thread is created. Return to the task to find its coding threads,
-linked pull requests, and handoffs. Complete your manual check, then select **Submit** on the
-handoff to mark its pull requests ready, request review from **vrybakk** unless he authored the
-pull request, move the task to Code Review, and post a short result with the pull request links.
-Merge and deployment remain with the CTO. A partial submission shows which steps succeeded;
+The task link is saved when the thread is created. Select **Review handoff** beside the thread's
+primary task to open its handoff panel, or find it in the task's **Linked work** section.
+Complete your manual check and submit the handoff there; typing "Submit" in chat does not submit it.
+
+Nerd checks the reviewed PR revisions and current task status. Open PRs are marked ready and
+sent for review to **vrybakk** unless he authored the PR; an In Progress task moves to Code Review.
+When every handoff PR is merged, an In Progress or Code Review task moves to its QA status
+instead, without requesting PR review again. After an earlier submission, select **Check merge
+and send to QA** to reconcile it. The list must have one identifiable QA status, such as **QA**
+or **QA Testing**. The handoff summary is posted once, including when continuing after merge.
+Merge and deployment remain with the CTO. Partial submissions show completed and failed steps;
 refresh before continuing after an unconfirmed response.
 
 Studio instructions are updated with app releases and loaded again when work resumes.

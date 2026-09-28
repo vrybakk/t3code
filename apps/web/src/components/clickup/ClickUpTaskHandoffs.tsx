@@ -1,10 +1,11 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { ClickUpHandoff, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
+import type { ClickUpHandoff, ClickUpTaskInput, EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
+import { useServerConfigs } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Badge } from "../ui/badge";
@@ -23,13 +24,20 @@ const statusLabels = {
 export function ClickUpTaskHandoffs({
   environmentId,
   input,
+  threadId,
 }: {
   environmentId: EnvironmentId;
   input: ClickUpTaskInput;
+  threadId?: ThreadId;
 }) {
   const query = serverEnvironment.clickUpWorkflow({ environmentId, input });
   const result = useAtomValue(query);
   const data = Option.getOrNull(AsyncResult.value(result));
+  const handoffs =
+    data?.handoffs.filter((handoff) => !threadId || handoff.threadId === threadId) ?? [];
+  useEffect(() => {
+    appAtomRegistry.refresh(query);
+  }, [query]);
   return (
     <section className="space-y-3" aria-label="Developer handoff">
       <div className="flex items-center justify-between gap-2">
@@ -51,12 +59,12 @@ export function ClickUpTaskHandoffs({
         <p role="status" className="text-sm text-muted-foreground">
           Loading handoffs…
         </p>
-      ) : !data.handoffs.length ? (
+      ) : !handoffs.length ? (
         <p className="text-sm text-muted-foreground">
           The agent will prepare a handoff here when implementation and review are ready.
         </p>
       ) : (
-        data.handoffs.map((handoff) => (
+        handoffs.map((handoff) => (
           <HandoffCard
             key={handoff.id}
             handoff={handoff}
@@ -81,6 +89,8 @@ function HandoffCard({
   input: ClickUpTaskInput;
   onRefresh: () => void;
 }) {
+  const supportsMergedHandoff =
+    useServerConfigs().get(environmentId)?.environment.capabilities.clickUpMergedHandoffs === true;
   const submit = useAtomCommand(serverEnvironment.clickUpSubmitWorkflow, { reportFailure: false });
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -88,7 +98,10 @@ function HandoffCard({
   const [unconfirmedReceipt, setUnconfirmedReceipt] = useState<ClickUpHandoff | null>(null);
   const unconfirmed = unconfirmedReceipt === handoff;
   const sending = useRef(false);
-  const canSubmit = handoff.status === "pending" || handoff.status === "partial";
+  const canSubmit =
+    handoff.status === "pending" ||
+    handoff.status === "partial" ||
+    (supportsMergedHandoff && handoff.status === "submitted" && handoff.destination !== "qa");
   async function send() {
     if (!checked || !canSubmit || sending.current || unconfirmed) return;
     sending.current = true;
@@ -119,7 +132,11 @@ function HandoffCard({
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Badge variant="secondary">{statusLabels[handoff.status]}</Badge>
+        <Badge variant="secondary">
+          {handoff.status === "submitted" && handoff.destination === "qa"
+            ? "Submitted to QA"
+            : statusLabels[handoff.status]}
+        </Badge>
         <Link
           to="/$environmentId/$threadId"
           params={{ environmentId, threadId: handoff.threadId }}
@@ -129,17 +146,22 @@ function HandoffCard({
         </Link>
       </div>
       <p className="whitespace-pre-wrap text-sm">{handoff.summary}</p>
-      <ul className="space-y-2 text-sm">
-        {handoff.evidence.map((item) => (
-          <li key={`${item.kind}:${item.details}`}>
-            <span className="font-medium">
-              {item.kind === "independent-review" ? "Independent review" : "Verification"}:{" "}
-              {item.outcome === "passed" ? "Passed" : "Waived"}
-            </span>
-            <p className="whitespace-pre-wrap text-muted-foreground">{item.details}</p>
-          </li>
-        ))}
-      </ul>
+      <details className="space-y-2">
+        <summary className="cursor-pointer text-xs text-muted-foreground">
+          Verification and review evidence
+        </summary>
+        <ul className="space-y-2 text-sm">
+          {handoff.evidence.map((item) => (
+            <li key={`${item.kind}:${item.details}`}>
+              <span className="font-medium">
+                {item.kind === "independent-review" ? "Independent review" : "Verification"}:{" "}
+                {item.outcome === "passed" ? "Passed" : "Waived"}
+              </span>
+              <p className="whitespace-pre-wrap text-muted-foreground">{item.details}</p>
+            </li>
+          ))}
+        </ul>
+      </details>
       <ul className="space-y-2 text-sm">
         {handoff.pullRequests.map((pr) => (
           <li key={pr.url}>
@@ -154,7 +176,7 @@ function HandoffCard({
               </a>
             )}
             <span className="ml-2 text-xs text-muted-foreground">
-              {pr.ready ? "Ready" : "Awaiting submission"}
+              {pr.merged ? "Merged" : pr.ready ? "Ready" : "Awaiting submission"}
               {pr.reviewerRequested ? " · Reviewer requested" : ""}
             </span>
           </li>
@@ -162,8 +184,13 @@ function HandoffCard({
       </ul>
       {(handoff.status === "partial" || handoff.status === "uncertain") && (
         <p className="text-xs text-muted-foreground">
-          Code Review status: {handoff.statusUpdated ? "Updated" : "Not confirmed"}. Handoff
-          comment: {handoff.commentPosted ? "Posted" : "Not confirmed"}.
+          Task status:{" "}
+          {handoff.statusUpdated
+            ? handoff.destination === "qa"
+              ? "QA"
+              : "Code Review"
+            : "Not confirmed"}
+          . Handoff comment: {handoff.commentPosted ? "Posted" : "Not confirmed"}.
         </p>
       )}
       {handoff.error && (
@@ -188,15 +215,18 @@ function HandoffCard({
             I completed my manual check and approve this handoff.
           </label>
           <p className="text-xs text-muted-foreground">
-            Submit marks these PRs ready, requests CTO review, and moves the task to Code Review.
-            Merge and deployment stay with the CTO.
+            {supportsMergedHandoff
+              ? "Open PRs are marked ready and sent for CTO review. When all PRs are merged, the task moves to QA; otherwise it moves to Code Review. The summary is posted once."
+              : "Submit marks open PRs ready, requests CTO review, and moves the task to Code Review. Update this environment to support already-merged PRs."}
           </p>
           <Button size="sm" disabled={!checked || busy || unconfirmed} onClick={() => void send()}>
             {busy
               ? "Submitting…"
-              : handoff.status === "partial"
-                ? "Continue submission"
-                : "Submit for code review"}
+              : handoff.status === "submitted"
+                ? "Check merge and send to QA"
+                : handoff.status === "partial"
+                  ? "Continue handoff"
+                  : "Submit handoff"}
           </Button>
         </>
       )}
