@@ -9842,6 +9842,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   it.effect("stops an overflowing shell producer without an ACK and recovers deleted entries", () =>
     Effect.gen(function* () {
       const liveEvents = yield* PubSub.unbounded<OrchestrationEvent>();
+      const archiverSnapshotRead = yield* Deferred.make<void>();
       const detached = yield* Deferred.make<void>();
       const ackHeld = yield* Deferred.make<void>();
       const releaseAck = yield* Deferred.make<void>();
@@ -9895,10 +9896,13 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                   threads: headSequence === 1 ? [thread] : [],
                   updatedAt: "2026-01-01T00:00:02.000Z",
                 };
-              }),
+              }).pipe(Effect.tap(() => Deferred.succeed(archiverSnapshotRead, undefined))),
           },
         },
       });
+      // The startup archiver reads the shell independently of subscription recovery.
+      yield* Deferred.await(archiverSnapshotRead);
+      snapshotCalls = 0;
       const wsUrl = yield* getWsServerUrl("/ws");
       yield* makeWsRpcClient.pipe(
         Effect.flatMap((client) =>

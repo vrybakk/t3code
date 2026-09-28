@@ -1,8 +1,14 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { ClickUpTask, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
+import type {
+  ClickUpTask,
+  ClickUpTaskInput,
+  EnvironmentId,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
+import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { CalculatorIcon, ListChecksIcon, PlayIcon } from "lucide-react";
+import { CalculatorIcon, EyeIcon, ListChecksIcon, PlayIcon } from "lucide-react";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
@@ -30,7 +36,7 @@ const actions = {
     label: "Estimate task",
     icon: CalculatorIcon,
     description:
-      "Estimate AI-assisted work from the task context using your default text-generation model.",
+      "Estimate AI-assisted implementation and verification using your default text-generation model.",
   },
   implement: {
     label: "Start task",
@@ -46,10 +52,12 @@ const actions = {
 export function ClickUpTaskActionButtons({
   task,
   compact = false,
+  runningThread,
   onSelect,
 }: {
   task: Pick<ClickUpTask, "name" | "timeEstimate" | "tags">;
   compact?: boolean;
+  runningThread?: ScopedThreadRef | undefined;
   onSelect: (action: ClickUpTaskAction) => void;
 }) {
   return (
@@ -63,6 +71,26 @@ export function ClickUpTaskActionButtons({
     >
       {(Object.keys(actions) as ClickUpTaskAction[]).map((action) => {
         if (action === "estimate" && task.timeEstimate != null) return null;
+        if (action === "implement" && runningThread) {
+          return (
+            <Tooltip key={action}>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size={compact ? "icon-sm" : "default"}
+                    variant="outline"
+                    aria-label={`See running thread: ${task.name}`}
+                    render={<Link to="/$environmentId/$threadId" params={runningThread} />}
+                  />
+                }
+              >
+                <EyeIcon className="size-3.5" />
+                {!compact && "See"}
+              </TooltipTrigger>
+              <TooltipPopup>See running thread</TooltipPopup>
+            </Tooltip>
+          );
+        }
         const blocked =
           action === "implement" &&
           task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
@@ -127,41 +155,47 @@ export function ClickUpTaskActionDialog({
       }}
     >
       <DialogPopup>
-        <DialogHeader>
-          <DialogTitle>{actions[action].label}</DialogTitle>
-          <DialogDescription>{actions[action].description}</DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
-          <p className="text-sm font-medium">{taskName}</p>
-          {action !== "implement" ? (
-            <ClickUpBackgroundAction
-              key={`${environmentId}:${input.userId}:${input.taskId}:${action}`}
-              environmentId={environmentId}
-              input={{ ...input, action }}
-              taskName={taskName}
-            />
-          ) : AsyncResult.isFailure(result) ? (
-            <div className="space-y-2">
-              <p role="alert" className="text-sm text-destructive">
-                Could not load task context.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={result.waiting}
-                onClick={() => appAtomRegistry.refresh(query)}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : !details ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading task context…
-            </p>
-          ) : (
-            <ClickUpTaskLauncher environmentId={environmentId} details={details} />
-          )}
-        </DialogPanel>
+        {action !== "implement" ? (
+          <ClickUpBackgroundAction
+            key={`${environmentId}:${input.userId}:${input.workspaceId}:${input.taskId}:${action}`}
+            environmentId={environmentId}
+            input={{ ...input, action }}
+            taskName={taskName}
+            listName={details?.task.listName}
+            onClose={onClose}
+          />
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>{actions[action].label}</DialogTitle>
+              <DialogDescription>{actions[action].description}</DialogDescription>
+            </DialogHeader>
+            <DialogPanel>
+              <p className="text-sm font-medium">{taskName}</p>
+              {AsyncResult.isFailure(result) ? (
+                <div className="space-y-2">
+                  <p role="alert" className="text-sm text-destructive">
+                    Could not load task context.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={result.waiting}
+                    onClick={() => appAtomRegistry.refresh(query)}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : !details ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Loading task context…
+                </p>
+              ) : (
+                <ClickUpTaskLauncher environmentId={environmentId} details={details} />
+              )}
+            </DialogPanel>
+          </>
+        )}
       </DialogPopup>
     </Dialog>
   );

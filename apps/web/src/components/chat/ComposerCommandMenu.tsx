@@ -1,19 +1,19 @@
-import type { ClickUpTaskReference } from "@t3tools/contracts";
-import { ClipboardListIcon } from "lucide-react";
 import {
   formatProviderSkillDisplayName,
   resolveProviderSkillSourceKind,
+  type ComposerSkill,
   type ProviderSkillSourceKind,
 } from "@t3tools/client-runtime/providerSkills";
 import {
+  type ClickUpTaskReference,
   type ProjectEntry,
   type ProviderDriverKind,
   type PullRequestContextMetadata,
-  type ServerProviderSkill,
   type ServerProviderSlashCommand,
 } from "@t3tools/contracts";
 import {
   BlocksIcon,
+  ClipboardListIcon,
   FolderIcon,
   PackageIcon,
   SettingsIcon,
@@ -59,7 +59,7 @@ export type ComposerCommandItem =
       id: string;
       type: "skill";
       provider: ProviderDriverKind;
-      skill: ServerProviderSkill;
+      skill: ComposerSkill;
       label: string;
       description: string;
     }

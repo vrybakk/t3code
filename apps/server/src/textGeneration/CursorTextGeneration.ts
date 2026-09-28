@@ -56,6 +56,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       | "generatePrContent"
       | "generateBranchName"
       | "generateThreadTitle"
+      | "researchTaskEstimate"
       | "generateTaskAnalysis";
     cwd: string;
     prompt: string;
@@ -240,6 +241,16 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       };
     });
 
+  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] =
+    () =>
+      Effect.fail(
+        new TextGenerationError({
+          operation: "researchTaskEstimate",
+          detail:
+            "Research-backed estimation is not available with Cursor yet. Choose Codex, Claude, OpenCode or Antigravity as the default text-generation provider.",
+        }),
+      );
+
   const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
     input,
   ) =>
@@ -280,5 +291,6 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
     generateBranchName,
     generateThreadTitle,
     generateTaskAnalysis,
+    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

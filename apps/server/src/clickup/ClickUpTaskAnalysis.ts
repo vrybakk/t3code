@@ -1,3 +1,4 @@
+import { ClickUpTaskEstimation } from "./ClickUpTaskEstimation.ts";
 import {
   ClickUpError,
   ClickUpTaskDetails,
@@ -29,6 +30,7 @@ export const layer = Layer.effect(
     const editing = yield* ClickUpTaskEditing;
     const workflow = yield* ClickUpWorkflow;
     const generation = yield* TextGeneration;
+    const estimation = yield* ClickUpTaskEstimation;
     const settings = yield* ServerSettingsService;
     const fs = yield* FileSystem.FileSystem;
     const run = Effect.fn("ClickUpTaskAnalysis.run")(function* (input: ClickUpAnalyzeTaskInput) {
@@ -37,6 +39,7 @@ export const layer = Layer.effect(
       if (input.action === "estimate" && existing != null) {
         return {
           summary: "This task already has an estimate. It was preserved.",
+          estimatePreserved: true,
           estimateMinutes: null,
           findings: null,
           estimateSaved: false,
@@ -55,6 +58,12 @@ export const layer = Layer.effect(
       const result = yield* Effect.scoped(
         Effect.gen(function* () {
           const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-task-analysis-" });
+          if (input.action === "estimate")
+            return yield* estimation.run({
+              details,
+              cwd,
+              modelSelection: textGenerationModelSelection,
+            });
           return yield* generation.generateTaskAnalysis({
             cwd,
             modelSelection: textGenerationModelSelection,
@@ -76,7 +85,9 @@ export const layer = Layer.effect(
               message:
                 cause._tag === "TextGenerationError"
                   ? cause.detail
-                  : "Could not prepare task analysis.",
+                  : cause._tag === "ClickUpError"
+                    ? cause.message
+                    : "Could not prepare task analysis.",
             }),
         ),
       );

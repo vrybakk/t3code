@@ -358,6 +358,10 @@
     "./gitPatchPath": {
       "types": "./src/gitPatchPath.ts",
       "import": "./src/gitPatchPath.ts"
+    },
+    "./clickUpProjectMappings": {
+      "types": "./src/clickUpProjectMappings.ts",
+      "import": "./src/clickUpProjectMappings.ts"
     }
   },
   "scripts": {

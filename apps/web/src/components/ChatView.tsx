@@ -353,7 +353,10 @@ import {
   requestOlderThreadTurns,
   threadHasOlderTurns,
 } from "@t3tools/client-runtime/state/threads";
-import { resolveProviderSkillsForCwd } from "@t3tools/client-runtime/providerSkills";
+import {
+  getComposerSkills,
+  resolveProviderSkillsForCwd,
+} from "@t3tools/client-runtime/providerSkills";
 import { vcsEnvironment } from "../state/vcs";
 import { sourceControlEnvironment } from "../state/sourceControl";
 import { useProjectClone } from "../state/projectClones";
@@ -2623,7 +2626,7 @@ export default function ChatView(props: ChatViewProps) {
   const pullRequestsCapabilityKnown = serverConfig !== null;
   const supportsPullRequests = serverConfig?.environment.capabilities.pullRequests === true;
   const supportsGitButlerWorkspace =
-    serverConfig?.environment.capabilities.gitButlerWorkspace === true;
+    serverConfig?.environment.capabilities.gitButlerWorkspace === true && settings.enableGitButler;
   const attachmentEnvironmentConfig = environmentById.get(environmentId)?.serverConfig ?? null;
   const attachmentUploadsCapabilityKnown = attachmentEnvironmentConfig !== null;
   const supportsQuestionAttachments =
@@ -9722,7 +9725,7 @@ export default function ChatView(props: ChatViewProps) {
       </Suspense>
     ) : renderedRightPanelSurface?.kind === "gitbutler" && !supportsGitButlerWorkspace ? (
       <Suspense fallback={null}>
-        <GitButlerUnavailableState />
+        <GitButlerUnavailableState disabled={!settings.enableGitButler} />
       </Suspense>
     ) : renderedRightPanelSurface?.kind === "gitbutler" && activeProject ? (
       <Suspense fallback={null}>
@@ -10001,11 +10004,12 @@ export default function ChatView(props: ChatViewProps) {
                     ? (heldPaintContext?.workspaceRoot ?? undefined)
                     : activeWorkspaceRoot
                 }
-                skills={
+                skills={getComposerSkills(
                   activeProviderStatus
                     ? resolveProviderSkillsForCwd(activeProviderStatus, gitCwd)
-                    : EMPTY_PROVIDER_SKILLS
-                }
+                    : EMPTY_PROVIDER_SKILLS,
+                  serverConfig?.environment.capabilities.clickUpTasks === true,
+                )}
                 anchorMessageId={paintOnlyDisplayedTimeline ? null : timelineAnchorMessageId}
                 onAnchorReady={onTimelineAnchorReady}
                 contentInsetEndAdjustment={composerTimelineInset}

@@ -323,9 +323,11 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "thread-notifications",
-    title: "Thread notifications",
+    title: "Thread and task notifications",
     to: "/settings/general",
-    searchTerms: ["notification sound alert completion input approval desktop"],
+    searchTerms: [
+      "notification sound alert completion input approval desktop task estimate requirements",
+    ],
   },
   {
     id: "in-app-notifications",

@@ -35,3 +35,16 @@ describe("buildRuntimeInstructions", () => {
     expect(instructions).not.toContain("reasoning effort");
   });
 });
+
+it.each(["Codex", "Claude Code", "Cursor", "Grok", "OpenCode", "Antigravity"])(
+  "routes the app workflow through T3 tools for %s",
+  (harness) => {
+    const instructions = buildRuntimeInstructions({ harness });
+    expect(instructions).toContain("$studio-task-workflow is an app-provided workflow");
+    expect(instructions).toContain(
+      "Load it using get_studio_task_workflow and get_linked_clickup_task",
+    );
+    expect(instructions).toContain("use Start task to prepare a linked thread");
+    expect(instructions).toContain("Ask if the action is ambiguous");
+  },
+);

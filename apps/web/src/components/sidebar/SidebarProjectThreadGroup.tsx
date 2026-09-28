@@ -19,13 +19,15 @@ import {
 import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  CheckIcon,
   ChevronRightIcon,
   CircleDashedIcon,
   FolderIcon,
   MessageCircleQuestionIcon,
   MessagesSquareIcon,
+  SquarePenIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, type MouseEvent, type ReactNode } from "react";
 
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import { useUiStateStore } from "../../uiStateStore";
@@ -48,6 +50,9 @@ interface SidebarProjectThreadGroupProps {
   statusCounts: SidebarProjectThreadStatusCounts;
   sortable?: boolean;
   renderThread: (thread: EnvironmentThreadShell) => ReactNode;
+  onContextMenu: (position: { x: number; y: number }) => void;
+  onNewThread: (() => void) | undefined;
+  onSettleAll: (() => void) | undefined;
 }
 
 interface SortableSidebarProjectGroupListProps {
@@ -118,6 +123,14 @@ function StatusCount(props: {
 }
 
 export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupProps) {
+  const suppressClickAfterContextMenuRef = useRef(false);
+  const ignoreContextMenuClick = (event: MouseEvent) => {
+    if (suppressClickAfterContextMenuRef.current || event.ctrlKey) {
+      suppressClickAfterContextMenuRef.current = false;
+      return true;
+    }
+    return false;
+  };
   const expansionKey = sidebarProjectThreadGroupExpansionKey(props.section, props.group.key);
   const expanded = useUiStateStore((state) =>
     resolveSidebarProjectGroupExpanded(state.projectExpandedById, expansionKey),
@@ -152,7 +165,19 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
       )}
       data-testid={`sidebar-project-group-${props.section}`}
     >
-      <div className="group/project-row flex h-9 w-full items-center rounded-md text-xs text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+      <div
+        className="group/project-row relative flex h-9 w-full items-center rounded-md text-xs text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+        onPointerDownCapture={(event) => {
+          if (event.button === 0 && !event.ctrlKey) {
+            suppressClickAfterContextMenuRef.current = false;
+          }
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          suppressClickAfterContextMenuRef.current = true;
+          props.onContextMenu({ x: event.clientX, y: event.clientY });
+        }}
+      >
         <button
           ref={props.sortable ? setActivatorNodeRef : undefined}
           type="button"
@@ -160,8 +185,23 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
           {...(props.sortable ? listeners : {})}
           aria-expanded={expanded}
           aria-label={`${label}, ${props.statusCounts.total} chats, ${props.statusCounts.running} running, ${props.statusCounts.pending} pending`}
-          onClick={() => setProjectExpanded(expansionKey, !expanded)}
+          onClick={(event) => {
+            if (ignoreContextMenuClick(event)) return;
+            setProjectExpanded(expansionKey, !expanded);
+          }}
+          onPointerDownCapture={(event) => {
+            if (event.button !== 0 || event.ctrlKey) event.stopPropagation();
+          }}
           onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              suppressClickAfterContextMenuRef.current = false;
+            }
+            if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+              event.preventDefault();
+              const bounds = event.currentTarget.getBoundingClientRect();
+              props.onContextMenu({ x: bounds.left, y: bounds.bottom });
+              return;
+            }
             if (event.key !== "Enter") listeners?.onKeyDown?.(event);
           }}
           className={cn(
@@ -184,7 +224,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
           <span className="min-w-0 flex-1 truncate font-medium text-sidebar-foreground/90">
             {label}
           </span>
-          <span className="flex shrink-0 items-center gap-1.5 text-3xs leading-none">
+          <span className="flex shrink-0 items-center gap-1.5 text-3xs leading-none transition-opacity group-hover/project-row:opacity-0 group-has-[:focus-visible]/project-row:opacity-0">
             {props.statusCounts.idle > 0 ? (
               <StatusCount
                 count={props.statusCounts.idle}
@@ -210,6 +250,48 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
             ) : null}
           </span>
         </button>
+        {props.onNewThread || props.onSettleAll ? (
+          <span className="pointer-events-none absolute inset-y-0 right-1 flex items-center gap-0.5 bg-sidebar-row-hover opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 group-hover/project-row:pointer-events-auto group-hover/project-row:opacity-100">
+            {props.onNewThread ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={`New thread in ${label}`}
+                      onClick={(event) => {
+                        if (!ignoreContextMenuClick(event)) props.onNewThread?.();
+                      }}
+                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-row-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  }
+                >
+                  <SquarePenIcon aria-hidden className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipPopup side="top">New thread in project</TooltipPopup>
+              </Tooltip>
+            ) : null}
+            {props.onSettleAll ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={`Settle all chats in ${label}`}
+                      onClick={(event) => {
+                        if (!ignoreContextMenuClick(event)) props.onSettleAll?.();
+                      }}
+                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-row-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  }
+                >
+                  <CheckIcon aria-hidden className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipPopup side="top">Settle all chats</TooltipPopup>
+              </Tooltip>
+            ) : null}
+          </span>
+        ) : null}
       </div>
       {expanded ? (
         <ul className="flex flex-col gap-px border-l border-sidebar-border/50">

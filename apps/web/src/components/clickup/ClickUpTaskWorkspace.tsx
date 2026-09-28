@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useClickUpCachedQuery } from "./useClickUpCachedQuery";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Link, useSearch } from "@tanstack/react-router";
 import * as Option from "effect/Option";
@@ -38,7 +38,7 @@ export function ClickUpTaskWorkspace({
   );
   const sprintsContentId = useId();
   const query = serverEnvironment.clickUpSprints({ environmentId, input: { workspaceId, userId } });
-  const result = useAtomValue(query);
+  const result = useClickUpCachedQuery(query);
   const data = Option.getOrNull(AsyncResult.value(result));
   const sprintId = search.sprintId ?? data?.activeSprintId;
   const selected = data?.sprints.find((sprint) => sprint.id === sprintId);
@@ -92,7 +92,17 @@ export function ClickUpTaskWorkspace({
           </div>
         </div>
         <div id={sprintsContentId} hidden={!sprintsOpen}>
-          {AsyncResult.isFailure(result) ? (
+          {data && result.waiting && (
+            <p role="status" className="px-2 py-2 text-xs text-muted-foreground">
+              Updating sprints…
+            </p>
+          )}
+          {data && AsyncResult.isFailure(result) && (
+            <p role="alert" className="px-2 py-2 text-xs text-destructive">
+              Could not refresh sprints. Showing saved data.
+            </p>
+          )}
+          {!data && AsyncResult.isFailure(result) ? (
             <p role="alert" className="px-2 py-3 text-xs text-destructive">
               Could not load company sprints. Check your workspace and access, then refresh.
             </p>

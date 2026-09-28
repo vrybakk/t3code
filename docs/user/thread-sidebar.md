@@ -47,6 +47,12 @@ order. Snoozed and settled threads remain in their own shelves and use the same 
 those shelves are open. Switch back to the flat list when you want to drag threads between
 lifecycle sections or reorder pinned and active work.
 
+Hover over a project group to start a thread or settle its active chats. Right-click a group to
+start a thread, open project settings, filter the list, rename or regroup a checkout, copy its
+path, or remove that checkout. The same menu can settle or snooze active chats, wake snoozed chats, and
+un-settle settled chats. A group lifecycle action applies to that shelf, including chats hidden
+beyond the settled shelf's visible page.
+
 On web and desktop, pinning or unpinning a thread keeps the sidebar at your current
 scroll position instead of following the thread to its new place in the list.
 

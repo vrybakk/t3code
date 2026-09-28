@@ -1,4 +1,4 @@
-import { TaskAnalysis } from "@t3tools/contracts";
+import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -36,6 +36,7 @@ const OpenCodeTextGenerationOperation = Schema.Literals([
   "generateBranchName",
   "generateThreadTitle",
   "generateTaskAnalysis",
+  "researchTaskEstimate",
 ]);
 
 type OpenCodeTextGenerationOperation = typeof OpenCodeTextGenerationOperation.Type;
@@ -432,6 +433,17 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       };
     });
 
+  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] = (
+    input,
+  ) =>
+    runOpenCodeJson({
+      operation: "researchTaskEstimate",
+      cwd: input.cwd,
+      prompt: input.prompt,
+      outputSchemaJson: TaskEstimationResponse,
+      modelSelection: input.modelSelection,
+    });
+
   const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
     input,
   ) =>
@@ -472,5 +484,6 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
     generateBranchName,
     generateThreadTitle,
     generateTaskAnalysis,
+    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

@@ -1,6 +1,8 @@
+import { ClickUpTaskEstimation } from "./ClickUpTaskEstimation.ts";
 import { it } from "@effect/vitest";
 import {
   DEFAULT_SERVER_SETTINGS,
+  ClickUpError,
   type ClickUpTaskDetails,
   type TaskAnalysis,
   TextGenerationError,
@@ -51,6 +53,26 @@ const harness = Effect.fn(function* (generated: TaskAnalysis, snapshot = details
             Layer.mock(ClickUpTaskEditing)({ completeEstimation }),
             Layer.mock(ClickUpWorkflow)({ findings }),
             Layer.mock(TextGeneration)({ generateTaskAnalysis }),
+            Layer.mock(ClickUpTaskEstimation)({
+              run: (args) =>
+                generateTaskAnalysis({
+                  ...args,
+                  prompt: 'Return only a JSON object with all three keys: "summary"',
+                }).pipe(
+                  Effect.mapError((error) => new ClickUpError({ message: error.detail })),
+                  Effect.map((result) => ({
+                    ...result,
+                    estimationEvidence: {
+                      implementationMinutes: 20,
+                      verificationMinutes: 10,
+                      followUpMinutes: 0,
+                      confidence: "high" as const,
+                      files: ["app/checkout.ts"],
+                      limitations: [],
+                    },
+                  })),
+                ),
+            }),
             Layer.mock(ServerSettingsService)({
               getSettings: Effect.succeed({
                 ...DEFAULT_SERVER_SETTINGS,

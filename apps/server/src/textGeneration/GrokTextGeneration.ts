@@ -56,6 +56,7 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       | "generatePrContent"
       | "generateBranchName"
       | "generateThreadTitle"
+      | "researchTaskEstimate"
       | "generateTaskAnalysis";
     cwd: string;
     prompt: string;
@@ -242,6 +243,16 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       };
     });
 
+  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] =
+    () =>
+      Effect.fail(
+        new TextGenerationError({
+          operation: "researchTaskEstimate",
+          detail:
+            "Research-backed estimation is not available with Grok yet. Choose Codex, Claude, OpenCode or Antigravity as the default text-generation provider.",
+        }),
+      );
+
   const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
     input,
   ) =>
@@ -282,5 +293,6 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
     generateBranchName,
     generateThreadTitle,
     generateTaskAnalysis,
+    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

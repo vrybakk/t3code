@@ -52,6 +52,7 @@ interface EnvironmentQueryAtomOptions<Input, A, E, R> extends EnvironmentAtomOpt
 > {
   readonly staleTimeMs?: number;
   readonly idleTtlMs?: number;
+  readonly retainSnapshot?: boolean | ((input: Input) => boolean);
   readonly refreshIntervalMs?: number;
   readonly refreshTrigger?: (target: {
     readonly environmentId: EnvironmentIdType;
@@ -511,9 +512,18 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
       { initialValue: null },
     ),
   );
+  const snapshots = Atom.family((_key: string) =>
+    Atom.make<AsyncResult.AsyncResult<A, E | ER | Error>>(AsyncResult.initial()).pipe(
+      Atom.keepAlive,
+    ),
+  );
   const family = Atom.family((key: string) => {
     const target = parseEnvironmentRpcKey<Input>(key);
-    const idleTtlMs = options.idleTtlMs ?? 5 * 60_000;
+    const retainSnapshot =
+      typeof options.retainSnapshot === "function"
+        ? options.retainSnapshot(target.input)
+        : options.retainSnapshot;
+    const idleTtlMs = retainSnapshot ? 0 : (options.idleTtlMs ?? 5 * 60_000);
     const queryAtom = runtime
       .atom<
         A,
@@ -562,11 +572,25 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
         ? queryAtom
         : queryAtom.pipe(Atom.withRefresh(options.refreshIntervalMs));
     const refreshTrigger = options.refreshTrigger?.(target);
-    return (
+    const activeQuery = (
       refreshTrigger === undefined
         ? intervalQuery
         : intervalQuery.pipe(Atom.makeRefreshOnSignal(refreshTrigger))
     ).pipe(Atom.setIdleTTL(idleTtlMs), Atom.withLabel(`${options.label}:${key}`));
+    if (!retainSnapshot) return activeQuery;
+    // Keep only data while the route is closed, not live RPC/revision subscriptions.
+    const snapshot = snapshots(key);
+    return activeQuery.pipe(
+      Atom.transform((get) => {
+        const result = get(activeQuery);
+        const saved = get.once(snapshot);
+        if (result._tag === "Success" && !result.waiting) get.set(snapshot, result);
+        if (result._tag === "Initial" && Option.isSome(AsyncResult.value(saved)))
+          return AsyncResult.waiting(saved);
+        return AsyncResult.replacePrevious(result, Option.some(saved));
+      }),
+      Atom.setIdleTTL(0),
+    );
   });
   return (target) => family(environmentRpcKey(target));
 }
@@ -623,6 +647,7 @@ export function createEnvironmentRpcQueryAtomFamily<R, ER, TTag extends Environm
     >;
     readonly staleTimeMs?: number;
     readonly idleTtlMs?: number;
+    readonly retainSnapshot?: boolean | ((input: EnvironmentRpcInput<TTag>) => boolean);
     readonly refreshIntervalMs?: number;
     readonly refreshTrigger?: (target: {
       readonly environmentId: EnvironmentIdType;
@@ -634,6 +659,7 @@ export function createEnvironmentRpcQueryAtomFamily<R, ER, TTag extends Environm
     label: options.label,
     ...(options.staleTimeMs === undefined ? {} : { staleTimeMs: options.staleTimeMs }),
     ...(options.idleTtlMs === undefined ? {} : { idleTtlMs: options.idleTtlMs }),
+    ...(options.retainSnapshot === undefined ? {} : { retainSnapshot: options.retainSnapshot }),
     ...(options.refreshIntervalMs === undefined
       ? {}
       : { refreshIntervalMs: options.refreshIntervalMs }),

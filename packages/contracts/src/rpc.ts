@@ -1,4 +1,8 @@
 import {
+  ClickUpLocalRepositoriesInput,
+  ClickUpLocalRepositories,
+} from "./clickupLocalRepositories.ts";
+import {
   ClickUpAnalyzeTaskInput,
   ClickUpTaskAnalysis,
   ClickUpWorkflow,
@@ -411,6 +415,7 @@ export const WS_METHODS = {
   clickUpSprints: "clickup.sprints",
   clickUpTaskOptions: "clickup.taskOptions",
   clickUpAnalyzeTask: "clickup.analyzeTask",
+  clickUpLocalRepositories: "clickup.localRepositories",
   clickUpWorkflow: "clickup.workflow",
   clickUpSubmitWorkflow: "clickup.submitWorkflow",
   clickUpSetStatus: "clickup.setStatus",
@@ -713,6 +718,12 @@ const WsServerDiscoverSourceControlRpc = Rpc.make(WS_METHODS.serverDiscoverSourc
   payload: Schema.Struct({}),
   success: SourceControlDiscoveryResult,
   error: EnvironmentAuthorizationError,
+});
+
+const WsClickUpLocalRepositoriesRpc = Rpc.make(WS_METHODS.clickUpLocalRepositories, {
+  payload: ClickUpLocalRepositoriesInput,
+  success: ClickUpLocalRepositories,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 
 const WsClickUpAnalyzeTaskRpc = Rpc.make(WS_METHODS.clickUpAnalyzeTask, {
@@ -1756,6 +1767,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerDiscoverSourceControlRpc,
   WsGitButlerWorkspaceStatusRpc,
   WsClickUpAnalyzeTaskRpc,
+  WsClickUpLocalRepositoriesRpc,
   WsClickUpWorkflowRpc,
   WsClickUpSubmitWorkflowRpc,
   WsClickUpOAuthConfigRpc,

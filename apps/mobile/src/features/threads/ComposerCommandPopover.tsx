@@ -1,12 +1,9 @@
+import type { ComposerSkill } from "@t3tools/client-runtime/providerSkills";
 import {
   resolveProviderSkillSourceKind,
   type ProviderSkillSourceKind,
 } from "@t3tools/client-runtime/providerSkills";
-import type {
-  PullRequestContextMetadata,
-  ServerProviderSkill,
-  ServerProviderSlashCommand,
-} from "@t3tools/contracts";
+import type { PullRequestContextMetadata, ServerProviderSlashCommand } from "@t3tools/contracts";
 import type { ComposerTriggerKind } from "@t3tools/shared/composerTrigger";
 import { memo } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
@@ -48,7 +45,7 @@ export type ComposerCommandItem =
   | {
       readonly id: string;
       readonly type: "skill";
-      readonly skill: ServerProviderSkill;
+      readonly skill: ComposerSkill;
       readonly label: string;
       readonly description: string;
     };

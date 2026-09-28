@@ -21,20 +21,26 @@ vi.mock("../ui/dialog", () => ({
   DialogTitle: "h2",
   DialogDescription: "p",
   DialogPanel: "section",
+  DialogFooter: "footer",
 }));
+vi.mock("../ui/spinner", () => ({ Spinner: "svg" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/tooltip", () => ({ Tooltip: "div", TooltipPopup: "div", TooltipTrigger: "div" }));
+import { subscribeTaskAnalysisNotifications } from "./taskAnalysisFeedback";
 import { ClickUpTaskActionDialog } from "./ClickUpTaskActions";
 
 let renderer: ReactTestRenderer;
 let taskNumber = 0;
+let unsubscribe: () => void;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.clearAllMocks();
+  unsubscribe = subscribeTaskAnalysisNotifications(mocks.toast);
   input.taskId = `task-${++taskNumber}`;
 });
 afterEach(async () => {
   await act(async () => renderer?.unmount());
+  unsubscribe();
   vi.unstubAllGlobals();
 });
 const input = { workspaceId: "42", taskId: "task", userId: 7 };
@@ -72,7 +78,7 @@ it.each(["estimate", "requirements"] as const)(
       renderer = create(dialog(action));
     });
     expect(renderer.root.findByProps({ role: "status" }).children.join("")).toContain(
-      "Running in the background",
+      "continues after closing",
     );
     expect(mocks.analyze).toHaveBeenCalledTimes(1);
     expect(mocks.analyze).toHaveBeenCalledWith({
@@ -103,7 +109,7 @@ it("announces completion after closing the dialog", async () => {
     finish(AsyncResult.success(success));
   });
   expect(mocks.toast).toHaveBeenCalledWith(
-    expect.objectContaining({ description: success.summary }),
+    expect.objectContaining({ state: { result: success, error: null } }),
   );
 });
 it("surfaces the actual background error without opening a thread", async () => {
@@ -113,8 +119,9 @@ it("surfaces the actual background error without opening a thread", async () => 
   await act(async () => {
     renderer = create(dialog("estimate"));
   });
-  expect(renderer.root.findByProps({ role: "alert" }).children).toContain(
-    "Provider is unavailable",
+  expect(renderer.root.findByType("pre").children).toContain("Provider is unavailable");
+  expect(renderer.root.findByProps({ role: "alert" }).children.join("")).toContain(
+    "Could not confirm",
   );
   expect(mocks.launch).not.toHaveBeenCalled();
 });

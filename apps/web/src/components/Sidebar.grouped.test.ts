@@ -5,6 +5,7 @@ import {
   getVisibleSidebarProjectThreads,
   groupSidebarThreadsByProject,
   planSidebarProjectGroupReorder,
+  resolveSidebarProjectGroupActionThreads,
   resolveSidebarProjectGroupExpanded,
 } from "./Sidebar.grouped";
 
@@ -169,6 +170,30 @@ describe("project group preferences", () => {
       draggedProjectIds: ["environment-a:project-a", "environment-b:project-b"],
       targetProjectIds: ["environment-a:project-c"],
     });
+  });
+});
+
+describe("resolveSidebarProjectGroupActionThreads", () => {
+  it("acts on the full snoozed or settled group, including rows hidden by a collapsed shelf or paging", () => {
+    const visible = { key: "project-a", project: null, threads: ["visible"] };
+    const snoozed = { ...visible, threads: ["visible", "hidden-snoozed"] };
+    const settled = { ...visible, threads: ["visible", "hidden-settled"] };
+    const fullGroups = {
+      snoozed: new Map([[visible.key, snoozed]]),
+      settled: new Map([[visible.key, settled]]),
+    };
+
+    expect(resolveSidebarProjectGroupActionThreads(visible, "active", fullGroups)).toEqual([
+      "visible",
+    ]);
+    expect(resolveSidebarProjectGroupActionThreads(visible, "snoozed", fullGroups)).toEqual([
+      "visible",
+      "hidden-snoozed",
+    ]);
+    expect(resolveSidebarProjectGroupActionThreads(visible, "settled", fullGroups)).toEqual([
+      "visible",
+      "hidden-settled",
+    ]);
   });
 });
 
