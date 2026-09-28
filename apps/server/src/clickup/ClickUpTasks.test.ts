@@ -1,6 +1,8 @@
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { ClickUpError } from "@t3tools/contracts";
 import { makeTaskSearch } from "./ClickUpTaskSearch.ts";
@@ -488,29 +490,31 @@ it.effect("searches all workspace pages and reuses the account-scoped snapshot",
   return Effect.gen(function* () {
     const tasks = yield* ClickUpTasks;
     const input = { workspaceId: "42", userId: 17, page: 0, query: "hero slider" };
-    const result = yield* tasks.list(input);
+    const pending = yield* Effect.forkChild(tasks.list(input));
+    yield* TestClock.adjust("1 second");
+    const result = yield* Fiber.join(pending);
     assert.deepEqual(
       result.tasks.map((task) => task.taskId),
       ["older-task"],
     );
-    assert.equal(test.paths.length, 4);
+    assert.equal(test.paths.length, 2);
     assert.ok(
       test.paths.every(
         (path) => path.includes("include_closed=true") && !path.includes("assignees"),
       ),
     );
     yield* tasks.list({ ...input, query: "older-task" });
-    assert.equal(test.paths.length, 4);
+    assert.equal(test.paths.length, 2);
     assert.equal(
       (yield* Effect.result(tasks.list({ ...input, workspaceId: "other" })))._tag,
       "Failure",
     );
     assert.equal((yield* Effect.result(tasks.list({ ...input, userId: 99 })))._tag, "Failure");
-    assert.equal(test.paths.length, 4);
+    assert.equal(test.paths.length, 2);
   }).pipe(Effect.provide(test.layer));
 });
 
-it.effect("does not cache a partial workspace after a page fails", () =>
+it.effect("resumes a failed page without exposing a partial workspace", () =>
   Effect.gen(function* () {
     let failing = true;
     let calls = 0;
@@ -520,14 +524,18 @@ it.effect("does not cache a partial workspace after a page fails", () =>
         const page = new URL(path, "https://fixture.test").searchParams.get("page");
         return failing && page === "1"
           ? Effect.fail(new ClickUpError({ message: "ClickUp rate limit reached." }))
-          : Effect.succeed({ tasks: [task], last_page: true });
+          : Effect.succeed({ tasks: [task], last_page: page === "1" });
       },
     });
-    assert.equal((yield* Effect.result(search("42", "token", "checkout")))._tag, "Failure");
+    const failed = yield* Effect.forkChild(Effect.result(search("42", "token", "checkout")));
+    yield* TestClock.adjust("1 second");
+    assert.equal((yield* Fiber.join(failed))._tag, "Failure");
     const previousCalls = calls;
     failing = false;
-    const result = yield* search("42", "token", "checkout");
+    const pending = yield* Effect.forkChild(search("42", "token", "checkout"));
+    yield* TestClock.adjust("1 second");
+    const result = yield* Fiber.join(pending);
     assert.equal(result.tasks.length, 1);
-    assert.ok(calls > previousCalls);
+    assert.equal(calls, previousCalls + 1);
   }),
 );

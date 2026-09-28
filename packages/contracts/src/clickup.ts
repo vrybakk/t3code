@@ -172,4 +172,5 @@ export const ClickUpThreadLink = Schema.Struct({
 
 export class ClickUpError extends Schema.TaggedError<ClickUpError>()("ClickUpError", {
   message: Schema.String,
+  retryAfterMs: Schema.optionalKey(Schema.Number),
 }) {}
