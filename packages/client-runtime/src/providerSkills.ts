@@ -4,6 +4,26 @@ import type {
   ServerProviderSlashCommand,
 } from "@t3tools/contracts";
 
+// App workflows have no provider-owned SKILL.md file.
+export interface ComposerSkill extends Omit<ServerProviderSkill, "path"> {
+  readonly path?: string;
+}
+
+const STUDIO_TASK_WORKFLOW: ComposerSkill = {
+  name: "studio-task-workflow",
+  displayName: "Studio Task Workflow",
+  shortDescription: "Check requirements, estimate or implement a linked ClickUp task.",
+  scope: "app",
+  enabled: true,
+};
+
+export function getComposerSkills(
+  providerSkills: ReadonlyArray<ServerProviderSkill>,
+  supportsStudioWorkflow: boolean,
+): ComposerSkill[] {
+  return supportsStudioWorkflow ? [STUDIO_TASK_WORKFLOW, ...providerSkills] : [...providerSkills];
+}
+
 export type ProviderSkillSourceKind = "app" | "repo" | "project" | "personal" | "system" | "other";
 
 function titleCaseWords(value: string): string {
@@ -29,9 +49,9 @@ export function formatProviderSkillDisplayName(
   return titleCaseWords(skill.name);
 }
 
-export function dedupeProviderSkillsByName(
-  skills: ReadonlyArray<ServerProviderSkill>,
-): ServerProviderSkill[] {
+export function dedupeProviderSkillsByName<T extends { readonly name: string }>(
+  skills: ReadonlyArray<T>,
+): T[] {
   const seenNames = new Set<string>();
   return skills.filter((skill) => {
     const normalizedName = skill.name.trim().toLowerCase();
@@ -56,10 +76,10 @@ export function isProviderSkillUserInvocable(
   return skill.enabled && skill.userInvocable !== false;
 }
 
-export function getProviderSkillsForSlashMenu(
-  skills: ReadonlyArray<ServerProviderSkill>,
+export function getProviderSkillsForSlashMenu<T extends ComposerSkill>(
+  skills: ReadonlyArray<T>,
   showSkillsInSlashMenu: boolean,
-): ServerProviderSkill[] {
+): T[] {
   return showSkillsInSlashMenu
     ? dedupeProviderSkillsByName(skills.filter(isProviderSkillUserInvocable))
     : [];
@@ -67,22 +87,24 @@ export function getProviderSkillsForSlashMenu(
 
 export function getProviderSlashCommandsForSlashMenu(
   slashCommands: ReadonlyArray<ServerProviderSlashCommand>,
-  visibleSkills: ReadonlyArray<ServerProviderSkill>,
+  visibleSkills: ReadonlyArray<Pick<ComposerSkill, "name">>,
 ): ServerProviderSlashCommand[] {
   const skillNames = new Set(visibleSkills.map((skill) => skill.name.trim().toLowerCase()));
   return slashCommands.filter((command) => !skillNames.has(command.name.trim().toLowerCase()));
 }
 
 export function resolveProviderSkillSourceKind(
-  skill: Pick<ServerProviderSkill, "path" | "scope">,
+  skill: Pick<ComposerSkill, "path" | "scope">,
 ): ProviderSkillSourceKind {
-  const normalizedPath = normalizePathSeparators(skill.path);
+  const normalizedPath = normalizePathSeparators(skill.path ?? "");
   if (normalizedPath.includes("/.codex/plugins/") || normalizedPath.includes("/.agents/plugins/")) {
     return "app";
   }
 
   const normalizedScope = skill.scope?.trim().toLowerCase();
   switch (normalizedScope) {
+    case "app":
+      return "app";
     case "repo":
     case "repository":
       return "repo";

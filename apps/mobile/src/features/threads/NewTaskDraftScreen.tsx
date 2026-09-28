@@ -454,6 +454,8 @@ export function NewTaskDraftScreen(props: {
     [flow.attachments],
   );
   const composerMenu = useComposerCommandMenu({
+    supportsStudioWorkflow:
+      selectedEnvironmentServerConfig?.environment.capabilities.clickUpTasks === true,
     draftMessage: flow.prompt,
     ownerKey: flow.draftKey,
     environmentId: selectedProject?.environmentId ?? null,
