@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { ServerSettingsService } from "../serverSettings.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as GitButlerCli from "./GitButlerCli.ts";
 import * as GitButlerProjectRegistry from "./GitButlerProjectRegistry.ts";
@@ -216,9 +217,23 @@ export class GitButlerWorkspace extends Context.Service<
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const processRunner = yield* VcsProcess.VcsProcess;
+  const settings = yield* ServerSettingsService;
   const projectRegistry = yield* GitButlerProjectRegistry.GitButlerProjectRegistry;
 
   const read = Effect.fn("GitButlerWorkspace.read")(function* (cwd: string) {
+    const enabled = yield* settings.getSettings.pipe(
+      Effect.map((value) => value.enableGitButler),
+      Effect.orElseSucceed(() => null),
+    );
+    if (enabled !== true) {
+      return {
+        status: "error" as const,
+        detail:
+          enabled === false
+            ? "GitButler integration is turned off in Settings → Source Control."
+            : "T3 Code could not read the GitButler integration setting.",
+      };
+    }
     const versionResult = yield* GitButlerCli.readVersionOutput(
       processRunner,
       cwd,
