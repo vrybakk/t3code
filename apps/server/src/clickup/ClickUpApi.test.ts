@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { ClickUpApi, layer } from "./ClickUpApi.ts";
 
@@ -115,6 +116,41 @@ it.effect("keeps API error bodies out of errors and does not retry failed reques
     ),
   );
 });
+
+it.effect.each([
+  { header: "120", status: 429, retryAfterMs: 119_000 },
+  { header: "invalid", status: 429, retryAfterMs: 60_000 },
+  { header: "0", status: 429, retryAfterMs: 60_000 },
+  { header: "120", status: 403, retryAfterMs: undefined },
+])(
+  "exposes cooldown metadata only for rate-limit responses: %j",
+  ({ header, status, retryAfterMs }) =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1_000);
+      const api = yield* ClickUpApi;
+      const result = yield* api.request("user").pipe(Effect.result);
+      assert.equal(result._tag, "Failure");
+      if (result._tag === "Failure") assert.equal(result.failure.retryAfterMs, retryAfterMs);
+    }).pipe(
+      Effect.provide(
+        layer.pipe(
+          Layer.provide(
+            Layer.succeed(
+              HttpClient.HttpClient,
+              HttpClient.make((request) =>
+                Effect.succeed(
+                  HttpClientResponse.fromWeb(
+                    request,
+                    new Response(null, { status, headers: { "X-RateLimit-Reset": header } }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+);
 
 it.effect(
   "sends explicit mutation methods and accepts empty success while preserving OAuth POST",

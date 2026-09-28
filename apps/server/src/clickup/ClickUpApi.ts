@@ -1,5 +1,6 @@
 import { ClickUpError } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Duration from "effect/Duration";
@@ -162,6 +163,14 @@ export const layer = Layer.effect(
                 : response.status === 403
                   ? "Your ClickUp account does not have access to this resource."
                   : `ClickUp request failed (${response.status}). Try again.`;
+          if (response.status === 429) {
+            const now = yield* Clock.currentTimeMillis;
+            const resetAt = Number(response.headers["x-ratelimit-reset"]) * 1_000;
+            return yield* new ClickUpError({
+              message,
+              retryAfterMs: Number.isFinite(resetAt) && resetAt > now ? resetAt - now : 60_000,
+            });
+          }
           return yield* new ClickUpError({ message });
         }
         if (response.status === 204) return null;

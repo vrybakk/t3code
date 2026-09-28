@@ -302,7 +302,9 @@ export function useComposerCommandMenu({
     if (!enabled || selection.start !== selection.end) {
       return null;
     }
-    return detectComposerTrigger(draftMessage, selection.end);
+    const detected = detectComposerTrigger(draftMessage, selection.end);
+    // Native ClickUp task selection is not available yet.
+    return detected?.kind === "task" ? null : detected;
   }, [draftMessage, enabled, selection]);
   const pathSearch = useComposerPathSearch({
     environmentId,

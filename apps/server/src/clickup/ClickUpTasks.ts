@@ -24,6 +24,7 @@ import { validateSprintList } from "./ClickUpSprints.ts";
 import { readTaskTypes } from "./ClickUpTaskTypes.ts";
 import { normalizeComment } from "./ClickUpCommentData.ts";
 import { taskScopeFingerprint } from "./ClickUpTaskScope.ts";
+import { makeTaskSearch } from "./ClickUpTaskSearch.ts";
 
 const decodeThreadLinks = Schema.decodeUnknownEffect(Schema.Array(ClickUpThreadLink));
 
@@ -50,6 +51,7 @@ export const layer = Layer.effect(
     const api = yield* ClickUpApi;
     const connection = yield* ClickUpConnection;
     const sql = yield* SqlClient.SqlClient;
+    const search = yield* makeTaskSearch(api);
 
     const list = Effect.fn("ClickUpTasks.list")(function* (input: ClickUpTasksInput) {
       const { token, connection: account } = yield* connection.account;
@@ -62,6 +64,7 @@ export const layer = Layer.effect(
           message: "Select a workspace authorized by your ClickUp account.",
         });
       }
+      if (input.query) return yield* search(input.workspaceId, token, input.query);
       const query = new URLSearchParams({
         page: String(input.listId ? 0 : input.page),
         subtasks: "true",

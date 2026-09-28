@@ -1,3 +1,6 @@
+import { useComposerTaskSearch } from "./useComposerTaskSearch";
+import { taskContextRecord } from "../../lib/composerTaskContext";
+import { referencedTaskContexts } from "@t3tools/shared/composerTaskContext";
 import { clampFileAttachmentUploadBytes } from "@t3tools/client-runtime/state/attachments";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
@@ -1639,6 +1642,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const composerTerminalContexts = composerDraft.terminalContexts;
   const composerPreviewAnnotations = composerDraft.previewAnnotations;
   const composerReviewComments = composerDraft.reviewComments;
+  const composerTaskContexts = composerDraft.taskContexts;
+  const setComposerTaskContexts = useComposerDraftStore((store) => store.setTaskContexts);
   const pendingSnapShotAnimations = useSyncExternalStore(
     subscribeToPendingSnapShotAnimations,
     getPendingSnapShotAnimations,
@@ -1701,6 +1706,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const composerContextRecords = useMemo(
     () =>
       composerContextRecordsFromDraft({
+        taskContexts: composerTaskContexts,
         terminalContexts: composerTerminalContexts,
         reviewComments: composerReviewComments,
         previewAnnotations: composerPreviewAnnotations,
@@ -1712,6 +1718,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerFiles,
       composerImages,
       composerPreviewAnnotations,
+      composerTaskContexts,
       composerReviewComments,
       composerTerminalContexts,
       uploadsByImageId,
@@ -2261,6 +2268,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // Derived: composer trigger / menu
   // ------------------------------------------------------------------
   const composerTriggerKind = composerTrigger?.kind ?? null;
+  const taskSearch = useComposerTaskSearch(
+    environmentId,
+    composerTrigger?.kind === "task" && pendingUserInputs.length === 0
+      ? composerTrigger.query
+      : null,
+    serverConfigs.get(environmentId)?.environment.capabilities.composerTaskMentions === true,
+    activeThread?.clickUpTasks?.find((task) => task.primary)?.workspaceId,
+  );
   const pathTriggerQuery = composerTrigger?.kind === "path" ? composerTrigger.query : "";
   const pullRequestTriggerQuery =
     composerTrigger?.kind === "pull-request" ? composerTrigger.query : "";
@@ -2354,6 +2369,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
   const composerMenuItems = useMemo<ComposerCommandItem[]>(() => {
     if (!composerTrigger) return [];
+    if (composerTrigger.kind === "task") {
+      return taskSearch.tasks.map((task) => ({
+        id: `task:${task.workspaceId}:${task.taskId}`,
+        type: "task" as const,
+        task,
+        label: task.name,
+        description: `${task.status} · ${task.listName}`,
+      }));
+    }
     if (composerTrigger.kind === "path") {
       return workspaceEntries.entries.map((entry) => ({
         id: `path:${entry.kind}:${entry.path}`,
@@ -2508,6 +2532,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     selectedProviderStatus,
     settings.showSkillsInSlashMenu,
     workspaceEntries.entries,
+    taskSearch.tasks,
   ]);
 
   const composerMenuOpen = Boolean(composerTrigger);
@@ -2578,6 +2603,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   ]);
 
   const isComposerMenuLoading =
+    (composerTriggerKind === "task" && taskSearch.isLoading) ||
     (composerTriggerKind === "path" && pathTriggerQuery.length > 0 && workspaceEntries.isPending) ||
     (composerTriggerKind === "pull-request" &&
       pullRequestProjectId !== null &&
@@ -2587,6 +2613,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         pullRequestTriggerNumber !== debouncedPullRequestNumber ||
         exactPullRequestLookup.isPending));
   const composerMenuEmptyState = useMemo(() => {
+    if (composerTriggerKind === "task")
+      return pendingUserInputs.length > 0
+        ? "Attach tasks when writing a message, after answering this question."
+        : taskSearch.emptyState;
     if (composerTriggerKind === "skill") {
       return "No skills found. Try / to browse provider commands.";
     }
@@ -2610,6 +2640,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   }, [
     composerTrigger,
     composerTriggerKind,
+    taskSearch.emptyState,
+    pendingUserInputs.length,
     pullRequestLookup.data?.errors,
     pullRequestLookup.error,
     pullRequestProjectId,
@@ -2796,6 +2828,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
       }
       const records: ComposerContextRecord[] = [
+        ...(composerTaskContexts ?? []).filter((record) => wanted.has(record.contextId)),
         ...composerTerminalContexts
           .filter((c) => wanted.has(terminalContextReference(c).contextId))
           .map(terminalContextRecord),
@@ -2835,6 +2868,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerFiles,
       composerImages,
       composerPreviewAnnotations,
+      composerTaskContexts,
       composerReviewComments,
       composerTerminalContexts,
       environmentId,
@@ -2972,15 +3006,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           return found ? [found] : [];
         })[0];
         const existingRecord =
-          existing?.kind === "terminal"
-            ? terminalContextRecord(existing.record)
-            : existing?.kind === "review-comment"
-              ? reviewCommentContextRecord(existing.record)
-              : existing?.kind === "preview-annotation"
-                ? previewAnnotationContextRecord(existing.record)
-                : existing
-                  ? (uploadedContextRecordFromDraft(existing) ?? undefined)
-                  : undefined;
+          existing?.kind === "task"
+            ? existing.record
+            : existing?.kind === "terminal"
+              ? terminalContextRecord(existing.record)
+              : existing?.kind === "review-comment"
+                ? reviewCommentContextRecord(existing.record)
+                : existing?.kind === "preview-annotation"
+                  ? previewAnnotationContextRecord(existing.record)
+                  : existing
+                    ? (uploadedContextRecordFromDraft(existing) ?? undefined)
+                    : undefined;
         if (existingRecord && isSameComposerContextPayload(existingRecord, record)) {
           if (record.kind === "preview-annotation" && record.screenshotContextId) {
             skippedDependentAttachmentIds.add(record.screenshotContextId);
@@ -2989,6 +3025,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
         const conflicts = existing !== undefined;
         switch (record.kind) {
+          case "task": {
+            const records =
+              useComposerDraftStore.getState().getComposerDraft(composerDraftTarget)
+                ?.taskContexts ?? [];
+            setComposerTaskContexts(composerDraftTarget, [
+              ...records.filter((task) => task.contextId !== record.contextId),
+              record,
+            ]);
+            break;
+          }
           case "terminal": {
             const threadId = activeThread?.id ?? activeThreadId;
             if (!threadId) break;
@@ -3053,6 +3099,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerContextRecords,
       composerDraftTarget,
       importAttachmentRecord,
+      setComposerTaskContexts,
     ],
   );
   const importContextFragment = useCallback(
@@ -3684,6 +3731,35 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
         return;
       }
+      if (item.type === "task") {
+        if (
+          trigger.kind !== "task" ||
+          !composerMenuItemsRef.current.some((candidate) => candidate.id === item.id)
+        )
+          return;
+        const record = taskContextRecord(item.task);
+        const replacement = `${formatInlineContextReference(record)} `;
+        const end = extendReplacementRangeForTrailingSpace(
+          snapshot.value,
+          trigger.rangeEnd,
+          replacement,
+        );
+        if (
+          applyPromptReplacement(trigger.rangeStart, end, replacement, {
+            expectedText: snapshot.value.slice(trigger.rangeStart, end),
+          })
+        ) {
+          const records =
+            useComposerDraftStore.getState().getComposerDraft(composerDraftTarget)?.taskContexts ??
+            [];
+          setComposerTaskContexts(composerDraftTarget, [
+            ...records.filter((task) => task.contextId !== record.contextId),
+            record,
+          ]);
+          setComposerHighlightedItemId(null);
+        }
+        return;
+      }
       if (item.type === "pull-request") {
         if (
           trigger.kind !== "pull-request" ||
@@ -3723,6 +3799,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       planModeUiEnabled,
       onUsageLimitsCommand,
       resolveActiveComposerTrigger,
+      setComposerTaskContexts,
     ],
   );
 
@@ -4454,6 +4531,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     // Context chips keep their links in the prompt; the payloads behind them travel as
     // records so the restore can resolve every chip.
     const stashedRecords: ComposerContextRecord[] = [
+      ...referencedTaskContexts(prompt, composerTaskContexts ?? []),
       ...composerTerminalContextsRef.current.map(terminalContextRecord),
       ...composerReviewComments.map(reviewCommentContextRecord),
       ...composerPreviewAnnotations.map((annotation) =>
@@ -4657,6 +4735,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     composerFilesRef,
     composerImagesRef,
     composerTerminalContextsRef,
+    composerTaskContexts,
     composerReviewComments,
     composerPreviewAnnotations,
     removeComposerDraftReviewComment,
@@ -5887,7 +5966,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             toastManager.add({
               type: "error",
               title: `Couldn't get the path of "${folder.name}"`,
-              description: "Type the folder path with @ instead.",
+              description: "Type the folder path with ~ instead.",
             });
             continue;
           }
@@ -6460,6 +6539,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     resolvedTheme={resolvedTheme}
                     isLoading={isComposerMenuLoading}
                     triggerKind={composerTriggerKind}
+                    heading={composerTriggerKind === "task" ? taskSearch.label : undefined}
                     emptyStateText={composerMenuEmptyState}
                     activeItemId={activeComposerMenuItem?.id ?? null}
                     onHighlightedItemChange={onComposerMenuItemHighlighted}
@@ -6895,7 +6975,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                 ? "Enable a provider in Settings to send a message"
                                 : phase === "disconnected"
                                   ? DISCONNECTED_COMPOSER_PLACEHOLDER
-                                  : "Ask anything, @tag files/folders, $use skills, or / for commands"
+                                  : "Ask anything, @attach tasks, ~files/folders, $skills, or / commands"
                     }
                     disabled={
                       isConnecting ||

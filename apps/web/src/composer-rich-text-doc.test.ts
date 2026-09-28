@@ -154,24 +154,24 @@ describe("composer rich text document model", () => {
     "- [ ]  ",
     "- [ ]\n  - [ ] child",
     "  - [ ] first\n - [ ] second\n  - [ ] child",
-    "**before @README.md after**",
+    "**before ~README.md after**",
     "*a **b** c*",
     "*a**b***",
     "**a*b***",
     "**a *b* c**",
-    "literal \uFFFC **before @README.md after**",
+    "literal \uFFFC **before ~README.md after**",
     "- [x] done\n- [ ] next",
     "- [ ] parent\n  - [ ] child\n  - [ ] sibling\n- [ ] uncle",
     "- [ ] empty task follows\n- [ ]",
-    "- [ ] **bold** task with @README.md",
+    "- [ ] **bold** task with ~README.md",
     "para\n- [ ] task\npara",
     "- [ ]No space stays literal",
     "-[ ] also literal",
-    "@README.md explain this",
-    '@"docs/My File.md" and $my-skill please',
+    "~README.md explain this",
+    '~"docs/My File.md" and $my-skill please',
     "snake_case stays literal",
     "unmatched ** stays literal",
-    "**bold** then @README.md then *italic*",
+    "**bold** then ~README.md then *italic*",
   ])("round-trips %s through a real ProseMirror document", (value) => {
     expect(roundTrip(value).value).toBe(value);
   });
@@ -183,7 +183,7 @@ describe("composer rich text document model", () => {
     "- [ ]\n- [ ] next\n",
     "- [ ] parent\n  - [ ] child\n- [ ]",
     "para\n- [ ] task\npara",
-    "**before @README.md after**",
+    "**before ~README.md after**",
   ])("maps editable positions in %s", (value) => {
     const doc = ProseMirrorNode.fromJSON(
       schema,
@@ -224,13 +224,13 @@ describe("composer rich text document model", () => {
   it("applies a shared mark to text on both sides of a chip", () => {
     const doc = ProseMirrorNode.fromJSON(
       schema,
-      buildDocJson("**before @README.md after**", (name) => ({ label: name, description: null })),
+      buildDocJson("**before ~README.md after**", (name) => ({ label: name, description: null })),
     );
     expect(doc.firstChild!.childCount).toBe(3);
     doc.firstChild!.forEach((child) =>
       expect(child.marks.map((mark) => mark.type.name)).toContain("bold"),
     );
-    expect(serializeEditorDoc(doc).value).toBe("**before @README.md after**");
+    expect(serializeEditorDoc(doc).value).toBe("**before ~README.md after**");
   });
 
   it.each([
@@ -315,8 +315,8 @@ describe("composer rich text document model", () => {
   });
 
   it("keeps chip sources canonical through the document", () => {
-    const map = roundTrip("explain @README.md with **care**\nsecond line *here*");
-    expect(map.value).toBe("explain @README.md with **care**\nsecond line *here*");
+    const map = roundTrip("explain ~README.md with **care**\nsecond line *here*");
+    expect(map.value).toBe("explain ~README.md with **care**\nsecond line *here*");
     expect(
       map.runs.some((run) => run.kind === "token" && run.nodeName === "composer-mention"),
     ).toBe(true);
@@ -335,14 +335,14 @@ describe("composer rich text document model", () => {
     "- [ ] stays a paragraph",
     "- [x] stays a paragraph",
     "line one\nline two",
-    "@README.md explain this",
-    "**bold** then @README.md then *italic*",
+    "~README.md explain this",
+    "**bold** then ~README.md then *italic*",
   ])("round-trips %s byte-identically in plain mode", (value) => {
     expect(roundTripPlain(value).value).toBe(value);
   });
 
   it("maps every document offset through collapsed coordinates and back", () => {
-    const value = "hi **bold** @README.md bye";
+    const value = "hi **bold** ~README.md bye";
     const map = roundTrip(value);
     expect(map.value).toBe(value);
     for (let flat = 0; flat <= map.docLength; flat += 1) {

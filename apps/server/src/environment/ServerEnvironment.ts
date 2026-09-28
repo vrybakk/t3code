@@ -224,6 +224,7 @@ export const make = Effect.gen(function* () {
       clickUpTasks: true,
       threadTaskLinks: true,
       clickUpMergedHandoffs: true,
+      composerTaskMentions: true,
       clickUpRepositorySetup: true,
       clickUpLocalRepositories: true,
       clickUpOAuthConfiguration: true,

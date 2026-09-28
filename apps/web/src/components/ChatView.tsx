@@ -1,3 +1,4 @@
+import { referencedTaskContexts } from "@t3tools/shared/composerTaskContext";
 import { useLoadBalancedEnvironment } from "../hooks/useLoadBalancedEnvironment";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 import type { UsageLimitSourceSnapshots } from "@t3tools/contracts";
@@ -7341,6 +7342,16 @@ export default function ChatView(props: ChatViewProps) {
     composerTerminalContextsRef.current = restoredTerminalContexts;
     setComposerDraftTerminalContexts(composerDraftTarget, restoredTerminalContexts);
     const draft = useComposerDraftStore.getState().getComposerDraft(composerDraftTarget);
+    useComposerDraftStore
+      .getState()
+      .setTaskContexts(composerDraftTarget, [
+        ...new Map(
+          [
+            ...(draft?.taskContexts ?? []),
+            ...messages.flatMap((message) => message.taskContexts ?? []),
+          ].map((record) => [record.contextId, record]),
+        ).values(),
+      ]);
     setComposerDraftPreviewAnnotations(composerDraftTarget, [
       ...(draft?.previewAnnotations ?? []),
       ...messages.flatMap((message) => message.previewAnnotations),
@@ -7444,6 +7455,10 @@ export default function ChatView(props: ChatViewProps) {
       notifyDirectAnnotationAttached();
       return;
     }
+    const composerTaskContexts = referencedTaskContexts(
+      promptRef.current,
+      useComposerDraftStore.getState().getComposerDraft(composerDraftTarget)?.taskContexts ?? [],
+    );
     const multipleModelSelections = sendCtx.multipleModelSelections;
     if (
       multipleModelSelections !== null &&
@@ -7626,6 +7641,7 @@ export default function ChatView(props: ChatViewProps) {
       const followUpSent = await onSubmitPlanFollowUp({
         text: followUp.text,
         context: buildMessageContext({
+          taskContexts: composerTaskContexts,
           terminalContexts: sendableComposerTerminalContexts,
           reviewComments: composerReviewComments,
           previewAnnotations: composerPreviewAnnotations,
@@ -7633,6 +7649,7 @@ export default function ChatView(props: ChatViewProps) {
         interactionMode: followUp.interactionMode,
       });
       if (!followUpSent) {
+        useComposerDraftStore.getState().setTaskContexts(composerDraftTarget, composerTaskContexts);
         promptRef.current = followUpPromptSnapshot;
         composerTerminalContextsRef.current = [...followUpTerminalContexts];
         restorePlanFollowUpComposer({
@@ -7726,6 +7743,7 @@ export default function ChatView(props: ChatViewProps) {
         terminalContexts: [...composerTerminalContexts],
         previewAnnotations: [...composerPreviewAnnotations],
         reviewComments: [...composerReviewComments],
+        taskContexts: [...composerTaskContexts],
         sendSettings,
         queuedAfterToolActivityId: latestCompletedToolActivityId(threadActivities),
         createdAt: new Date().toISOString(),
@@ -7777,6 +7795,7 @@ export default function ChatView(props: ChatViewProps) {
     // rebinds them to the persisted id.
     const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) =>
       buildMessageContext({
+        taskContexts: composerTaskContexts,
         terminalContexts: composerTerminalContextsSnapshot,
         reviewComments: composerReviewCommentsSnapshot,
         previewAnnotations: composerPreviewAnnotationsSnapshot,
@@ -8171,6 +8190,9 @@ export default function ChatView(props: ChatViewProps) {
               composerPreviewAnnotationsSnapshot,
             );
             setComposerDraftReviewComments(composerDraftTarget, composerReviewCommentsSnapshot);
+            useComposerDraftStore
+              .getState()
+              .setTaskContexts(composerDraftTarget, composerTaskContexts);
             if (composerRef.current && currentRouteThreadKeyRef.current === routeThreadKey) {
               promptRef.current = messageTextForSend;
               composerRef.current.resetCursorState({
@@ -8567,6 +8589,7 @@ export default function ChatView(props: ChatViewProps) {
         setComposerDraftTerminalContexts(composerDraftTarget, composerTerminalContextsSnapshot);
         setComposerDraftPreviewAnnotations(composerDraftTarget, composerPreviewAnnotationsSnapshot);
         setComposerDraftReviewComments(composerDraftTarget, composerReviewCommentsSnapshot);
+        useComposerDraftStore.getState().setTaskContexts(composerDraftTarget, composerTaskContexts);
         composerRef.current?.resetCursorState({
           cursor: collapseExpandedComposerCursor(messageTextForSend, messageTextForSend.length),
           prompt: messageTextForSend,

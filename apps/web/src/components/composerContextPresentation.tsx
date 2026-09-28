@@ -1,3 +1,5 @@
+import type { TaskContextRecord } from "@t3tools/contracts";
+import { ClipboardListIcon } from "lucide-react";
 import ChatMarkdown from "./ChatMarkdown";
 import { ReadOnlySourcePreview } from "./files/AttachmentFilePreview";
 import type { PreviewAnnotationPayload } from "@t3tools/contracts";
@@ -52,6 +54,7 @@ import {
  * shape; the editor only needs a way to look one up by id.
  */
 export type ComposerDraftContextRecord =
+  | { kind: "task"; record: TaskContextRecord }
   | { kind: "terminal"; record: TerminalContextDraft }
   | { kind: "review-comment"; record: ReviewCommentContext }
   | { kind: "preview-annotation"; record: PreviewAnnotationPayload }
@@ -91,6 +94,7 @@ export const ComposerContextRecordsContext = createContext<ComposerDraftContextR
 );
 
 export function composerContextRecordsFromDraft(input: {
+  taskContexts?: ReadonlyArray<TaskContextRecord> | undefined;
   terminalContexts: ReadonlyArray<TerminalContextDraft>;
   reviewComments?: ReadonlyArray<ReviewCommentContext>;
   previewAnnotations?: ReadonlyArray<PreviewAnnotationPayload>;
@@ -99,6 +103,8 @@ export function composerContextRecordsFromDraft(input: {
   uploadsByImageId?: Readonly<Record<string, AttachmentUploadState>>;
 }): ComposerDraftContextRecords {
   const records = new Map<string, ComposerDraftContextRecord>();
+  for (const record of input.taskContexts ?? [])
+    records.set(record.contextId, { kind: "task", record });
   for (const record of input.images ?? []) {
     records.set(imageContextReference(record).contextId, {
       kind: "image",
@@ -327,8 +333,23 @@ const composerContextPresentationRegistry = createContextPresentationRegistry<
   ComposerContextRenderContext,
   ReactElement
 >({
-  requiredKinds: ["image", "file", "terminal", "review-comment", "preview-annotation"],
+  requiredKinds: ["task", "image", "file", "terminal", "review-comment", "preview-annotation"],
   handlers: [
+    {
+      kind: "task",
+      canRender: (entry) => entry.kind === "task",
+      render: (entry) =>
+        entry.kind === "task" ? (
+          <ContextChipShell
+            kind="mention"
+            icon={<ClipboardListIcon />}
+            label={entry.record.label}
+            tooltip={`${entry.record.name}\nClickUp #${entry.record.taskId}`}
+          />
+        ) : (
+          <UnresolvedContextChip label="Task" />
+        ),
+    },
     {
       kind: "terminal",
       canRender: (entry) => entry.kind === "terminal",

@@ -9,7 +9,7 @@ import {
   type ComposerPromptSegment,
 } from "./composer-editor-mentions";
 
-export type ComposerTriggerKind = "path" | "pull-request" | "slash-command" | "skill";
+export type ComposerTriggerKind = "path" | "task" | "pull-request" | "slash-command" | "skill";
 export type ComposerSlashCommand = "model" | "plan" | "default";
 export type ComposerSubmissionIntent = "foreground" | "background" | "alternate";
 
@@ -234,6 +234,15 @@ export function detectComposerTrigger(text: string, cursorInput: number): Compos
   }
 
   const tokenStart = tokenStartForCursor(text, cursor);
+  const taskMatch = /(?:^|\s)@([^@\n~$#]*)$/.exec(text.slice(0, cursor));
+  if (taskMatch) {
+    return {
+      kind: "task",
+      query: (taskMatch[1] ?? "").trim(),
+      rangeStart: cursor - taskMatch[0].length + (taskMatch[0].startsWith("@") ? 0 : 1),
+      rangeEnd: cursor,
+    };
+  }
   const token = text.slice(tokenStart, cursor);
   const pullRequestMatch = /^#([\p{L}\p{N}][\p{L}\p{N}_-]*)?$/u.exec(token);
   if (pullRequestMatch) {
@@ -253,7 +262,7 @@ export function detectComposerTrigger(text: string, cursorInput: number): Compos
       rangeEnd: cursor,
     };
   }
-  if (!token.startsWith("@")) {
+  if (!token.startsWith("~")) {
     return null;
   }
 

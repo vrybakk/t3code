@@ -42,3 +42,15 @@ describe("serializeComposerFileLink", () => {
     );
   });
 });
+
+it("uses @ for task search and ~ for files without treating email as a task", () => {
+  expect(detectComposerTrigger("Discuss @hero slider", 20)).toEqual({
+    kind: "task",
+    query: "hero slider",
+    rangeStart: 8,
+    rangeEnd: 20,
+  });
+  expect(detectComposerTrigger("~src/app", 8)?.kind).toBe("path");
+  expect(detectComposerTrigger("a@example.com", 13)).toBeNull();
+  expect(detectComposerTrigger("@", 1)?.query).toBe("");
+});

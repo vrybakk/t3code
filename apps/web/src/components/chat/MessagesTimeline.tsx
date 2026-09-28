@@ -1,3 +1,4 @@
+import { ClipboardListIcon } from "lucide-react";
 import { ArrowUpIcon, ClockIcon } from "lucide-react";
 import { ReadOnlySourcePreview } from "../files/AttachmentFilePreview";
 import { useRightPanelStore } from "~/rightPanelStore";
@@ -3695,6 +3696,23 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
 >({
   requiredKinds: COMPOSER_CONTEXT_KINDS,
   handlers: [
+    {
+      kind: "task",
+      canRender: (record) => record.kind === "task",
+      render: (record, context) =>
+        record.kind === "task" ? (
+          <UserMessageContextChip
+            icon={<ClipboardListIcon />}
+            label={record.label || record.name}
+            kindLabel="ClickUp task"
+            tooltip={`${record.name}\nhttps://app.clickup.com/t/${record.taskId}`}
+            copyMarkdown={context.copyMarkdown}
+            kind="mention"
+          />
+        ) : (
+          <UnavailableUserMessageContextChip {...context} />
+        ),
+    },
     {
       kind: "mention",
       canRender: (record) => record.kind === "mention",

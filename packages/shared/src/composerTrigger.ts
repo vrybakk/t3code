@@ -1,5 +1,6 @@
 export type ComposerTriggerKind =
   | "path"
+  | "task"
   | "pull-request"
   | "slash-command"
   | "slash-model"
@@ -46,7 +47,7 @@ function isWhitespace(char: string): boolean {
 }
 
 /**
- * Detect an active trigger (@path, $skill, /command) at the cursor position.
+ * Detect an active trigger (@task, ~path, $skill, /command) at the cursor position.
  *
  * Accepts an optional `isWhitespaceChar` override so callers with inline
  * placeholder characters (e.g. terminal context chips on web) can treat
@@ -99,6 +100,15 @@ export function detectComposerTrigger(
   }
   const tokenStart = tokenIdx + 1;
 
+  const taskMatch = /(?:^|\s)@([^@\n~$#]*)$/.exec(text.slice(0, cursor));
+  if (taskMatch) {
+    return {
+      kind: "task",
+      query: (taskMatch[1] ?? "").trim(),
+      rangeStart: cursor - taskMatch[0].length + (taskMatch[0].startsWith("@") ? 0 : 1),
+      rangeEnd: cursor,
+    };
+  }
   const token = text.slice(tokenStart, cursor);
   const pullRequestMatch = /^#([\p{L}\p{N}][\p{L}\p{N}_-]*)?$/u.exec(token);
   if (pullRequestMatch)
@@ -117,7 +127,7 @@ export function detectComposerTrigger(
       rangeEnd: cursor,
     };
   }
-  if (!token.startsWith("@")) {
+  if (!token.startsWith("~")) {
     return null;
   }
 

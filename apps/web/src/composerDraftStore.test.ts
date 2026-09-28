@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 import {
   defaultInstanceIdForDriver,
   EnvironmentId,
+  ComposerContextId,
   MessageId,
   ProjectId,
   ProviderDriverKind,
@@ -199,6 +200,41 @@ function draftByKey(key: string) {
 describe("composerDraftStore assistant citations", () => {
   beforeEach(resetComposerDraftStore);
   afterEach(resetComposerDraftStore);
+
+  it("preserves task chips through reload and keeps metadata for undo until send clears it", async () => {
+    await useComposerDraftStore.persist.clearStorage();
+    vi.useFakeTimers();
+    try {
+      const threadId = ThreadId.make("task-draft");
+      const threadRef = scopeThreadRef(TEST_ENVIRONMENT_ID, threadId);
+      const task = {
+        version: 1 as const,
+        kind: "task" as const,
+        contextId: ComposerContextId.make("task_a"),
+        label: "Task A",
+        name: "Task A",
+        workspaceId: "42",
+        taskId: "a",
+      };
+      const prompt = "Discuss [Task A](t3-context://v1/task/task_a)";
+      useComposerDraftStore.getState().setPrompt(threadRef, prompt);
+      useComposerDraftStore.getState().setTaskContexts(threadRef, [task]);
+      await vi.advanceTimersByTimeAsync(300);
+      resetComposerDraftStore();
+      await useComposerDraftStore.persist.rehydrate();
+      expect(draftFor(threadId, TEST_ENVIRONMENT_ID)).toMatchObject({
+        prompt,
+        taskContexts: [task],
+      });
+      useComposerDraftStore.getState().setPrompt(threadRef, "");
+      expect(draftFor(threadId, TEST_ENVIRONMENT_ID)?.taskContexts).toEqual([task]);
+      useComposerDraftStore.getState().clearComposerContent(threadRef);
+      expect(draftFor(threadId, TEST_ENVIRONMENT_ID)?.taskContexts ?? []).toEqual([]);
+    } finally {
+      await useComposerDraftStore.persist.clearStorage();
+      vi.useRealTimers();
+    }
+  });
 
   it("keeps quotes, comments, and remote source IDs through persistence and removes them on clear", async () => {
     await useComposerDraftStore.persist.clearStorage();

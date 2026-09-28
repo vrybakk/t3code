@@ -17,6 +17,14 @@ const decodeTurnStart = Schema.decodeUnknownSync(ThreadTurnStartCommand);
 const base = { version: 1, contextId: "ctx_1" } as const;
 
 const knownRecords: Record<(typeof COMPOSER_CONTEXT_KINDS)[number], Record<string, unknown>> = {
+  task: {
+    ...base,
+    kind: "task",
+    label: "Fix checkout",
+    workspaceId: "workspace-1",
+    taskId: "task-1",
+    name: "Fix checkout",
+  },
   image: {
     ...base,
     kind: "image",

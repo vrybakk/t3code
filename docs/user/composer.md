@@ -166,6 +166,15 @@ provider supports it. Web and desktop also offer compaction from the context met
 
 ## Context in your message
 
+On web and desktop, type `@` to attach a ClickUp task. The initial suggestions
+come from the current sprint; typing a name or task ID searches all accessible
+tasks in the workspace. Use `~` to select local files or folders.
+
+Tasks become linked when you send the message. The first task is primary if the
+thread has none; additional tasks provide context without replacing its primary
+task. You can attach tasks to any custom prompt without starting the studio
+workflow. Remove a task chip before sending to leave it unattached.
+
 Context you attach lands where your cursor is, as a chip inside your text: a terminal excerpt,
 a review comment from a diff or file, a preview annotation, or a file. You can type before and
 after a chip, move it by cutting and pasting, and delete it like a character. Hover a chip for

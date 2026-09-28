@@ -894,7 +894,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             const task = event.payload.link;
             yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id, name, is_primary)
               VALUES (${event.payload.threadId}, ${task.workspaceId}, ${task.taskId}, ${task.name}, ${task.primary ? 1 : 0})
-              ON CONFLICT(thread_id, workspace_id, task_id) DO UPDATE SET name = excluded.name`.pipe(
+              ON CONFLICT(thread_id, workspace_id, task_id) DO UPDATE SET name = excluded.name, is_primary = excluded.is_primary`.pipe(
               Effect.mapError(toPersistenceSqlError("ThreadTasks.link")),
             );
           } else {

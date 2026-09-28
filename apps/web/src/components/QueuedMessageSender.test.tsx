@@ -1,5 +1,5 @@
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
-import { EnvironmentId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
+import { ComposerContextId, EnvironmentId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { act, createElement } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -99,6 +99,27 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+it("carries task records through queue cancellation, retry, and provider dispatch", async () => {
+  const task = {
+    version: 1 as const,
+    kind: "task" as const,
+    contextId: ComposerContextId.make("task_a"),
+    label: "Task A",
+    name: "Task A",
+    workspaceId: "42",
+    taskId: "a",
+  };
+  const prompt = "Discuss [Task A](t3-context://v1/task/task_a)";
+  enqueue({ prompt, taskContexts: [task] });
+  const [restored] = useQueuedMessageStore.getState().drain(threadKey);
+  expect(restored?.taskContexts).toEqual([task]);
+  const queued = enqueue(restored);
+  await sendQueuedMessage(threadRef, queued.id);
+  expect(io.run.mock.calls.at(-1)?.[2]).toMatchObject({
+    input: { message: { text: prompt, context: { records: [task] } } },
+  });
 });
 
 describe("QueuedMessageSender", () => {
