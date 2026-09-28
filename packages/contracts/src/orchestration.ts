@@ -1155,8 +1155,12 @@ const ThreadTaskAutoArchiveCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   snapshotSequence: NonNegativeInt,
-  workspaceId: TrimmedNonEmptyString,
-  taskId: TrimmedNonEmptyString,
+  tasks: Schema.Array(
+    Schema.Struct({
+      workspaceId: TrimmedNonEmptyString,
+      taskId: TrimmedNonEmptyString,
+    }),
+  ),
 });
 
 const ThreadUnarchiveCommand = Schema.Struct({

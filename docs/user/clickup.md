@@ -93,10 +93,10 @@ Refresh task details to see agent updates; existing provider sessions may need r
 pick up new tools. Description edits and inbox notifications are not available yet. The task
 association does not change Work reports or export time to ClickUp.
 
-Threads with exactly one linked task are automatically archived after that task reaches ClickUp's
+Threads with linked tasks are automatically archived after all their tasks reach ClickUp's
 final Closed status. The server checks every minute while connected and waits for running work
-or pending questions to finish. Threads with multiple tasks stay open. Archived conversations
-keep their history; reopening one keeps it open until the task is reopened and completed again.
+or pending questions to finish. Any unfinished or unavailable task keeps its thread open. Archived conversations
+keep their history; reopening one keeps it open until a linked task is reopened and completed again.
 Attaching an already completed task does not archive a new conversation.
 
 Disconnecting removes Nerd's saved ClickUp credential for that environment. It does not revoke

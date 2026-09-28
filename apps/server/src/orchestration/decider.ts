@@ -444,9 +444,13 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       if (command.type === "thread.task.auto-archive") {
         const links = thread.clickUpTasks ?? [];
         if (
-          links.length !== 1 ||
-          links[0]?.workspaceId !== command.workspaceId ||
-          links[0]?.taskId !== command.taskId ||
+          links.length === 0 ||
+          links.length !== command.tasks.length ||
+          !links.every((link) =>
+            command.tasks.some(
+              (task) => task.workspaceId === link.workspaceId && task.taskId === link.taskId,
+            ),
+          ) ||
           thread.session?.status === "starting" ||
           thread.session?.status === "running" ||
           openRequests(thread).size > 0 ||
@@ -454,7 +458,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         ) {
           return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
-            detail: `thread ${command.threadId} is not idle with exactly the completed task linked`,
+            detail: `thread ${command.threadId} is not idle with exactly the completed tasks linked`,
           });
         }
       }

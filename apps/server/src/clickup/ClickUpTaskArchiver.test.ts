@@ -85,26 +85,29 @@ for (const [name, response] of [
   });
 }
 
-it.effect("does not fetch while disconnected, and leaves multi-task threads untouched", () => {
-  const test = fixture();
-  return Effect.gen(function* () {
-    const { engine, read } = yield* setup;
-    const sweep = yield* make;
-    test.state.connected = false;
-    yield* sweep();
-    expect(test.state.reads).toBe(0);
-    test.state.connected = true;
-    yield* engine.dispatch({
-      type: "thread.task.link",
-      commandId: CommandId.make("second"),
-      threadId,
-      task: { ...task, taskId: "second" },
-    });
-    yield* sweep();
-    expect(test.state.reads).toBe(0);
-    expect((yield* read).archivedAt).toBeNull();
-  }).pipe(Effect.provide(test.layer));
-});
+it.effect(
+  "does not fetch while disconnected, and keeps threads with unconfirmed tasks open",
+  () => {
+    const test = fixture();
+    return Effect.gen(function* () {
+      const { engine, read } = yield* setup;
+      const sweep = yield* make;
+      test.state.connected = false;
+      yield* sweep();
+      expect(test.state.reads).toBe(0);
+      test.state.connected = true;
+      yield* engine.dispatch({
+        type: "thread.task.link",
+        commandId: CommandId.make("second"),
+        threadId,
+        task: { ...task, taskId: "second" },
+      });
+      yield* sweep();
+      expect(test.state.reads).toBe(2);
+      expect((yield* read).archivedAt).toBeNull();
+    }).pipe(Effect.provide(test.layer));
+  },
+);
 
 it.effect("defers live background work until idle", () => {
   const test = fixture();
@@ -177,32 +180,28 @@ for (const race of ["second-task", "background-work", "account-change", "manual-
   });
 }
 
-it.effect(
-  "rejects auto-archive for an unlinked or multi-task thread even with a fresh snapshot",
-  () => {
-    const test = fixture();
-    return Effect.gen(function* () {
-      const { engine, read } = yield* setup;
-      yield* engine.dispatch({
-        type: "thread.task.link",
-        commandId: CommandId.make("extra"),
-        threadId,
-        task: { ...task, taskId: "extra" },
-      });
-      const command = {
-        type: "thread.task.auto-archive" as const,
-        commandId: CommandId.make("bad-auto"),
-        threadId,
-        snapshotSequence: yield* engine.latestSequence,
-        workspaceId: "42",
-        taskId: "task",
-      };
-      expect(isClientCommand(command)).toBe(false);
-      expect((yield* Effect.result(engine.dispatch(command)))._tag).toBe("Failure");
-      expect((yield* read).archivedAt).toBeNull();
-    }).pipe(Effect.provide(test.layer));
-  },
-);
+it.effect("rejects auto-archive when the confirmed task set is incomplete", () => {
+  const test = fixture();
+  return Effect.gen(function* () {
+    const { engine, read } = yield* setup;
+    yield* engine.dispatch({
+      type: "thread.task.link",
+      commandId: CommandId.make("extra"),
+      threadId,
+      task: { ...task, taskId: "extra" },
+    });
+    const command = {
+      type: "thread.task.auto-archive" as const,
+      commandId: CommandId.make("bad-auto"),
+      threadId,
+      snapshotSequence: yield* engine.latestSequence,
+      tasks: [{ workspaceId: "42", taskId: "task" }],
+    };
+    expect(isClientCommand(command)).toBe(false);
+    expect((yield* Effect.result(engine.dispatch(command)))._tag).toBe("Failure");
+    expect((yield* read).archivedAt).toBeNull();
+  }).pipe(Effect.provide(test.layer));
+});
 
 it.effect("an inaccessible task does not prevent another thread from archiving", () => {
   const test = fixture();

@@ -24,7 +24,7 @@ const TaskCompletion = Schema.Struct({
 function isCandidate(thread: OrchestrationThreadShell, now: string): boolean {
   return (
     thread.archivedAt === null &&
-    thread.clickUpTasks?.length === 1 &&
+    (thread.clickUpTasks?.length ?? 0) > 0 &&
     thread.session?.status !== "starting" &&
     thread.session?.status !== "running" &&
     !thread.hasPendingApprovals &&
@@ -48,83 +48,99 @@ export const make = Effect.gen(function* () {
     const candidates = snapshot.threads.filter((thread) => isCandidate(thread, now));
     if (candidates.length === 0 || !(yield* connection.status).user) return;
     const account = yield* connection.account;
-    const groups = Map.groupBy(
-      candidates.filter((thread) =>
-        account.connection.workspaces.some(
-          (workspace) => workspace.id === thread.clickUpTasks![0]!.workspaceId,
-        ),
-      ),
-      (thread) =>
-        JSON.stringify([thread.clickUpTasks![0]!.workspaceId, thread.clickUpTasks![0]!.taskId]),
-    );
-    for (const threads of groups.values()) {
-      const link = threads[0]!.clickUpTasks![0]!;
-      const result = yield* api
-        .request(`task/${encodeURIComponent(link.taskId)}`, {
-          token: account.token,
-        })
-        .pipe(Effect.flatMap(decodeResponse(TaskCompletion)), Effect.result);
-      if (Result.isFailure(result)) {
-        yield* Effect.logWarning("Completed task lookup failed", {
-          taskId: link.taskId,
-          error: result.failure,
-        });
-        continue;
-      }
-      const task = result.success;
-      const closedAt = task.date_closed === null ? NaN : Number(task.date_closed);
+    const completions = new Map<string, number | null>();
+    for (const thread of candidates) {
+      const links = thread.clickUpTasks!;
       if (
-        task.id !== link.taskId ||
-        task.team_id !== link.workspaceId ||
-        task.status.type !== "closed" ||
-        !Number.isFinite(closedAt) ||
-        closedAt <= 0
+        !links.every((link) =>
+          account.connection.workspaces.some((workspace) => workspace.id === link.workspaceId),
+        )
       )
         continue;
-
+      let latestClosedAt = 0;
+      let allCompleted = true;
+      for (const link of links) {
+        const key = `${encodeURIComponent(link.workspaceId)}:${encodeURIComponent(link.taskId)}`;
+        if (!completions.has(key)) {
+          const result = yield* api
+            .request(`task/${encodeURIComponent(link.taskId)}`, {
+              token: account.token,
+            })
+            .pipe(Effect.flatMap(decodeResponse(TaskCompletion)), Effect.result);
+          let closedAt: number | null = null;
+          if (Result.isFailure(result)) {
+            yield* Effect.logWarning("Completed task lookup failed", {
+              taskId: link.taskId,
+              error: result.failure,
+            });
+          } else {
+            const task = result.success;
+            const timestamp = task.date_closed === null ? NaN : Number(task.date_closed);
+            if (
+              task.id === link.taskId &&
+              task.team_id === link.workspaceId &&
+              task.status.type === "closed" &&
+              Number.isFinite(timestamp) &&
+              timestamp > 0
+            ) {
+              closedAt = timestamp;
+            }
+          }
+          completions.set(key, closedAt);
+        }
+        const closedAt = completions.get(key);
+        if (closedAt == null) {
+          allCompleted = false;
+          break;
+        }
+        latestClosedAt = Math.max(latestClosedAt, closedAt);
+      }
+      if (!allCompleted) continue;
       const currentAccount = yield* connection.account;
       if (
         currentAccount.token !== account.token ||
         currentAccount.connection.user?.id !== account.connection.user?.id
       )
         return;
-      for (const thread of threads) {
-        // Reopening or linking historical work must survive restarts and later refreshes.
-        const [reopened] = yield* sql<{ occurredAt: string }>`
-          SELECT occurred_at AS "occurredAt" FROM orchestration_events
-          WHERE aggregate_kind = 'thread' AND stream_id = ${thread.id}
-            AND sequence <= ${snapshot.snapshotSequence}
-            AND (event_type = 'thread.unarchived' OR (
-              event_type = 'thread.task-linked'
-              AND json_extract(payload_json, '$.link.workspaceId') = ${link.workspaceId}
-              AND json_extract(payload_json, '$.link.taskId') = ${link.taskId}
-            ))
-          ORDER BY sequence DESC LIMIT 1
-        `;
-        const anchor = Math.max(
-          Date.parse(thread.createdAt),
-          Date.parse(thread.latestUserMessageAt ?? thread.createdAt),
-          Date.parse(reopened?.occurredAt ?? thread.createdAt),
+      // Reopening or linking historical work must survive restarts and later refreshes.
+      const [reopened] = yield* sql<{ occurredAt: string }>`
+        SELECT occurred_at AS "occurredAt" FROM orchestration_events
+        WHERE aggregate_kind = 'thread' AND stream_id = ${thread.id}
+          AND sequence <= ${snapshot.snapshotSequence}
+          AND (event_type = 'thread.unarchived' OR (event_type = 'thread.task-linked' AND
+            ${sql.or(
+              links.map(
+                (link) => sql`(
+              json_extract(payload_json, '$.link.workspaceId') = ${link.workspaceId} AND
+              json_extract(payload_json, '$.link.taskId') = ${link.taskId}
+            )`,
+              ),
+            )}
+          ))
+        ORDER BY sequence DESC LIMIT 1
+      `;
+      const anchor = Math.max(
+        Date.parse(thread.createdAt),
+        Date.parse(thread.latestUserMessageAt ?? thread.createdAt),
+        Date.parse(reopened?.occurredAt ?? thread.createdAt),
+      );
+      if (!(latestClosedAt > anchor)) continue;
+      yield* engine
+        .dispatch({
+          type: "thread.task.auto-archive",
+          commandId: CommandId.make(`task-archive:${yield* crypto.randomUUIDv4}`),
+          threadId: thread.id,
+          snapshotSequence: snapshot.snapshotSequence,
+          tasks: links.map(({ workspaceId, taskId }) => ({ workspaceId, taskId })),
+        })
+        .pipe(
+          Effect.catch((error) =>
+            Effect.logWarning("Completed task thread archive deferred", {
+              threadId: thread.id,
+              error,
+            }),
+          ),
         );
-        if (!(closedAt > anchor)) continue;
-        yield* engine
-          .dispatch({
-            type: "thread.task.auto-archive",
-            commandId: CommandId.make(`task-archive:${yield* crypto.randomUUIDv4}`),
-            threadId: thread.id,
-            snapshotSequence: snapshot.snapshotSequence,
-            workspaceId: link.workspaceId,
-            taskId: link.taskId,
-          })
-          .pipe(
-            Effect.catch((error) =>
-              Effect.logWarning("Completed task thread archive deferred", {
-                threadId: thread.id,
-                error,
-              }),
-            ),
-          );
-      }
     }
   });
 });

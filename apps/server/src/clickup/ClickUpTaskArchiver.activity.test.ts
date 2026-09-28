@@ -60,8 +60,7 @@ for (const activity of ["running", "starting", "approval", "question", "queued"]
             commandId: CommandId.make("force-auto"),
             threadId,
             snapshotSequence: yield* engine.latestSequence,
-            workspaceId: "42",
-            taskId: "task",
+            tasks: [{ workspaceId: "42", taskId: "task" }],
           }),
         ))._tag,
       ).toBe("Failure");
