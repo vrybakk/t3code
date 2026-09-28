@@ -224,7 +224,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
           <span className="min-w-0 flex-1 truncate font-medium text-sidebar-foreground/90">
             {label}
           </span>
-          <span className="flex shrink-0 items-center gap-1.5 text-3xs leading-none transition-opacity group-hover/project-row:opacity-0 group-has-[:focus-visible]/project-row:opacity-0">
+          <span className="flex shrink-0 items-center gap-1.5 text-3xs leading-none transition-opacity group-hover/project-row:pointer-events-none group-hover/project-row:absolute group-hover/project-row:right-2 group-hover/project-row:opacity-0 group-has-[:focus-visible]/project-row:pointer-events-none group-has-[:focus-visible]/project-row:absolute group-has-[:focus-visible]/project-row:right-2 group-has-[:focus-visible]/project-row:opacity-0">
             {props.statusCounts.idle > 0 ? (
               <StatusCount
                 count={props.statusCounts.idle}
@@ -251,7 +251,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
           </span>
         </button>
         {props.onNewThread || props.onSettleAll ? (
-          <span className="pointer-events-none absolute inset-y-0 right-1 flex items-center gap-0.5 bg-sidebar-row-hover opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 group-hover/project-row:pointer-events-auto group-hover/project-row:opacity-100">
+          <span className="pointer-events-none absolute inset-y-0 right-0 flex shrink-0 items-center gap-0.5 pr-1 opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:static has-[:focus-visible]:opacity-100 group-hover/project-row:pointer-events-auto group-hover/project-row:static group-hover/project-row:opacity-100">
             {props.onNewThread ? (
               <Tooltip>
                 <TooltipTrigger
@@ -262,7 +262,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
                       onClick={(event) => {
                         if (!ignoreContextMenuClick(event)) props.onNewThread?.();
                       }}
-                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-row-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     />
                   }
                 >
@@ -281,7 +281,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
                       onClick={(event) => {
                         if (!ignoreContextMenuClick(event)) props.onSettleAll?.();
                       }}
-                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-row-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     />
                   }
                 >
