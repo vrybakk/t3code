@@ -100,6 +100,7 @@ export const ClickUpTaskInput = Schema.Struct({
 export type ClickUpTaskInput = typeof ClickUpTaskInput.Type;
 export const ClickUpTasksInput = Schema.Struct({
   workspaceId: ClickUpId,
+  query: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(200))),
   listId: Schema.optional(ClickUpId),
   showAll: Schema.optional(Schema.Boolean),
   page: NonNegativeInt,

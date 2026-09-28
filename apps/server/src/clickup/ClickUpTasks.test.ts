@@ -2,6 +2,8 @@ import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
+import { ClickUpError } from "@t3tools/contracts";
+import { makeTaskSearch } from "./ClickUpTaskSearch.ts";
 import { ClickUpApi } from "./ClickUpApi.ts";
 import { ClickUpConnection } from "./ClickUpConnection.ts";
 import { ClickUpTasks, layer } from "./ClickUpTasks.ts";
@@ -469,4 +471,63 @@ it.effect(
       assert.equal(test.paths.filter((path) => path.endsWith("/custom_item")).length, 2);
     }).pipe(Effect.provide(test.layer));
   },
+);
+
+it.effect("searches all workspace pages and reuses the account-scoped snapshot", () => {
+  const test = setup((path) => {
+    const page = new URL(path, "https://fixture.test").searchParams.get("page");
+    return page === "0"
+      ? { tasks: [{ ...task, name: "Unrelated" }], last_page: false }
+      : page === "1"
+        ? { tasks: [{ ...task, id: "older-task", name: "Hero slider" }], last_page: true }
+        : {
+            tasks: [{ ...task, id: "ignore-after-terminal", name: "Hero slider" }],
+            last_page: true,
+          };
+  });
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    const input = { workspaceId: "42", userId: 17, page: 0, query: "hero slider" };
+    const result = yield* tasks.list(input);
+    assert.deepEqual(
+      result.tasks.map((task) => task.taskId),
+      ["older-task"],
+    );
+    assert.equal(test.paths.length, 4);
+    assert.ok(
+      test.paths.every(
+        (path) => path.includes("include_closed=true") && !path.includes("assignees"),
+      ),
+    );
+    yield* tasks.list({ ...input, query: "older-task" });
+    assert.equal(test.paths.length, 4);
+    assert.equal(
+      (yield* Effect.result(tasks.list({ ...input, workspaceId: "other" })))._tag,
+      "Failure",
+    );
+    assert.equal((yield* Effect.result(tasks.list({ ...input, userId: 99 })))._tag, "Failure");
+    assert.equal(test.paths.length, 4);
+  }).pipe(Effect.provide(test.layer));
+});
+
+it.effect("does not cache a partial workspace after a page fails", () =>
+  Effect.gen(function* () {
+    let failing = true;
+    let calls = 0;
+    const search = yield* makeTaskSearch({
+      request: (path) => {
+        calls++;
+        const page = new URL(path, "https://fixture.test").searchParams.get("page");
+        return failing && page === "1"
+          ? Effect.fail(new ClickUpError({ message: "ClickUp rate limit reached." }))
+          : Effect.succeed({ tasks: [task], last_page: true });
+      },
+    });
+    assert.equal((yield* Effect.result(search("42", "token", "checkout")))._tag, "Failure");
+    const previousCalls = calls;
+    failing = false;
+    const result = yield* search("42", "token", "checkout");
+    assert.equal(result.tasks.length, 1);
+    assert.ok(calls > previousCalls);
+  }),
 );

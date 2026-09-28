@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import { ClickUpTaskReference } from "./clickup.ts";
 
 import {
   ForwardCompatibleArray,
@@ -25,6 +26,7 @@ export const COMPOSER_CONTEXT_KINDS = [
   "review-comment",
   "mention",
   "skill",
+  "task",
 ] as const;
 export type KnownComposerContextKind = (typeof COMPOSER_CONTEXT_KINDS)[number];
 
@@ -215,6 +217,13 @@ export const SkillContextRecord = Schema.Struct({
 });
 export type SkillContextRecord = typeof SkillContextRecord.Type;
 
+export const TaskContextRecord = Schema.Struct({
+  ...recordBase,
+  kind: Schema.Literal("task"),
+  ...ClickUpTaskReference.fields,
+});
+export type TaskContextRecord = typeof TaskContextRecord.Type;
+
 /**
  * Catch-all for kinds this build does not know. Known discriminators are excluded so a
  * malformed known record fails its own schema instead of sliding through unchecked.
@@ -245,6 +254,7 @@ export const KnownComposerContextRecord = Schema.Union([
   ReviewCommentContextRecord,
   MentionContextRecord,
   SkillContextRecord,
+  TaskContextRecord,
 ]);
 export type KnownComposerContextRecord = typeof KnownComposerContextRecord.Type;
 

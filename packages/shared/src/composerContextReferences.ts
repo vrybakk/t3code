@@ -181,6 +181,8 @@ function formatElementDetails(element: ElementContextDetails): string[] {
 /** Body lines for one payload, including authoritative paths and names behind display labels. */
 function formatComposerContextProviderPayload(record: KnownComposerContextRecord): string {
   switch (record.kind) {
+    case "task":
+      return `workspaceId: ${record.workspaceId}\ntaskId: ${record.taskId}\nname: ${record.name}\nurl: https://app.clickup.com/t/${record.taskId}`;
     case "image":
     case "file":
       return [

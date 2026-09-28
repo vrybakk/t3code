@@ -1,3 +1,4 @@
+import { newTaskLinksFromMessage } from "@t3tools/shared/composerTaskContext";
 import {
   EventId,
   MAX_SCRIPT_ID_LENGTH,
@@ -1565,7 +1566,26 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           },
         });
       }
+      const taskLinkEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
+      const taskMessage = persistedUserMessage ?? command.message;
+      for (const link of newTaskLinksFromMessage(
+        taskMessage.text,
+        taskMessage.context?.records ?? [],
+        targetThread.clickUpTasks ?? [],
+      )) {
+        taskLinkEvents.push({
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt: command.createdAt,
+            commandId: command.commandId,
+          })),
+          type: "thread.task-linked",
+          payload: { threadId: command.threadId, link, updatedAt: command.createdAt },
+        });
+      }
       return [
+        ...taskLinkEvents,
         ...lifecycleResetEvents,
         ...(userMessageEvent ? [userMessageEvent] : []),
         turnStartRequestedEvent,
@@ -1590,28 +1610,48 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           detail: `Message '${command.message.messageId}' already exists on thread '${command.threadId}'.`,
         });
       }
-      return {
-        ...(yield* withEventBase({
-          aggregateKind: "thread",
-          aggregateId: command.threadId,
-          occurredAt: command.createdAt,
-          commandId: command.commandId,
-          metadata: { deferredTurn: true },
-        })),
-        type: "thread.message-sent",
-        payload: {
-          threadId: command.threadId,
-          messageId: command.message.messageId,
-          role: "user",
-          text: command.message.text,
-          attachments: command.message.attachments,
-          ...(command.message.context !== undefined ? { context: command.message.context } : {}),
-          turnId: null,
-          streaming: false,
-          createdAt: command.createdAt,
-          updatedAt: command.createdAt,
+      const taskLinkEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
+      for (const link of newTaskLinksFromMessage(
+        command.message.text,
+        command.message.context?.records ?? [],
+        thread.clickUpTasks ?? [],
+      )) {
+        taskLinkEvents.push({
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt: command.createdAt,
+            commandId: command.commandId,
+          })),
+          type: "thread.task-linked",
+          payload: { threadId: command.threadId, link, updatedAt: command.createdAt },
+        });
+      }
+      return [
+        ...taskLinkEvents,
+        {
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt: command.createdAt,
+            commandId: command.commandId,
+            metadata: { deferredTurn: true },
+          })),
+          type: "thread.message-sent",
+          payload: {
+            threadId: command.threadId,
+            messageId: command.message.messageId,
+            role: "user",
+            text: command.message.text,
+            attachments: command.message.attachments,
+            ...(command.message.context !== undefined ? { context: command.message.context } : {}),
+            turnId: null,
+            streaming: false,
+            createdAt: command.createdAt,
+            updatedAt: command.createdAt,
+          },
         },
-      };
+      ];
     }
 
     case "thread.turn.interrupt": {

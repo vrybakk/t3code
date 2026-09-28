@@ -165,6 +165,7 @@ export async function sendQueuedMessage(
     const thread = readThread(threadRef) ?? undefined;
     if (!queue.markDispatching(threadKey, message.id, createLocalDispatchSnapshot(thread))) return;
     const context = buildMessageContext({
+      taskContexts: message.taskContexts ?? [],
       terminalContexts: sendableTerminalContexts,
       reviewComments: message.reviewComments,
       previewAnnotations: message.previewAnnotations,
