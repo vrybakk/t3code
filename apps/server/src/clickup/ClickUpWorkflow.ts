@@ -76,6 +76,17 @@ export const layer = Layer.effect(
       if (options.status !== target.name)
         yield* editing.setStatus({ ...task, status: target.name });
     });
+    const qaStatus = Effect.fn("ClickUpWorkflow.qaStatus")(function* (task: ClickUpTaskInput) {
+      const options = yield* editing.options(task);
+      const candidates = options.statuses.filter((item) =>
+        /^(qa|qa testing|quality assurance|quality assurance testing)$/i.test(item.name.trim()),
+      );
+      if (candidates.length !== 1)
+        return yield* failure(
+          "The task list must have one unambiguous QA status (for example QA or QA Testing). Check its statuses before continuing.",
+        );
+      return candidates[0]!.name;
+    });
     const read = Effect.fn("ClickUpWorkflow.read")(function* (task: ClickUpTaskInput) {
       yield* tasks.authorize(task);
       return { handoffs: yield* store.list(task) };
@@ -141,6 +152,7 @@ export const layer = Layer.effect(
           url: link.url,
           headSha: detail.headSha,
           ready: !detail.isDraft,
+          merged: detail.state === "merged",
           reviewerRequested: detail.reviewers.some(
             (reviewer) => reviewer.login.toLowerCase() === "vrybakk",
           ),
@@ -180,7 +192,12 @@ export const layer = Layer.effect(
         return yield* failure(
           "This handoff does not belong to the current ClickUp account and task.",
         );
-      if (found.status === "submitted" || found.status === "uncertain") return found;
+      if (
+        found.status === "uncertain" ||
+        (found.status === "submitted" &&
+          (found.destination === "qa" || !found.taskScopeFingerprint))
+      )
+        return found;
       const checkScope = (fingerprint: string) =>
         found.taskScopeFingerprint === fingerprint
           ? Effect.void
@@ -189,12 +206,8 @@ export const layer = Layer.effect(
                 "The task title or description changed, or this handoff predates scope checks. Reconcile the requirements and prepare a new handoff before submitting.",
               ),
             );
-      if (!["in progress", "code review"].includes(taskDetails.task.status.trim().toLowerCase()))
-        return yield* failure(
-          "Submit requires In Progress or Code Review. The task status changed; review it before submitting.",
-        );
       let receipt: ClickUpHandoff = Object.assign({}, found, {
-        status: "partial" as const,
+        status: found.status === "submitted" ? ("submitted" as const) : ("partial" as const),
         error: null,
       });
       const save = () => store.save(task, receipt);
@@ -202,15 +215,27 @@ export const layer = Layer.effect(
       const run = Effect.gen(function* () {
         yield* checkScope(taskScopeFingerprint(taskDetails.task));
         const registered = yield* store.registered(task);
+        let allInitiallyMerged = receipt.pullRequests.length > 0;
         for (const pr of receipt.pullRequests) {
           if (!registered.some((item) => item.url === pr.url && item.projectId === pr.projectId))
             return yield* failure("A handoff PR was unlinked. Prepare a new handoff.");
           const live = yield* refreshHandoffPullRequest(prs, pr);
+          allInitiallyMerged &&= live.state === "merged";
           if (live.headSha !== pr.headSha)
             return yield* failure(
               "A PR changed after review. Review the new head and prepare a new handoff.",
             );
         }
+        const initialTargetStatus = allInitiallyMerged ? yield* qaStatus(task) : "Code Review";
+        const initialStatus = taskDetails.task.status.trim().toLowerCase();
+        if (!["in progress", "code review"].includes(initialStatus)) {
+          if (!allInitiallyMerged || initialStatus !== initialTargetStatus.trim().toLowerCase())
+            return yield* failure(
+              "Submit requires In Progress or Code Review, or the verified merged task's QA status. Review the current task status before continuing.",
+            );
+        }
+        receipt = Object.assign({}, receipt, { status: "partial" as const });
+        yield* save();
         for (let index = 0; index < receipt.pullRequests.length; index++) {
           const pr = receipt.pullRequests[index]!;
           let live = yield* refreshHandoffPullRequest(prs, pr);
@@ -218,6 +243,7 @@ export const layer = Layer.effect(
             return yield* failure(
               "A PR changed during submission. Review the new head before continuing.",
             );
+          if (live.state === "merged") continue;
           yield* checkScope(taskScopeFingerprint((yield* current(task)).task));
           if (live.isDraft)
             yield* prs
@@ -234,6 +260,7 @@ export const layer = Layer.effect(
             return yield* failure(
               "A PR changed during submission. Review the new head before continuing.",
             );
+          if (live.state === "merged") continue;
           if (
             live.author?.login.toLowerCase() !== "vrybakk" &&
             !live.reviewers.some((reviewer) => reviewer.login.toLowerCase() === "vrybakk")
@@ -256,20 +283,33 @@ export const layer = Layer.effect(
           });
           yield* save();
         }
+        const observedPrs: ClickUpHandoff["pullRequests"][number][] = [];
         for (const pr of receipt.pullRequests) {
-          if ((yield* refreshHandoffPullRequest(prs, pr)).headSha !== pr.headSha)
+          const live = yield* refreshHandoffPullRequest(prs, pr);
+          if (live.headSha !== pr.headSha)
             return yield* failure(
               "A PR changed during submission. Review the new head before continuing.",
             );
+          observedPrs.push({ ...pr, merged: live.state === "merged" });
         }
+        const allMerged = observedPrs.length > 0 && observedPrs.every((pr) => pr.merged);
+        const targetStatus = allMerged ? yield* qaStatus(task) : "Code Review";
         const latestTask = yield* current(task);
         yield* checkScope(taskScopeFingerprint(latestTask.task));
-        if (!["in progress", "code review"].includes(latestTask.task.status.trim().toLowerCase()))
+        const currentStatus = latestTask.task.status.trim().toLowerCase();
+        if (
+          !["in progress", "code review"].includes(currentStatus) &&
+          currentStatus !== targetStatus.toLowerCase()
+        )
           return yield* failure(
             "The task status changed during submission. Review it before continuing.",
           );
-        yield* status(task, "Code Review");
-        receipt = Object.assign({}, receipt, { statusUpdated: true });
+        yield* status(task, targetStatus);
+        receipt = Object.assign({}, receipt, {
+          statusUpdated: true,
+          destination: allMerged ? ("qa" as const) : ("code-review" as const),
+          pullRequests: observedPrs,
+        });
         yield* save();
         // An unconfirmed comment cannot be retried even if the process loses its final receipt.
         receipt = Object.assign({}, receipt, { status: "uncertain" as const });

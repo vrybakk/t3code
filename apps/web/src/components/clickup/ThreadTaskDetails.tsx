@@ -1,15 +1,19 @@
-import type { ClickUpTaskReference, EnvironmentId } from "@t3tools/contracts";
+import type { ClickUpTaskReference, EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
+import { ScrollArea } from "../ui/scroll-area";
+import { ClickUpTaskHandoffs } from "./ClickUpTaskHandoffs";
 import { ClickUpTaskPanel } from "./ClickUpTaskPanel";
 
 export function ThreadTaskDetails({
   environmentId,
   task,
+  handoffThreadId,
 }: {
   environmentId: EnvironmentId;
   task: ClickUpTaskReference;
+  handoffThreadId?: ThreadId;
 }) {
   const connection = useEnvironmentQuery(
     serverEnvironment.clickUpConnection({ environmentId, input: {} }),
@@ -41,6 +45,19 @@ export function ThreadTaskDetails({
       </div>
     );
   }
+  if (handoffThreadId)
+    return (
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-4 p-4">
+          <p className="text-sm font-medium">{task.name}</p>
+          <ClickUpTaskHandoffs
+            environmentId={environmentId}
+            input={{ workspaceId: task.workspaceId, taskId: task.taskId, userId: account.user.id }}
+            threadId={handoffThreadId}
+          />
+        </div>
+      </ScrollArea>
+    );
   return (
     <ClickUpTaskPanel
       key={`${task.workspaceId}:${task.taskId}`}

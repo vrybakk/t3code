@@ -88,10 +88,7 @@ it.effect("rejects changed or unlinked PR heads before any submit write", () =>
     );
     const handoff = yield* service.prepare(task, threadId, input);
     state.status = "QA Testing";
-    assert.equal(
-      (yield* Effect.result(service.submit({ ...task, handoffId: handoff.id })))._tag,
-      "Failure",
-    );
+    assert.equal((yield* service.submit({ ...task, handoffId: handoff.id })).status, "partial");
     assert.deepEqual(state.writes, []);
     state.status = "In Progress";
     state.head = "new-head";
@@ -213,5 +210,137 @@ it.effect("does not attribute a thread's implementation PRs to a context task", 
     assert.equal((yield* Effect.result(service.prepare(task, threadId, input)))._tag, "Failure");
     assert.deepEqual(state.writes, []);
     assert.deepEqual(state.comments, []);
+  }).pipe(Effect.provide(database)),
+);
+
+for (const initialStatus of ["In Progress", "Code Review"]) {
+  it.effect(`sends reviewed merged PRs from ${initialStatus} to QA without PR writes`, () =>
+    Effect.gen(function* () {
+      const { service, state } = yield* harness();
+      const handoff = yield* service.prepare(task, threadId, input);
+      state.prState = "merged";
+      state.status = initialStatus;
+      const receipt = yield* service.submit({ ...task, handoffId: handoff.id });
+      assert.equal(receipt.status, "submitted");
+      assert.equal(receipt.destination, "qa");
+      assert.equal(receipt.pullRequests[0]?.merged, true);
+      assert.deepEqual(state.writes, ["status:QA Testing"]);
+      assert.equal(state.comments.length, 1);
+      yield* service.submit({ ...task, handoffId: handoff.id });
+      assert.deepEqual(state.writes, ["status:QA Testing"]);
+      assert.equal(state.comments.length, 1);
+    }).pipe(Effect.provide(database)),
+  );
+}
+
+it.effect("continues a submitted code review to QA after merge without reposting its summary", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const handoff = yield* service.prepare(task, threadId, input);
+    assert.equal(
+      (yield* service.submit({ ...task, handoffId: handoff.id })).destination,
+      "code-review",
+    );
+    state.prState = "merged";
+    state.writes.length = 0;
+    const receipt = yield* service.submit({ ...task, handoffId: handoff.id });
+    assert.equal(receipt.destination, "qa");
+    assert.deepEqual(state.writes, ["status:QA Testing"]);
+    assert.equal(state.comments.length, 1);
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect(
+  "observes a merge during submission before requesting review or selecting task status",
+  () =>
+    Effect.gen(function* () {
+      const { service, state } = yield* harness();
+      const handoff = yield* service.prepare(task, threadId, input);
+      state.onReady = () => {
+        state.prState = "merged";
+      };
+      const receipt = yield* service.submit({ ...task, handoffId: handoff.id });
+      assert.equal(receipt.destination, "qa");
+      assert.deepEqual(state.writes, ["ready", "status:QA Testing"]);
+    }).pipe(Effect.provide(database)),
+);
+
+for (const scenario of [
+  "closed",
+  "changed-head",
+  "missing-qa",
+  "ambiguous-qa",
+  "unlinked",
+] as const) {
+  it.effect(`blocks ${scenario} merged handoff without external writes`, () =>
+    Effect.gen(function* () {
+      const { service, state, sql } = yield* harness();
+      const handoff = yield* service.prepare(task, threadId, input);
+      state.prState = scenario === "closed" ? "closed" : "merged";
+      if (scenario === "changed-head") state.head = "unreviewed";
+      if (scenario === "missing-qa") state.qaStatuses = [];
+      if (scenario === "ambiguous-qa") state.qaStatuses = ["QA", "QA Testing"];
+      if (scenario === "unlinked") yield* sql`DELETE FROM projection_thread_pull_requests`;
+      const receipt = yield* service.submit({ ...task, handoffId: handoff.id });
+      assert.equal(receipt.status, "partial");
+      assert.isNotNull(receipt.error);
+      assert.deepEqual(state.writes, []);
+      assert.deepEqual(state.comments, []);
+    }).pipe(Effect.provide(database)),
+  );
+}
+
+it.effect("keeps a mixed open and merged handoff in Code Review until every PR is merged", () =>
+  Effect.gen(function* () {
+    const { service, state, sql } = yield* harness();
+    const secondUrl = "https://github.com/studio/repo/pull/2";
+    yield* sql`INSERT INTO projection_thread_pull_requests VALUES ('thread', 'github.com', 'studio/repo', 2, ${secondUrl})`;
+    const handoff = yield* service.prepare(task, threadId, {
+      ...input,
+      reviewedHeads: [...input.reviewedHeads, { url: secondUrl, headSha: "abc" }],
+    });
+    state.prStates[1] = "merged";
+    const receipt = yield* service.submit({ ...task, handoffId: handoff.id });
+    assert.equal(receipt.destination, "code-review");
+    assert.deepEqual(
+      receipt.pullRequests.map((pr) => pr.merged),
+      [true, false],
+    );
+    assert.deepEqual(state.writes, ["ready", "reviewer", "status:Code Review"]);
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("does not retry an uncertain merged-handoff comment", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const handoff = yield* service.prepare(task, threadId, input);
+    state.prState = "merged";
+    state.failComment = true;
+    const receipt = yield* service.submit({ ...task, handoffId: handoff.id });
+    assert.equal(receipt.status, "uncertain");
+    state.failComment = false;
+    assert.equal((yield* service.submit({ ...task, handoffId: handoff.id })).status, "uncertain");
+    assert.equal(state.comments.length, 1);
+    assert.deepEqual(state.writes, ["status:QA Testing"]);
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("recovers when QA status was applied but its response was lost", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const handoff = yield* service.prepare(task, threadId, input);
+    state.prState = "merged";
+    state.failStatusResponse = true;
+    const failed = yield* service.submit({ ...task, handoffId: handoff.id });
+    assert.equal(failed.status, "partial");
+    assert.equal(state.status, "QA Testing");
+    assert.equal(failed.statusUpdated, false);
+    assert.deepEqual(state.comments, []);
+    state.failStatusResponse = false;
+    const recovered = yield* service.submit({ ...task, handoffId: handoff.id });
+    assert.equal(recovered.status, "submitted");
+    assert.equal(recovered.destination, "qa");
+    assert.deepEqual(state.writes, ["status:QA Testing"]);
+    assert.equal(state.comments.length, 1);
   }).pipe(Effect.provide(database)),
 );

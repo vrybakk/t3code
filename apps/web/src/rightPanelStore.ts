@@ -31,6 +31,7 @@ const RIGHT_PANEL_KINDS = [
   "pull-requests",
   "task",
   "tasks",
+  "handoff",
   "agents",
   "gitbutler",
 ] as const;
@@ -91,6 +92,7 @@ export type RightPanelSurface =
   | { id: "pull-requests"; kind: "pull-requests" }
   | { id: `task:${string}`; kind: "task"; task: ClickUpTaskReference }
   | { id: "tasks"; kind: "tasks" }
+  | { id: "handoff"; kind: "handoff" }
   | { id: "agents"; kind: "agents" }
   | { id: "gitbutler"; kind: "gitbutler" };
 
@@ -100,7 +102,7 @@ const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 // v11 stops persisting the pull-request list's shared panel, so a restart opens the page fresh.
 // v12 adds the device surface.
 // v14 adds the GitButler workspace surface.
-const RIGHT_PANEL_STORAGE_VERSION = 15;
+const RIGHT_PANEL_STORAGE_VERSION = 16;
 
 /** A fixed workspace-level ref: each PR surface carries its own real environment. */
 export const PULL_REQUESTS_PANEL_REF = scopeThreadRef(
@@ -200,6 +202,8 @@ const singletonSurface = (
       return { id: "pull-requests", kind };
     case "tasks":
       return { id: "tasks", kind };
+    case "handoff":
+      return { id: "handoff", kind };
     case "agents":
       return { id: "agents", kind };
     case "device":

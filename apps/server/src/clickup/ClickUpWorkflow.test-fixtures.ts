@@ -98,6 +98,9 @@ export const harness = Effect.fn("workflowHarness")(function* () {
     tags: [] as string[],
     head: "abc",
     draft: true,
+    prState: "open" as "open" | "merged" | "closed",
+    prStates: {} as Record<number, "open" | "merged" | "closed">,
+    qaStatuses: ["QA Testing"],
     author: "developer",
     reviewers: [] as string[],
     status: "In Progress",
@@ -108,6 +111,7 @@ export const harness = Effect.fn("workflowHarness")(function* () {
     authorizationReads: 0,
     failReviewer: false,
     failComment: false,
+    failStatusResponse: false,
     writes: [] as string[],
     comments: [] as string[],
   };
@@ -142,7 +146,7 @@ export const harness = Effect.fn("workflowHarness")(function* () {
     Layer.mock(ClickUpTaskEditing)({
       options: () =>
         Effect.sync(() => ({
-          statuses: ["Open", "In Progress", "Code Review"].map((name) => ({
+          statuses: ["Open", "In Progress", "Code Review", ...state.qaStatuses].map((name) => ({
             name,
             color: null,
             type: null,
@@ -152,9 +156,11 @@ export const harness = Effect.fn("workflowHarness")(function* () {
           status: state.status,
         })),
       setStatus: (selected) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           state.writes.push(`status:${selected.status}`);
           state.status = selected.status;
+          if (state.failStatusResponse)
+            return yield* new ClickUpError({ message: "Lost status response" });
         }),
     }),
     Layer.mock(ClickUpInteractions)({
@@ -166,9 +172,10 @@ export const harness = Effect.fn("workflowHarness")(function* () {
     }),
     Layer.mock(PullRequestService)({
       invalidate: () => Effect.void,
-      detail: () =>
+      detail: (ref) =>
         Effect.sync(() => ({
           ...prFixture,
+          state: state.prStates[ref.number] ?? state.prState,
           headSha: state.head,
           isDraft: state.draft,
           author: { login: state.author, name: null, avatarUrl: null },

@@ -31,6 +31,7 @@ export const ClickUpHandoffPullRequest = Schema.Struct({
   headSha: TrimmedNonEmptyString,
   ready: Schema.Boolean,
   reviewerRequested: Schema.Boolean,
+  merged: Schema.optionalKey(Schema.Boolean),
 });
 export const ClickUpHandoff = Schema.Struct({
   id: TrimmedNonEmptyString,
@@ -42,6 +43,7 @@ export const ClickUpHandoff = Schema.Struct({
   error: Schema.NullOr(Schema.String),
   evidence: Schema.Array(ClickUpWorkflowEvidence),
   pullRequests: Schema.Array(ClickUpHandoffPullRequest),
+  destination: Schema.optionalKey(Schema.Literals(["code-review", "qa"])),
   statusUpdated: Schema.Boolean,
   commentPosted: Schema.Boolean,
 });
