@@ -10,6 +10,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
 const mocks = vi.hoisted(() => ({
   newThread: vi.fn(),
+  repositories: {} as Record<string, { remoteUrl: string }[]>,
+  clones: [] as { projectId: string; phase: string }[],
   setPrompt: vi.fn(),
   setInteractionMode: vi.fn(),
   setDraftThreadContext: vi.fn(),
@@ -18,13 +20,21 @@ vi.mock("../../composerDraftStore", () => ({ useComposerDraftStore: { getState: 
 vi.mock("../../hooks/useHandleNewThread", () => ({ useNewThreadHandler: () => mocks.newThread }));
 vi.mock("../../hooks/useSettings", () => ({
   useEnvironmentSettings: (_: unknown, selector: (settings: unknown) => unknown) =>
-    selector({ ...DEFAULT_SERVER_SETTINGS, clickUpProjectMappings: { "42:list::list": ["repo"] } }),
+    selector({
+      ...DEFAULT_SERVER_SETTINGS,
+      clickUpProjectMappings: { "42:list::list": ["repo"] },
+      clickUpRepositoryMappings: mocks.repositories,
+    }),
 }));
 vi.mock("../../state/entities", () => ({
   useProjects: () => [
     { id: "repo", environmentId: "test", title: "API" },
     { id: "other", environmentId: "remote", title: "Other environment" },
   ],
+}));
+vi.mock("../../state/projectClones", () => ({ useEnvironmentProjectClones: () => mocks.clones }));
+vi.mock("./ClickUpLinkedRepositories", () => ({
+  ClickUpLinkedRepositories: "linked-repositories",
 }));
 vi.mock("./ClickUpWorkflowModels", () => ({ ClickUpWorkflowModelPicker: "model-picker" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
@@ -56,6 +66,8 @@ let renderer: ReactTestRenderer;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.clearAllMocks();
+  mocks.repositories = {};
+  mocks.clones = [];
   mocks.newThread.mockResolvedValue({ draftId: "draft" });
 });
 afterEach(async () => {
@@ -137,3 +149,21 @@ it("does not prepare an estimation draft once an estimate exists", async () => {
   await act(async () => prepare().props.onClick());
   expect(mocks.newThread).not.toHaveBeenCalled();
 });
+
+it("does not prepare work while a required repository is missing", async () => {
+  mocks.repositories = { "42:list::list": [{ remoteUrl: "https://github.com/company/missing" }] };
+  await mount("implement");
+  expect(prepare().props.disabled).toBe(true);
+  await act(async () => prepare().props.onClick());
+  expect(mocks.newThread).not.toHaveBeenCalled();
+});
+it.each(["running", "failed", "cancelled"])(
+  "does not prepare work from a %s clone",
+  async (phase) => {
+    mocks.clones = [{ projectId: "repo", phase }];
+    await mount("implement");
+    expect(prepare().props.disabled).toBe(true);
+    await act(async () => prepare().props.onClick());
+    expect(mocks.newThread).not.toHaveBeenCalled();
+  },
+);

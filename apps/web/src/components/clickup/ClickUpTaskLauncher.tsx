@@ -9,12 +9,12 @@ import { useRef, useState } from "react";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
-import { useProjects } from "../../state/entities";
+import { useClickUpRepositories } from "./useClickUpRepositories";
+import { ClickUpLinkedRepositories } from "./ClickUpLinkedRepositories";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { buildClickUpTaskPrompt, type ClickUpTaskAction } from "./taskPrompt";
 import { ClickUpWorkflowModelPicker } from "./ClickUpWorkflowModels";
-import { resolveClickUpMapping } from "./projectMappings";
 
 export function ClickUpTaskLauncher({
   environmentId,
@@ -25,11 +25,14 @@ export function ClickUpTaskLauncher({
   details: ClickUpTaskDetails;
   action: ClickUpTaskAction;
 }) {
-  const projects = useProjects().filter((project) => project.environmentId === environmentId);
-  const mappings = useEnvironmentSettings(
-    environmentId,
-    (settings) => settings.clickUpProjectMappings,
-  );
+  const {
+    mapping,
+    mappedProjects,
+    allProjects: projects,
+    missing,
+    unavailableLocalIds,
+  } = useClickUpRepositories(details.task, environmentId);
+  const repositoriesUnavailable = missing.length > 0 || unavailableLocalIds.length > 0;
   const defaults = useEnvironmentSettings(
     environmentId,
     (settings) => settings.clickUpWorkflowModels,
@@ -39,8 +42,6 @@ export function ClickUpTaskLauncher({
     action === "implement" &&
     details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
   const alreadyEstimated = action === "estimate" && details.task.timeEstimate != null;
-  const mapping = resolveClickUpMapping(details.task, mappings);
-  const mappedProjects = projects.filter((project) => mapping?.projectIds.includes(project.id));
   const [showAllRepositories, setShowAllRepositories] = useState(false);
   const availableProjects = mapping && !showAllRepositories ? mappedProjects : projects;
   const [projectId, setProjectId] = useState<ProjectId | null>(null);
@@ -53,7 +54,14 @@ export function ClickUpTaskLauncher({
   );
   const launching = useRef(false);
   async function prepareThread() {
-    if (!selectedProject || launching.current || blocked || alreadyEstimated) return;
+    if (
+      !selectedProject ||
+      launching.current ||
+      blocked ||
+      alreadyEstimated ||
+      repositoriesUnavailable
+    )
+      return;
     launching.current = true;
     setBusy(true);
     setError(null);
@@ -122,7 +130,9 @@ export function ClickUpTaskLauncher({
       </div>
       <Button
         size="sm"
-        disabled={!selectedProject || busy || blocked || alreadyEstimated}
+        disabled={
+          !selectedProject || busy || blocked || alreadyEstimated || repositoriesUnavailable
+        }
         onClick={() => void prepareThread()}
       >
         {busy ? "Preparing…" : "Prepare thread"}
@@ -140,6 +150,14 @@ export function ClickUpTaskLauncher({
           >
             {showAllRepositories ? "Show linked repositories" : "Show all repositories"}
           </Button>
+        </div>
+      )}
+      {repositoriesUnavailable && (
+        <div className="w-full space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Set up the linked repositories before preparing this task.
+          </p>
+          <ClickUpLinkedRepositories task={details.task} environmentId={environmentId} />
         </div>
       )}
       <details className="w-full space-y-3">

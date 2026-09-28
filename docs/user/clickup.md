@@ -39,6 +39,17 @@ wins: Project field, List, Folder, then Space; removing a mapping restores the b
 The repository picker suggests the linked repositories; **Show all repositories** allows a manual
 choice. Project badges use the ClickUp Project-field color when available.
 
+Linked repositories appear with their local paths even before you create a thread. The mapping
+editor suggests an exact repository-name match when there is only one match. Save the selection
+once to reuse it for every task in that scope; this does not run an AI agent.
+
+You can also save a known GitHub repository URL. If its checkout is missing, select **Set up
+repository** to check access using the selected environment's GitHub account. Confirm an empty
+destination folder before downloading. Nerd remembers the location and waits for the download
+to finish before preparing task work. Reopen existing mappings and save their links once to
+retain their repository URLs too. Mappings belong to the selected environment; other developers'
+computers are not configured automatically.
+
 Use **Check requirements**, **Estimate task**, or **Implement** from the sprint table or task page.
 Choose a repository and select **Prepare thread**, then review the request, model and permissions
 and send it to begin. Configure research, implementation, and review model defaults in

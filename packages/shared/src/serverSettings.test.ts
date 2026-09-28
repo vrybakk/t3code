@@ -71,6 +71,31 @@ describe("serverSettings helpers", () => {
     });
     expect(removed.clickUpProjectMappings).toEqual({ "42:folder::web": [web, api] });
   });
+  it("replaces remote repository links without retaining removed bindings or changing other scopes", () => {
+    const projectId = ProjectId.make("api");
+    const remoteUrl = "https://github.com/studio/api.git";
+    const first = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
+      clickUpProjectMappings: { "42:folder::app": [projectId] },
+      clickUpRepositoryMappings: {
+        "42:folder::app": [{ remoteUrl, projectId }],
+        "42:folder::web": [{ remoteUrl, projectId }],
+      },
+    });
+    const replaced = applyServerSettingsPatch(first, {
+      clickUpRepositoryMappings: { "42:folder::app": [{ remoteUrl }] },
+    });
+    expect(replaced.clickUpRepositoryMappings).toEqual({
+      "42:folder::app": [{ remoteUrl }],
+      "42:folder::web": [{ remoteUrl, projectId }],
+    });
+    const removed = applyServerSettingsPatch(replaced, {
+      clickUpRepositoryMappings: { "42:folder::app": null },
+    });
+    expect(removed.clickUpRepositoryMappings).toEqual({
+      "42:folder::web": [{ remoteUrl, projectId }],
+    });
+    expect(removed.clickUpProjectMappings).toEqual(first.clickUpProjectMappings);
+  });
   it("changes a cleanup rule without replacing the machine's other rules", () => {
     const enabled = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       storageCleanup: { worktreeAfterDays: 8, worktreeOnMerge: true, logsAfterDays: 30 },

@@ -33,10 +33,20 @@ export function ClickUpTaskPanel({
   const linksQuery = serverEnvironment.clickUpThreads({ environmentId, input });
   return (
     <section aria-label="Task details" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3">
-        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {details?.task.listName ?? "Task details"}
-        </p>
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-5 py-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="min-w-0 truncate text-xs text-muted-foreground">
+            {details?.task.listName ?? "Task details"}
+          </p>
+          <a
+            href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Open in ClickUp <ExternalLinkIcon className="size-3.5" />
+          </a>
+        </div>
         <Button
           size="sm"
           variant="ghost"
@@ -48,14 +58,11 @@ export function ClickUpTaskPanel({
         >
           <RefreshCwIcon className="size-4" /> Refresh details
         </Button>
-        <a
-          href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          Open in ClickUp <ExternalLinkIcon className="size-3.5" />
-        </a>
+        {details && (
+          <div className="ml-auto flex min-w-0 max-w-full justify-end">
+            <ClickUpTaskActionButtons task={details.task} onSelect={setAction} />
+          </div>
+        )}
       </div>
       {AsyncResult.isFailure(result) && (
         <p role="alert" className="p-8 text-sm text-destructive">
@@ -81,7 +88,6 @@ export function ClickUpTaskPanel({
                   {details.task.name}
                 </h2>
               </div>
-              <ClickUpTaskActionButtons task={details.task} onSelect={setAction} />
               <ClickUpTaskFields details={details} environmentId={environmentId} input={input} />
               <section aria-label="Description" className="space-y-4 border-t border-border pt-6">
                 <h3 className="text-sm font-medium">Description</h3>
