@@ -19,13 +19,14 @@ import { RepositoryIdentityResolver } from "../project/RepositoryIdentityResolve
 import { ServerSettingsService } from "../serverSettings.ts";
 import { ProviderInstanceRegistry } from "../provider/Services/ProviderInstanceRegistry.ts";
 import { TextGeneration } from "../textGeneration/TextGeneration.ts";
-import { collectEstimationEvidence, estimationRepositories } from "./ClickUpEstimationResearch.ts";
+import { collectEstimationEvidence } from "./ClickUpEstimationResearch.ts";
+import { estimationRepositories } from "./ClickUpTaskRepositories.ts";
 import { ClickUpTaskEstimation, layer } from "./ClickUpTaskEstimation.ts";
 
 vi.mock("./ClickUpEstimationResearch.ts", () => ({
   collectEstimationEvidence: vi.fn(),
-  estimationRepositories: vi.fn(),
 }));
+vi.mock("./ClickUpTaskRepositories.ts", () => ({ estimationRepositories: vi.fn() }));
 const evidence = {
   context: "Actual code and tests",
   files: ["app/src/pay.ts"],

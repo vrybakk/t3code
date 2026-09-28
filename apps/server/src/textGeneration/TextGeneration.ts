@@ -83,6 +83,10 @@ export interface TaskAnalysisGenerationInput {
   imagePaths?: ReadonlyArray<string> | undefined;
 }
 
+export interface TaskEstimationGenerationInput extends TaskAnalysisGenerationInput {
+  phase: "research" | "final";
+}
+
 export interface ThreadTitleGenerationResult {
   title: string;
   needsRefinement?: boolean | undefined;
@@ -116,7 +120,7 @@ export class TextGeneration extends Context.Service<
     ) => Effect.Effect<BranchNameGenerationResult, TextGenerationError>;
 
     readonly researchTaskEstimate: (
-      input: TaskAnalysisGenerationInput,
+      input: TaskEstimationGenerationInput,
     ) => Effect.Effect<TaskEstimationResponse, TextGenerationError>;
 
     readonly generateTaskAnalysis: (

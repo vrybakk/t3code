@@ -1,4 +1,8 @@
-import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
+import {
+  TaskAnalysis,
+  TaskEstimationResponse,
+  TaskEstimationFinalResponse,
+} from "@t3tools/contracts";
 /**
  * ClaudeTextGeneration – Text generation layer using the Claude CLI.
  *
@@ -399,7 +403,8 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       operation: "researchTaskEstimate",
       cwd: input.cwd,
       prompt: input.prompt,
-      outputSchemaJson: TaskEstimationResponse,
+      outputSchemaJson:
+        input.phase === "final" ? TaskEstimationFinalResponse : TaskEstimationResponse,
       modelSelection: input.modelSelection,
     });
 
