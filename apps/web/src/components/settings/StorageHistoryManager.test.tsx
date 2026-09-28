@@ -18,7 +18,7 @@ vi.mock("../../state/session", () => ({
 }));
 vi.mock("../../state/storageUsage", () => ({ storageReviewCleanup: {} }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => mocks.review }));
-vi.mock("../ui/button", () => ({ Button: "button" }));
+vi.mock("../ui/button", () => ({ Button: "button", InlineButton: "button" }));
 vi.mock("../ui/input", () => ({ Input: "input" }));
 vi.mock("../ui/checkbox", () => ({
   Checkbox: ({
