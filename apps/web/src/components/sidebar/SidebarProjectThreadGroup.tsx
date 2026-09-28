@@ -212,7 +212,7 @@ export function SidebarProjectThreadGroupRow(props: SidebarProjectThreadGroupPro
         </button>
       </div>
       {expanded ? (
-        <ul className="border-l border-sidebar-border/50">
+        <ul className="flex flex-col gap-px border-l border-sidebar-border/50">
           {props.group.threads.map((thread) => props.renderThread(thread))}
         </ul>
       ) : null}
