@@ -218,6 +218,8 @@ import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavaila
 import { RightPanelTabs } from "./RightPanelTabs";
 import { AgentsPanel } from "./AgentsPanel";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
+import { ThreadTasksPanel } from "./clickup/ThreadTasksPanel";
+import { ThreadTaskDetails } from "./clickup/ThreadTaskDetails";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
 import { useDeviceState } from "~/state/device";
 import { DeviceSetup } from "./device/DeviceSetup";
@@ -4586,6 +4588,17 @@ export default function ChatView(props: ChatViewProps) {
     if (!activeThreadRef) return;
     useRightPanelStore.getState().open(activeThreadRef, "agents");
   }, [activeThreadRef]);
+  const linkedTasks = (activeThreadShell ?? activeThread)?.clickUpTasks ?? [];
+  const mainLinkedTask = linkedTasks.find((task) => task.primary) ?? linkedTasks[0];
+  const supportsTaskLinks = serverConfig?.environment.capabilities.threadTaskLinks === true;
+  const addTasksSurface = useCallback(() => {
+    if (activeThreadRef && supportsTaskLinks)
+      useRightPanelStore.getState().open(activeThreadRef, "tasks");
+  }, [activeThreadRef, supportsTaskLinks]);
+  const addTaskSurface = useCallback(() => {
+    if (activeThreadRef && mainLinkedTask)
+      useRightPanelStore.getState().openTask(activeThreadRef, mainLinkedTask);
+  }, [activeThreadRef, mainLinkedTask]);
   const supportsThreadPullRequests =
     serverConfig?.environment.capabilities.threadPullRequests === true;
   const visiblePullRequests = visibleThreadPullRequests(
@@ -9647,6 +9660,23 @@ export default function ChatView(props: ChatViewProps) {
       />
     ) : renderedRightPanelSurface?.kind === "pull-requests" && activeThreadRef ? (
       <ThreadPullRequestsPanel threadRef={activeThreadRef} />
+    ) : renderedRightPanelSurface?.kind === "tasks" && activeThreadRef && supportsTaskLinks ? (
+      <ThreadTasksPanel
+        key={`${activeThreadRef.environmentId}:${activeThreadRef.threadId}`}
+        threadRef={activeThreadRef}
+      />
+    ) : renderedRightPanelSurface?.kind === "task" && supportsTaskLinks ? (
+      linkedTasks.some(
+        (task) =>
+          task.workspaceId === renderedRightPanelSurface.task.workspaceId &&
+          task.taskId === renderedRightPanelSurface.task.taskId,
+      ) ? (
+        <ThreadTaskDetails environmentId={environmentId} task={renderedRightPanelSurface.task} />
+      ) : (
+        <p className="p-4 text-sm text-muted-foreground">
+          This task is no longer linked to the thread.
+        </p>
+      )
     ) : renderedRightPanelSurface?.kind === "agents" ? (
       <AgentsPanel
         model={agentPanelModel}
@@ -9812,6 +9842,25 @@ export default function ChatView(props: ChatViewProps) {
             onDeleteProjectScript={deleteProjectScript}
           />
         </WorkspacePageHeader>
+
+        {isServerThread && linkedTasks.length > 0 && (
+          <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-w-0 justify-start"
+              onClick={addTaskSurface}
+            >
+              <span className="shrink-0 text-muted-foreground">Task</span>
+              <span className="truncate">{mainLinkedTask?.name}</span>
+            </Button>
+            {linkedTasks.length > 1 ? (
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={addTasksSurface}>
+                Linked tasks ({linkedTasks.length})
+              </Button>
+            ) : null}
+          </div>
+        )}
 
         {isLocalDraftThread && draftId && draftThread?.clickUpTask && (
           <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">
@@ -10336,6 +10385,10 @@ export default function ChatView(props: ChatViewProps) {
           onAddGitButler={addGitButlerSurface}
           onAddPullRequest={addPullRequestSurface}
           onAddPullRequests={addPullRequestsSurface}
+          onAddTask={addTaskSurface}
+          onAddTasks={addTasksSurface}
+          taskAvailable={isServerThread && supportsTaskLinks && linkedTasks.length > 0}
+          tasksAvailable={isServerThread && supportsTaskLinks}
           onAddAgents={addAgentsSurface}
           onAddDevice={addDeviceSurface}
           browserAvailable={isPreviewSupportedInRuntime()}
@@ -10400,6 +10453,10 @@ export default function ChatView(props: ChatViewProps) {
             onAddGitButler={addGitButlerSurface}
             onAddPullRequest={addPullRequestSurface}
             onAddPullRequests={addPullRequestsSurface}
+            onAddTask={addTaskSurface}
+            onAddTasks={addTasksSurface}
+            taskAvailable={isServerThread && supportsTaskLinks && linkedTasks.length > 0}
+            tasksAvailable={isServerThread && supportsTaskLinks}
             onAddAgents={addAgentsSurface}
             onAddDevice={addDeviceSurface}
             browserAvailable={isPreviewSupportedInRuntime()}

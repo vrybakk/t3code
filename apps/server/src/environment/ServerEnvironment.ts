@@ -222,6 +222,7 @@ export const make = Effect.gen(function* () {
       pullRequests: true,
       inlineMessageContext: true,
       clickUpTasks: true,
+      threadTaskLinks: true,
       clickUpRepositorySetup: true,
       clickUpOAuthConfiguration: true,
       requiredWorktreeBootstrap: true,

@@ -12,6 +12,7 @@ import {
   EnvironmentId,
   ThreadId,
   type ChatFileAttachment,
+  type ClickUpTaskReference,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { create } from "zustand";
@@ -28,6 +29,8 @@ const RIGHT_PANEL_KINDS = [
   "terminal",
   "pull-request",
   "pull-requests",
+  "task",
+  "tasks",
   "agents",
   "gitbutler",
 ] as const;
@@ -86,6 +89,8 @@ export type RightPanelSurface =
     }
   /** The thread's linked pull requests, one singleton tab beside any number of `pull-request` tabs. */
   | { id: "pull-requests"; kind: "pull-requests" }
+  | { id: `task:${string}`; kind: "task"; task: ClickUpTaskReference }
+  | { id: "tasks"; kind: "tasks" }
   | { id: "agents"; kind: "agents" }
   | { id: "gitbutler"; kind: "gitbutler" };
 
@@ -95,7 +100,7 @@ const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 // v11 stops persisting the pull-request list's shared panel, so a restart opens the page fresh.
 // v12 adds the device surface.
 // v14 adds the GitButler workspace surface.
-const RIGHT_PANEL_STORAGE_VERSION = 14;
+const RIGHT_PANEL_STORAGE_VERSION = 15;
 
 /** A fixed workspace-level ref: each PR surface carries its own real environment. */
 export const PULL_REQUESTS_PANEL_REF = scopeThreadRef(
@@ -132,8 +137,9 @@ interface RightPanelStoreState {
   ) => boolean;
   open: (
     ref: ScopedThreadRef,
-    kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request">,
+    kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request" | "task">,
   ) => void;
+  openTask: (ref: ScopedThreadRef, task: ClickUpTaskReference) => void;
   openDevice: (ref: ScopedThreadRef, target: DeviceTabTarget, automatic?: boolean) => void;
   renameDevice: (ref: ScopedThreadRef, surfaceId: string, title: string) => void;
   openBrowser: (ref: ScopedThreadRef, tabId: string | null) => void;
@@ -171,7 +177,7 @@ interface RightPanelStoreState {
   toggleVisibility: (ref: ScopedThreadRef) => void;
   toggle: (
     ref: ScopedThreadRef,
-    kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request">,
+    kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request" | "task">,
   ) => void;
   removeThread: (ref: ScopedThreadRef) => void;
 }
@@ -183,7 +189,7 @@ const EMPTY_THREAD_STATE: ThreadRightPanelState = {
 };
 
 const singletonSurface = (
-  kind: Exclude<RightPanelKind, "file" | "preview" | "terminal" | "pull-request">,
+  kind: Exclude<RightPanelKind, "file" | "preview" | "terminal" | "pull-request" | "task">,
 ): RightPanelSurface => {
   switch (kind) {
     case "diff":
@@ -192,6 +198,8 @@ const singletonSurface = (
       return { id: "files", kind };
     case "pull-requests":
       return { id: "pull-requests", kind };
+    case "tasks":
+      return { id: "tasks", kind };
     case "agents":
       return { id: "agents", kind };
     case "device":
@@ -386,6 +394,22 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                           : 0;
                       return [{ ...surface, revealLine, revealRequestId }];
                     }
+                    if (surface.kind === "task") {
+                      const task = surface.task;
+                      if (
+                        !task ||
+                        typeof task.workspaceId !== "string" ||
+                        !task.workspaceId ||
+                        typeof task.taskId !== "string" ||
+                        !task.taskId ||
+                        typeof task.name !== "string" ||
+                        !task.name
+                      )
+                        return [];
+                      return [
+                        { id: `task:${task.workspaceId}:${task.taskId}`, kind: "task", task },
+                      ];
+                    }
                     if (surface.kind === "pull-request") {
                       if (
                         typeof surface.projectId !== "string" ||
@@ -520,6 +544,16 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             }
             return upsertSurface(current, singletonSurface(kind));
           }),
+        ),
+      openTask: (ref, task) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) =>
+            upsertSurface(current, {
+              id: `task:${task.workspaceId}:${task.taskId}`,
+              kind: "task",
+              task,
+            }),
+          ),
         ),
       openDevice: (ref, target, automatic = false) =>
         set((state) =>

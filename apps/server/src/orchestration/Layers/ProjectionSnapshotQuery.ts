@@ -1,3 +1,4 @@
+import type { ThreadClickUpTaskLink } from "@t3tools/contracts";
 import {
   AgentSessionImportSource,
   ApprovalRequestId,
@@ -497,6 +498,33 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
   const threadBackgroundLiveness = yield* ThreadBackgroundLivenessService;
   const threadPlanProgress = yield* ThreadPlanProgressService;
   const sql = yield* SqlClient.SqlClient;
+  const readTaskLinks = Effect.fn("ProjectionSnapshotQuery.readTaskLinks")(function* (
+    threadIds: ReadonlyArray<ThreadId>,
+  ) {
+    const grouped = new Map<string, ThreadClickUpTaskLink[]>();
+    if (threadIds.length === 0) return grouped;
+    const rows = yield* sql<{
+      threadId: string;
+      workspaceId: string;
+      taskId: string;
+      name: string;
+      isPrimary: number;
+    }>`
+      SELECT thread_id AS "threadId", workspace_id AS "workspaceId", task_id AS "taskId", name, is_primary AS "isPrimary"
+      FROM projection_thread_clickup_tasks WHERE ${sql.in("thread_id", threadIds)} ORDER BY is_primary DESC, name, task_id
+    `.pipe(Effect.mapError(toPersistenceSqlError("ProjectionSnapshotQuery.readTaskLinks")));
+    for (const row of rows) {
+      const links = grouped.get(row.threadId) ?? [];
+      links.push({
+        workspaceId: row.workspaceId,
+        taskId: row.taskId,
+        name: row.name,
+        primary: row.isPrimary === 1,
+      });
+      grouped.set(row.threadId, links);
+    }
+    return grouped;
+  });
   const repositoryIdentityResolver = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
   const repositoryIdentityResolutionConcurrency = 4;
   const resolveRepositoryIdentitiesForProjects = Effect.fn(
@@ -2213,6 +2241,7 @@ pending_approval_requests AS (
               const messagesByThread = new Map<string, Array<OrchestrationMessage>>();
               const proposedPlansByThread = new Map<string, Array<OrchestrationProposedPlan>>();
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const taskLinksByThread = yield* readTaskLinks(threadRows.map((row) => row.threadId));
               const activitiesByThread = new Map<string, Array<OrchestrationThreadActivity>>();
               const checkpointsByThread = new Map<string, Array<OrchestrationCheckpointSummary>>();
               const sessionsByThread = new Map<string, OrchestrationSession>();
@@ -2353,6 +2382,7 @@ pending_approval_requests AS (
                 interactionMode: row.interactionMode,
                 branch: row.branch,
                 worktreePath: row.worktreePath,
+                clickUpTasks: taskLinksByThread.get(row.threadId) ?? [],
                 ...mapThreadPullRequests(
                   pullRequestsByThread.get(row.threadId) ?? [],
                   row.projectId,
@@ -2565,6 +2595,7 @@ pending_approval_requests AS (
               }
               const proposedPlansByThread = new Map<string, Array<OrchestrationProposedPlan>>();
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const taskLinksByThread = yield* readTaskLinks(threadRows.map((row) => row.threadId));
               const sessionByThread = new Map<string, OrchestrationSession>();
 
               for (let index = 0; index < sessionRows.length; index += 1) {
@@ -2599,6 +2630,7 @@ pending_approval_requests AS (
                   interactionMode: row.interactionMode,
                   branch: row.branch,
                   worktreePath: row.worktreePath,
+                  clickUpTasks: taskLinksByThread.get(row.threadId) ?? [],
                   ...mapThreadPullRequests(
                     pullRequestsByThread.get(row.threadId) ?? [],
                     row.projectId,
@@ -2736,6 +2768,7 @@ pending_approval_requests AS (
                 sessionRows.map((row) => [row.threadId, mapSessionRow(row)] as const),
               );
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const taskLinksByThread = yield* readTaskLinks(threadRows.map((row) => row.threadId));
 
               // Built from schema-decoded rows, so no second decode here. The HTTP
               // and RPC layers encode it against OrchestrationShellSnapshot on the
@@ -2761,6 +2794,7 @@ pending_approval_requests AS (
                         branch: row.branch,
                         worktreePath: row.worktreePath,
                         branchPullRequest: row.branchPullRequest,
+                        clickUpTasks: taskLinksByThread.get(row.threadId) ?? [],
                         ...mapThreadPullRequests(
                           pullRequestsByThread.get(row.threadId) ?? [],
                           row.projectId,
@@ -2917,6 +2951,7 @@ pending_approval_requests AS (
               }
 
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const taskLinksByThread = yield* readTaskLinks(threadRows.map((row) => row.threadId));
               const activeProjectIds = new Set(threadRows.map((row) => row.projectId));
               const repositoryIdentities = yield* resolveRepositoryIdentitiesForProjects(
                 projectRows.filter((row) => activeProjectIds.has(row.projectId)),
@@ -2947,6 +2982,7 @@ pending_approval_requests AS (
                   branch: row.branch,
                   worktreePath: row.worktreePath,
                   branchPullRequest: row.branchPullRequest,
+                  clickUpTasks: taskLinksByThread.get(row.threadId) ?? [],
                   ...mapThreadPullRequests(
                     pullRequestsByThread.get(row.threadId) ?? [],
                     row.projectId,
@@ -3285,6 +3321,7 @@ pending_approval_requests AS (
 
       return Option.some({
         id: threadRow.value.threadId,
+        clickUpTasks: (yield* readTaskLinks([threadId])).get(threadId) ?? [],
         projectId: threadRow.value.projectId,
         title: threadRow.value.title,
         modelSelection: threadRow.value.modelSelection,
@@ -3587,6 +3624,7 @@ pending_approval_requests AS (
 
       const thread = {
         id: threadRow.value.threadId,
+        clickUpTasks: (yield* readTaskLinks([threadId])).get(threadId) ?? [],
         projectId: threadRow.value.projectId,
         title: threadRow.value.title,
         modelSelection: threadRow.value.modelSelection,

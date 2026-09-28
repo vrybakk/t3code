@@ -1,7 +1,8 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import type { ClickUpTaskDetails, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { MessageSquareIcon } from "lucide-react";
@@ -23,25 +24,44 @@ export function ClickUpTaskWork({
   input: ClickUpTaskInput;
   details: ClickUpTaskDetails;
 }) {
-  const linksResult = useAtomValue(serverEnvironment.clickUpThreads({ environmentId, input }));
+  const linksAtom = serverEnvironment.clickUpThreads({ environmentId, input });
+  const linksResult = useAtomValue(linksAtom);
+  const refreshLinks = useAtomRefresh(linksAtom);
   const links = Option.getOrNull(AsyncResult.value(linksResult)) ?? [];
   const shells = useThreadShells();
+  const taskLinkRevision = shells
+    .filter((shell) => shell.environmentId === environmentId)
+    .flatMap((shell) =>
+      (shell.clickUpTasks ?? [])
+        .filter((task) => task.workspaceId === input.workspaceId && task.taskId === input.taskId)
+        .map((task) => `${shell.id}:${task.primary}:${shell.title}`),
+    )
+    .sort()
+    .join("|");
+  const previousLinks = useRef<{ atom: typeof linksAtom; revision: string } | null>(null);
+  useEffect(() => {
+    const previous = previousLinks.current;
+    previousLinks.current = { atom: linksAtom, revision: taskLinkRevision };
+    if (previous?.atom !== linksAtom || previous.revision !== taskLinkRevision) refreshLinks();
+  }, [taskLinkRevision, linksAtom, refreshLinks]);
   const openPr = useOpenChangeRequestLink();
   const pullRequests = [
     ...new Map(
-      links.flatMap((link) => {
-        const thread = shells.find(
-          (shell) => shell.environmentId === environmentId && shell.id === link.threadId,
-        );
-        if (!thread) return [];
-        const current = visibleThreadPullRequests(thread.pullRequests);
-        const prs = current.length
-          ? current
-          : thread.linkedPullRequest
-            ? [thread.linkedPullRequest]
-            : [];
-        return prs.map((pr) => [pr.url, { ...pr, threadId: link.threadId }] as const);
-      }),
+      links
+        .filter((link) => link.role !== "context")
+        .flatMap((link) => {
+          const thread = shells.find(
+            (shell) => shell.environmentId === environmentId && shell.id === link.threadId,
+          );
+          if (!thread) return [];
+          const current = visibleThreadPullRequests(thread.pullRequests);
+          const prs = current.length
+            ? current
+            : thread.linkedPullRequest
+              ? [thread.linkedPullRequest]
+              : [];
+          return prs.map((pr) => [pr.url, { ...pr, threadId: link.threadId }] as const);
+        }),
     ).values(),
   ];
   return (

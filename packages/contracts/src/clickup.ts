@@ -13,6 +13,12 @@ export const ClickUpTaskReference = Schema.Struct({
 });
 export type ClickUpTaskReference = typeof ClickUpTaskReference.Type;
 
+export const ThreadClickUpTaskLink = Schema.Struct({
+  ...ClickUpTaskReference.fields,
+  primary: Schema.Boolean,
+});
+export type ThreadClickUpTaskLink = typeof ThreadClickUpTaskLink.Type;
+
 export const ClickUpUser = Schema.Struct({
   id: Schema.Int,
   username: Schema.String,
@@ -157,6 +163,7 @@ export const ClickUpTaskDetails = Schema.Struct({
 export type ClickUpTaskDetails = typeof ClickUpTaskDetails.Type;
 
 export const ClickUpThreadLink = Schema.Struct({
+  role: Schema.optionalKey(Schema.Literals(["primary", "context"])),
   threadId: ThreadId,
   projectId: ProjectId,
   title: Schema.String,

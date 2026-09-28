@@ -1,3 +1,4 @@
+import Migration0059 from "./Migrations/059_ThreadTaskLinks.ts";
 import Migration0057 from "./Migrations/057_ClickUpWorkflow.ts";
 import Migration0056 from "./Migrations/056_ClickUpThreadTasks.ts";
 /**
@@ -140,6 +141,7 @@ const migrationEntries = [
   [56, "ClickUpThreadTasks", Migration0056],
   [57, "ClickUpWorkflow", Migration0057],
   [58, "ProjectionThreadsAutoSettleDisabledAt", Migration0058],
+  [59, "ThreadTaskLinks", Migration0059],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

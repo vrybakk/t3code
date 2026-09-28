@@ -45,6 +45,8 @@ export type ReorderPinnedThreadInput = CommandInput<"thread.pin.reorder">;
 export type SetThreadAutoSettleInput = CommandInput<"thread.auto-settle.set">;
 export type ReorderActiveThreadInput = CommandInput<"thread.active.reorder">;
 export type UpdateThreadMetadataInput = CommandInput<"thread.meta.update">;
+export type LinkThreadTaskInput = CommandInput<"thread.task.link">;
+export type UnlinkThreadTaskInput = CommandInput<"thread.task.unlink">;
 export type LinkThreadPullRequestInput = CommandInput<"thread.pull-request.link">;
 export type UnlinkThreadPullRequestInput = CommandInput<"thread.pull-request.unlink">;
 export type SetThreadRuntimeModeInput = CommandInput<"thread.runtime-mode.set">;
@@ -263,6 +265,25 @@ export const updateThreadMetadata: (input: UpdateThreadMetadataInput) => Command
   return yield* dispatch({
     ...input,
     type: "thread.meta.update",
+    commandId: yield* commandId(input),
+  });
+});
+
+export const linkThreadTask: (input: LinkThreadTaskInput) => CommandEffect = Effect.fn(
+  "EnvironmentCommands.linkThreadTask",
+)(function* (input) {
+  return yield* dispatch({
+    ...input,
+    type: "thread.task.link",
+    commandId: yield* commandId(input),
+  });
+});
+export const unlinkThreadTask: (input: UnlinkThreadTaskInput) => CommandEffect = Effect.fn(
+  "EnvironmentCommands.unlinkThreadTask",
+)(function* (input) {
+  return yield* dispatch({
+    ...input,
+    type: "thread.task.unlink",
     commandId: yield* commandId(input),
   });
 });

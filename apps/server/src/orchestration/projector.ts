@@ -43,6 +43,8 @@ import {
   ThreadPinnedPayload,
   ThreadPinReorderedPayload,
   ThreadAutoSettleSetPayload,
+  ThreadTaskLinkedPayload,
+  ThreadTaskUnlinkedPayload,
   ThreadPullRequestLinkedPayload,
   ThreadPullRequestSyncedPayload,
   ThreadPullRequestUnlinkedPayload,
@@ -445,6 +447,7 @@ export function projectEvent(
             interactionMode: payload.interactionMode,
             branch: payload.branch,
             worktreePath: payload.worktreePath,
+            clickUpTasks: payload.clickUpTask ? [{ ...payload.clickUpTask, primary: true }] : [],
             pullRequests: [],
             branchPullRequest: null,
             latestTurn: null,
@@ -657,6 +660,44 @@ export function projectEvent(
                 ? { branchPullRequest: payload.branchPullRequest }
                 : {}),
               ...legacyLinkPatch,
+              updatedAt: payload.updatedAt,
+            }),
+          };
+        }),
+      );
+
+    case "thread.task-linked":
+      return decodeForEvent(ThreadTaskLinkedPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => {
+          const thread = nextBase.threads.find((entry) => entry.id === payload.threadId);
+          if (!thread) return nextBase;
+          const others = (thread.clickUpTasks ?? []).filter(
+            (task) =>
+              task.workspaceId !== payload.link.workspaceId || task.taskId !== payload.link.taskId,
+          );
+          return {
+            ...nextBase,
+            threads: updateThread(nextBase.threads, payload.threadId, {
+              clickUpTasks: [...others, payload.link],
+              updatedAt: payload.updatedAt,
+            }),
+          };
+        }),
+      );
+    case "thread.task-unlinked":
+      return decodeForEvent(ThreadTaskUnlinkedPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => {
+          const thread = nextBase.threads.find((entry) => entry.id === payload.threadId);
+          if (!thread) return nextBase;
+          return {
+            ...nextBase,
+            threads: updateThread(nextBase.threads, payload.threadId, {
+              clickUpTasks: (thread.clickUpTasks ?? []).filter(
+                (task) =>
+                  task.primary ||
+                  task.workspaceId !== payload.workspaceId ||
+                  task.taskId !== payload.taskId,
+              ),
               updatedAt: payload.updatedAt,
             }),
           };
