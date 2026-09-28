@@ -39,6 +39,9 @@ Use **Link repositories** in a task’s **Linked work** section to connect its P
 source List, Folder, or Space to one or more local repositories. A shared API repository can
 belong to several mappings. Mappings are saved on the selected environment. The first match
 wins: Project field, List, Folder, then Space; removing a mapping restores the broader fallback.
+Use the Project field to link tasks with the same field value across locations, a List for tasks
+in that list, a Folder for its lists, or a Space for all its folders and lists. Search local
+repositories by name or path, or show only linked repositories while editing.
 The repository picker preselects a linked repository and remembers your choice for tasks in the
 same ClickUp project or location on this client. Without a mapping, it suggests an exact name
 match or the first available project. Review the selection before preparing the thread;

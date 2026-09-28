@@ -10,8 +10,8 @@ import { useProjects, useServerConfigs } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { ClickUpKnownRepositories } from "./ClickUpKnownRepositories";
+import { ClickUpLocalRepositoryPicker } from "./ClickUpLocalRepositoryPicker";
 import { Button } from "../ui/button";
-import { Checkbox } from "../ui/checkbox";
 import {
   Dialog,
   DialogPopup,
@@ -116,6 +116,14 @@ export function ClickUpRepositoryMappings({
     mappings[sourceKey] === undefined && repositories[sourceKey] === undefined
       ? suggestClickUpRepository(source, projects)
       : null;
+  const scopeDescription =
+    source?.kind === "project"
+      ? "Tasks with this Project field value, even across different Lists."
+      : source?.kind === "list"
+        ? "Only tasks in this List."
+        : source?.kind === "folder"
+          ? "Tasks in every List in this Folder."
+          : "Tasks throughout this Space, across its Folders and Lists.";
   return (
     <>
       <Button
@@ -136,12 +144,12 @@ export function ClickUpRepositoryMappings({
           if (!busy) setOpen(value);
         }}
       >
-        <DialogPopup>
+        <DialogPopup className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Linked repositories</DialogTitle>
             <DialogDescription>
-              Choose which local repositories belong to this ClickUp project or location. A
-              repository can belong to several mappings.
+              Choose local repositories for tasks matching this field value or location. A
+              repository can have several links.
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -164,10 +172,11 @@ export function ClickUpRepositoryMappings({
                 ))}
               </SelectPopup>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              The first matching mapping is used: Project field, List, Folder, then Space. Removing
-              a mapping restores that fallback.
-            </p>
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <p>{scopeDescription}</p>
+              <p>More specific links take priority: Project field, List, Folder, then Space.</p>
+              <p>Removing this mapping restores the broader match.</p>
+            </div>
             {suggestion && !selected.includes(suggestion.id) && (
               <Button
                 variant="outline"
@@ -179,38 +188,19 @@ export function ClickUpRepositoryMappings({
               </Button>
             )}
             <div className="space-y-2">
-              {projects.map((project) => (
-                <label
-                  key={project.id}
-                  className="flex items-start gap-3 rounded-md border border-border p-3"
-                >
-                  <Checkbox
-                    aria-label={`${project.title} — ${project.workspaceRoot}`}
-                    checked={selected.includes(project.id)}
-                    disabled={busy}
-                    onCheckedChange={(checked) => {
-                      if (!checked)
-                        setRemotes((current) =>
-                          current.filter((link) => link.projectId !== project.id),
-                        );
-                      setSelected((current) =>
-                        checked
-                          ? [...current, project.id]
-                          : current.filter((id) => id !== project.id),
-                      );
-                    }}
-                  />
-                  <span className="min-w-0 text-sm">
-                    <span className="block">{project.title}</span>
-                    <span className="block break-all text-xs text-muted-foreground">
-                      {project.workspaceRoot}
-                    </span>
-                  </span>
-                </label>
-              ))}
-              {!projects.length && (
-                <p className="text-sm text-muted-foreground">Add a local project to Nerd first.</p>
-              )}
+              <ClickUpLocalRepositoryPicker
+                key={sourceKey}
+                projects={projects}
+                selected={selected}
+                disabled={busy}
+                onSelectionChange={(projectId, checked) => {
+                  if (!checked)
+                    setRemotes((current) => current.filter((link) => link.projectId !== projectId));
+                  setSelected((current) =>
+                    checked ? [...current, projectId] : current.filter((id) => id !== projectId),
+                  );
+                }}
+              />
               {selected.some((id) => !projects.some((project) => project.id === id)) && (
                 <p className="text-xs text-muted-foreground">
                   This mapping also contains repositories no longer available in this environment.
