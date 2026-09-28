@@ -1,3 +1,4 @@
+import { TaskAnalysis } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -54,7 +55,8 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateTaskAnalysis";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -238,6 +240,17 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       };
     });
 
+  const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
+    input,
+  ) =>
+    runCursorJson({
+      operation: "generateTaskAnalysis",
+      cwd: input.cwd,
+      prompt: input.prompt,
+      outputSchemaJson: TaskAnalysis,
+      modelSelection: input.modelSelection,
+    });
+
   const generateThreadTitle: TextGeneration.TextGeneration["Service"]["generateThreadTitle"] =
     Effect.fn("CursorTextGeneration.generateThreadTitle")(function* (input) {
       const { prompt, outputSchema } = buildThreadTitlePrompt({
@@ -266,5 +279,6 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateTaskAnalysis,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

@@ -79,6 +79,28 @@ function waitForFileContent(path: string): Effect.Effect<string> {
 }
 
 it.layer(CursorTextGenerationTestLayer)("CursorTextGeneration", (it) => {
+  it.effect("generates structured task analysis with the selected model", () =>
+    withFakeAcpAgent(
+      {
+        T3_ACP_PROMPT_RESPONSE_TEXT:
+          '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}',
+      },
+      (generation) =>
+        Effect.gen(function* () {
+          const result = yield* generation.generateTaskAnalysis({
+            cwd: process.cwd(),
+            prompt: "Analyze the task context",
+            modelSelection: createModelSelection(ProviderInstanceId.make("cursor"), "composer-2"),
+          });
+          expect(result).toEqual({
+            summary: "Task context estimate",
+            estimateMinutes: 30,
+            findings: null,
+          });
+        }),
+    ),
+  );
+
   it.effect("uses ACP model config options instead of raw CLI model ids", () => {
     const requestLogDir = NodeFS.mkdtempSync(
       NodePath.join(NodeOS.tmpdir(), "t3code-cursor-text-log-"),

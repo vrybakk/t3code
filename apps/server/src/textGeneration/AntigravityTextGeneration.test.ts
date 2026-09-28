@@ -278,6 +278,21 @@ const makeFixture = Effect.fn("makeAntigravityTextGenerationFixture")(function* 
 });
 
 it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
+  it.effect("generates structured task analysis", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture({
+        outputs: ['{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}'],
+      });
+      expect(
+        yield* fixture.textGeneration.generateTaskAnalysis({
+          cwd: fixture.projectDirectory,
+          prompt: "Analyze task",
+          modelSelection,
+        }),
+      ).toEqual({ summary: "Task context estimate", estimateMinutes: 30, findings: null });
+    }),
+  );
+
   it.effect(
     "generates all helper types in empty workspaces and removes only owned session files",
     () =>

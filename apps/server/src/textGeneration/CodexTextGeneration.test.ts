@@ -160,6 +160,25 @@ function withFakeCodexEnv<A, E, R>(
 }
 
 it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
+  it.effect("generates structured task analysis with the selected model", () =>
+    withFakeCodexEnv(
+      { output: '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}' },
+      (generation) =>
+        Effect.gen(function* () {
+          const result = yield* generation.generateTaskAnalysis({
+            cwd: process.cwd(),
+            prompt: "Analyze the task context",
+            modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5"),
+          });
+          expect(result).toEqual({
+            summary: "Task context estimate",
+            estimateMinutes: 30,
+            findings: null,
+          });
+        }),
+    ),
+  );
+
   for (const selectedModel of ["gpt-5.6-luna", "openai.gpt-5.6-luna"]) {
     it.effect(`dispatches the qualified live model for ${selectedModel}`, () =>
       withFakeCodexEnv(

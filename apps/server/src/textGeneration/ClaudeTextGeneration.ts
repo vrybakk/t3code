@@ -1,3 +1,4 @@
+import { TaskAnalysis } from "@t3tools/contracts";
 /**
  * ClaudeTextGeneration – Text generation layer using the Claude CLI.
  *
@@ -102,7 +103,8 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle",
+      | "generateThreadTitle"
+      | "generateTaskAnalysis",
     value: unknown,
     detail: string,
   ): Effect.Effect<string, TextGenerationError> =>
@@ -132,7 +134,8 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateTaskAnalysis";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -387,6 +390,17 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       };
     });
 
+  const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
+    input,
+  ) =>
+    runClaudeJson({
+      operation: "generateTaskAnalysis",
+      cwd: input.cwd,
+      prompt: input.prompt,
+      outputSchemaJson: TaskAnalysis,
+      modelSelection: input.modelSelection,
+    });
+
   const generateThreadTitle: TextGeneration.TextGeneration["Service"]["generateThreadTitle"] =
     Effect.fn("ClaudeTextGeneration.generateThreadTitle")(function* (input) {
       const { prompt, outputSchema } = buildThreadTitlePrompt({
@@ -415,5 +429,6 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateTaskAnalysis,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

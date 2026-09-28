@@ -15,6 +15,7 @@ import {
   DialogPanel,
 } from "../ui/dialog";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ClickUpBackgroundAction } from "./ClickUpBackgroundAction";
 import { ClickUpTaskLauncher } from "./ClickUpTaskLauncher";
 import type { ClickUpTaskAction } from "./taskPrompt";
 
@@ -29,10 +30,10 @@ const actions = {
     label: "Estimate task",
     icon: CalculatorIcon,
     description:
-      "Research the time to reach a review-ready result with AI and save the estimate. No implementation or comments.",
+      "Estimate AI-assisted work from the task context using your default text-generation model.",
   },
   implement: {
-    label: "Implement",
+    label: "Start task",
     icon: PlayIcon,
     description:
       "Research, implement, verify and review the task using your project instructions and studio skills.",
@@ -132,7 +133,14 @@ export function ClickUpTaskActionDialog({
         </DialogHeader>
         <DialogPanel>
           <p className="text-sm font-medium">{taskName}</p>
-          {AsyncResult.isFailure(result) ? (
+          {action !== "implement" ? (
+            <ClickUpBackgroundAction
+              key={`${environmentId}:${input.userId}:${input.taskId}:${action}`}
+              environmentId={environmentId}
+              input={{ ...input, action }}
+              taskName={taskName}
+            />
+          ) : AsyncResult.isFailure(result) ? (
             <div className="space-y-2">
               <p role="alert" className="text-sm text-destructive">
                 Could not load task context.
@@ -151,7 +159,7 @@ export function ClickUpTaskActionDialog({
               Loading task context…
             </p>
           ) : (
-            <ClickUpTaskLauncher environmentId={environmentId} details={details} action={action} />
+            <ClickUpTaskLauncher environmentId={environmentId} details={details} />
           )}
         </DialogPanel>
       </DialogPopup>

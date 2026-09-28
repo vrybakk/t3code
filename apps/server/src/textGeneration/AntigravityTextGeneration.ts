@@ -1,3 +1,4 @@
+import { TaskAnalysis } from "@t3tools/contracts";
 import {
   type ModelSelection,
   type ProviderSetupError,
@@ -387,6 +388,17 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
       return { branch: sanitizeBranchFragment(generated.branch) };
     });
 
+  const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
+    input,
+  ) =>
+    runAntigravityJson({
+      operation: "generateTaskAnalysis",
+
+      prompt: input.prompt,
+      outputSchema: TaskAnalysis,
+      modelSelection: input.modelSelection,
+    });
+
   const generateThreadTitle: TextGeneration.TextGeneration["Service"]["generateThreadTitle"] =
     Effect.fn("AntigravityTextGeneration.generateThreadTitle")(function* (input) {
       const generated = yield* runAntigravityJson({
@@ -410,5 +422,6 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateTaskAnalysis,
   } satisfies TextGeneration.TextGeneration["Service"];
 });
