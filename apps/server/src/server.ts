@@ -6,6 +6,7 @@ import * as NodeHttp from "node:http";
 
 import * as ClickUpApi from "./clickup/ClickUpApi.ts";
 import * as ClickUpConnection from "./clickup/ClickUpConnection.ts";
+import * as ClickUpCallbackListener from "./clickup/ClickUpCallbackListener.ts";
 import * as ClickUpTasks from "./clickup/ClickUpTasks.ts";
 import * as ClickUpSprints from "./clickup/ClickUpSprints.ts";
 import * as ClickUpInteractions from "./clickup/ClickUpInteractions.ts";
@@ -609,6 +610,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   Layer.provide(ClickUpInteractions.layer),
   Layer.provide(ClickUpTaskEditing.layer),
   Layer.provide(ClickUpConnection.layer),
+  Layer.provide(ClickUpCallbackListener.layer),
   Layer.provide(ClickUpApi.layer),
   Layer.provide(PreviewAutomationBroker.layer),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(DesktopAppUpdateLayerLive))),

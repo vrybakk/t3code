@@ -48,6 +48,20 @@ export const ClickUpConnection = Schema.Struct({
 });
 export type ClickUpConnection = typeof ClickUpConnection.Type;
 
+export const ClickUpOAuthConfig = Schema.Struct({
+  clientId: Schema.String,
+  redirectUri: Schema.String,
+  hasClientSecret: Schema.Boolean,
+  source: Schema.Literals(["saved", "environment", "none"]),
+});
+export type ClickUpOAuthConfig = typeof ClickUpOAuthConfig.Type;
+export const ClickUpSaveOAuthConfigInput = Schema.Struct({
+  clientId: TrimmedNonEmptyString.check(Schema.isMaxLength(512)),
+  redirectUri: TrimmedNonEmptyString.check(Schema.isMaxLength(2048)),
+  clientSecret: Schema.optional(Schema.String.check(Schema.isMaxLength(4096))),
+});
+export type ClickUpSaveOAuthConfigInput = typeof ClickUpSaveOAuthConfigInput.Type;
+
 export const ClickUpTaskSource = Schema.Struct({
   kind: Schema.Literals(["project", "list", "folder", "space"]),
   id: ClickUpId,

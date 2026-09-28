@@ -22,6 +22,8 @@ import {
 } from "./clickupInteractions.ts";
 import {
   ClickUpConnection,
+  ClickUpOAuthConfig,
+  ClickUpSaveOAuthConfigInput,
   ClickUpError,
   ClickUpTasksInput,
   ClickUpTaskInput,
@@ -397,6 +399,9 @@ export const WS_METHODS = {
 
   // GitButler methods
   gitButlerWorkspaceStatus: "gitButler.workspaceStatus",
+  clickUpOAuthConfig: "clickup.oauthConfig",
+  clickUpSaveOAuthConfig: "clickup.saveOAuthConfig",
+  clickUpClearOAuthConfig: "clickup.clearOAuthConfig",
   clickUpConnection: "clickup.connection",
   clickUpConnect: "clickup.connect",
   clickUpDisconnect: "clickup.disconnect",
@@ -715,6 +720,21 @@ const WsClickUpWorkflowRpc = Rpc.make(WS_METHODS.clickUpWorkflow, {
 const WsClickUpSubmitWorkflowRpc = Rpc.make(WS_METHODS.clickUpSubmitWorkflow, {
   payload: ClickUpSubmitWorkflowInput,
   success: ClickUpHandoff,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpOAuthConfigRpc = Rpc.make(WS_METHODS.clickUpOAuthConfig, {
+  payload: Schema.Struct({}),
+  success: ClickUpOAuthConfig,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpSaveOAuthConfigRpc = Rpc.make(WS_METHODS.clickUpSaveOAuthConfig, {
+  payload: ClickUpSaveOAuthConfigInput,
+  success: ClickUpOAuthConfig,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
+});
+const WsClickUpClearOAuthConfigRpc = Rpc.make(WS_METHODS.clickUpClearOAuthConfig, {
+  payload: Schema.Struct({}),
+  success: ClickUpOAuthConfig,
   error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 const WsClickUpConnectionRpc = Rpc.make(WS_METHODS.clickUpConnection, {
@@ -1729,6 +1749,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsGitButlerWorkspaceStatusRpc,
   WsClickUpWorkflowRpc,
   WsClickUpSubmitWorkflowRpc,
+  WsClickUpOAuthConfigRpc,
+  WsClickUpSaveOAuthConfigRpc,
+  WsClickUpClearOAuthConfigRpc,
   WsClickUpConnectionRpc,
   WsClickUpConnectRpc,
   WsClickUpDisconnectRpc,

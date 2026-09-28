@@ -1059,6 +1059,19 @@ export function createServerEnvironmentAtoms<R, E>(
       staleTimeMs: 60_000,
       refreshTrigger: ({ environmentId }) => usagePricesAtom(environmentId),
     }),
+    clickUpOAuthConfig: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpOAuthConfig",
+      tag: WS_METHODS.clickUpOAuthConfig,
+      staleTimeMs: 30_000,
+    }),
+    clickUpSaveOAuthConfig: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpSaveOAuthConfig",
+      tag: WS_METHODS.clickUpSaveOAuthConfig,
+    }),
+    clickUpClearOAuthConfig: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:clickup:clickUpClearOAuthConfig",
+      tag: WS_METHODS.clickUpClearOAuthConfig,
+    }),
     clickUpConnection: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:clickup:clickUpConnection",
       tag: WS_METHODS.clickUpConnection,
