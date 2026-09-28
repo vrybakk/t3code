@@ -31,3 +31,22 @@ Snapshots move from **Open** to **Submitted**, then **Invoiced**; invoiced snaps
 The ledger stays in the environment's local storage. Use the backup controls in **Settings → Work** to export a
 backup before moving or restoring local data. Agent elapsed time is available when captured, but
 active and waiting time can remain unavailable because providers do not expose those states.
+
+## Sync time to ClickUp
+
+After submitting a task handoff, use **Sync ClickUp time** to review its recorded time. The same
+option in **Work** lets you catch up on older records, including archived threads. Attach a task
+to the thread first; manual entries without a thread can be edited in Work to assign one.
+
+Single-task records default to their linked task. For a thread with several tasks, choose one task
+for each record before syncing, or leave it skipped. Sync applies to the selected records on the
+current page. Refresh after an agent turn finishes to include its final runtime.
+
+Exports create completed, non-billable entries under your connected ClickUp account without
+changing its running timer. Full agent runtime, including any waiting, is labeled as agent time;
+manual work is labeled separately. Subagent/task totals are excluded because they can overlap
+agent runtime. A manual entry's recorded date and time is used as its start.
+
+Already synced records are not exported again. If delivery is unconfirmed, **Check delivery** looks
+for the existing entry without resending it. If a manual record changes after export, reconcile
+its existing entry in ClickUp; syncing will not add a second entry or overwrite your changes.

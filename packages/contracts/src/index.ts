@@ -1,3 +1,4 @@
+export * from "./clickupTimeSync.ts";
 export * from "./clickupWorkflow.ts";
 export * from "./clickupTaskEditing.ts";
 export * from "./baseSchemas.ts";

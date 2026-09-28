@@ -29,6 +29,12 @@ describe("RPC authorization scopes", () => {
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpAnalyzeTask)).toBe(
       AuthOrchestrationOperateScope,
     );
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpTimePreview)).toBe(
+      AuthOrchestrationReadScope,
+    );
+    expect(requiredScopeForRpcMethod(WS_METHODS.clickUpTimeSync)).toBe(
+      AuthOrchestrationOperateScope,
+    );
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpWorkflow)).toBe(AuthOrchestrationReadScope);
     expect(requiredScopeForRpcMethod(WS_METHODS.clickUpSubmitWorkflow)).toBe(
       AuthOrchestrationOperateScope,

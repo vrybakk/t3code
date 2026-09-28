@@ -1,3 +1,4 @@
+import * as ClickUpTimeSync from "./clickup/ClickUpTimeSync.ts";
 import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
 import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
@@ -665,6 +666,7 @@ const makeWsRpcLayer = (
       const clickUpTasks = yield* ClickUpTasks.ClickUpTasks;
       const clickUpSprints = yield* ClickUpSprints.ClickUpSprints;
       const clickUpInteractions = yield* ClickUpInteractions.ClickUpInteractions;
+      const clickUpTimeSync = yield* ClickUpTimeSync.ClickUpTimeSync;
       const clickUpWorkflow = yield* ClickUpWorkflow.ClickUpWorkflow;
       const clickUpTaskAnalysis = yield* ClickUpTaskAnalysis.ClickUpTaskAnalysis;
       const clickUpTaskEditing = yield* ClickUpTaskEditing.ClickUpTaskEditing;
@@ -2679,6 +2681,8 @@ const makeWsRpcLayer = (
         [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
         [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
         [WS_METHODS.clickUpAnalyzeTask]: (input) => clickUpTaskAnalysis.run(input),
+        [WS_METHODS.clickUpTimePreview]: (input) => clickUpTimeSync.preview(input),
+        [WS_METHODS.clickUpTimeSync]: (input) => clickUpTimeSync.sync(input),
         [WS_METHODS.clickUpWorkflow]: (input) => clickUpWorkflow.read(input),
         [WS_METHODS.clickUpSubmitWorkflow]: (input) => clickUpWorkflow.submit(input),
         [WS_METHODS.clickUpTaskOptions]: (input) => clickUpTaskEditing.options(input),
@@ -4012,6 +4016,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const clickUpTasksService = yield* ClickUpTasks.ClickUpTasks;
     const clickUpSprintsService = yield* ClickUpSprints.ClickUpSprints;
     const clickUpInteractionsService = yield* ClickUpInteractions.ClickUpInteractions;
+    const clickUpTimeSyncService = yield* ClickUpTimeSync.ClickUpTimeSync;
     const clickUpWorkflowService = yield* ClickUpWorkflow.ClickUpWorkflow;
     const clickUpTaskAnalysisService = yield* ClickUpTaskAnalysis.ClickUpTaskAnalysis;
     const clickUpTaskEditingService = yield* ClickUpTaskEditing.ClickUpTaskEditing;
@@ -4073,6 +4078,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
               Layer.provide(
                 Layer.succeed(ClickUpTaskAnalysis.ClickUpTaskAnalysis, clickUpTaskAnalysisService),
               ),
+              Layer.provide(Layer.succeed(ClickUpTimeSync.ClickUpTimeSync, clickUpTimeSyncService)),
               Layer.provide(Layer.succeed(ClickUpWorkflow.ClickUpWorkflow, clickUpWorkflowService)),
               Layer.provide(
                 Layer.succeed(ClickUpTaskEditing.ClickUpTaskEditing, clickUpTaskEditingService),

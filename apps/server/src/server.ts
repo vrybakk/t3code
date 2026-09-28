@@ -1,3 +1,4 @@
+import * as ClickUpTimeSync from "./clickup/ClickUpTimeSync.ts";
 import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
 import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpWorkflowStore from "./clickup/ClickUpWorkflowStore.ts";
@@ -627,6 +628,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   // Both transports consume the same service instance, so caches single-flight across clients
   // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
   Layer.provide(ClickUpTaskAnalysis.layer.pipe(Layer.provide(TextGenerationLayerLive))),
+  Layer.provide(ClickUpTimeSync.layer),
   Layer.provide(ClickUpWorkflow.layer),
   Layer.provide(ClickUpWorkflowStore.layer),
   Layer.provide(PullRequestServiceLive),

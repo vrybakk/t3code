@@ -39,6 +39,7 @@ vi.mock("@base-ui/react/tabs", () => {
   };
 });
 vi.mock("@tanstack/react-router", () => ({ Link: "a" }));
+vi.mock("../clickup/ClickUpTimeSync", () => ({ ClickUpTimeSync: () => null }));
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => "env" }));
 vi.mock("../../state/workTracking", () => ({ useWorkMutations: () => ({}) }));

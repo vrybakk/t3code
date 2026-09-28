@@ -1,3 +1,4 @@
+import { ClickUpTimeSync } from "../clickup/ClickUpTimeSync";
 import { Tabs } from "@base-ui/react/tabs";
 import { Link } from "@tanstack/react-router";
 import {
@@ -47,7 +48,10 @@ function WorkEnvironmentPage({ environmentId }: { environmentId: EnvironmentId }
       >
         <WorkspacePageHeader electron={isElectron} className="h-auto">
           <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3 py-2">
-            <h1>Work</h1>
+            <div className="flex items-center gap-3">
+              <h1>Work</h1>
+              <ClickUpTimeSync environmentId={environmentId} />
+            </div>
             <Tabs.List
               aria-label="Work section"
               className="flex gap-0.5 rounded-lg bg-input/40 p-0.5"
