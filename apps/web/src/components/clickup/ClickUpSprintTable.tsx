@@ -6,12 +6,11 @@ import { useThreadShells } from "../../state/entities";
 import { resolveSidebarThreadStatus } from "../Sidebar.logic";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
-import { ClickUpStatusPicker } from "./ClickUpTaskEditors";
+import { Table, TableBody, TableCell, TableRow } from "../ui/table";
+import { ClickUpStatusIconPicker } from "./ClickUpTaskEditors";
 import { ClickUpProjectBadge } from "./ClickUpProjectBadge";
 import { ClickUpTaskActionButtons, ClickUpTaskActionDialog } from "./ClickUpTaskActions";
 import type { ClickUpTaskAction } from "./taskPrompt";
-import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
 import { ClickUpSprintTaskActions } from "./ClickUpSprintTaskActions";
 
 export function ClickUpSprintTable({
@@ -47,18 +46,12 @@ export function ClickUpSprintTable({
   return (
     <>
       <Table className="min-w-2xl table-fixed">
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <span className="ml-3">Name</span>
-            </TableHead>
-            <TableHead className="w-36">Project</TableHead>
-            <TableHead className="w-40">Status</TableHead>
-            <TableHead className="w-32 text-right">
-              <span className="mr-3">Actions</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
+        <colgroup>
+          <col className="w-12" />
+          <col className="w-36" />
+          <col />
+          <col className="w-32" />
+        </colgroup>
         <TableBody>
           {groups
             .filter((group) => group.tasks.length > 0)
@@ -78,8 +71,25 @@ export function ClickUpSprintTable({
                 )}
                 {group.tasks.map((task) => (
                   <TableRow key={task.taskId}>
+                    <TableCell compact>
+                      <div className="ml-2">
+                        <ClickUpStatusIconPicker
+                          environmentId={environmentId}
+                          input={{ workspaceId, userId, taskId: task.taskId }}
+                          taskName={task.name}
+                          taskType={task.taskType?.name ?? "Task"}
+                          status={task.status}
+                          color={task.statusColor}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell compact className="max-w-56">
+                      <div className="truncate text-muted-foreground">
+                        <ClickUpProjectBadge task={task} />
+                      </div>
+                    </TableCell>
                     <TableCell compact className="min-w-64 max-w-lg whitespace-normal">
-                      <div className="ml-3 flex min-w-0 items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <Tooltip>
                           <TooltipTrigger
                             render={
@@ -92,18 +102,14 @@ export function ClickUpSprintTable({
                                   showAll,
                                   taskId: task.taskId,
                                 }}
-                                className="flex min-w-0 items-start gap-2 text-xs font-medium hover:text-primary"
+                                className="min-w-0 truncate text-xs font-medium hover:text-primary"
                               />
                             }
                           >
-                            <ClickUpTaskTypeIcon
-                              name={task.taskType?.name ?? "Task"}
-                              className="mt-0.5"
-                            />
-                            <span className="min-w-0 truncate">{task.name}</span>
+                            {task.name}
                           </TooltipTrigger>
                           <TooltipPopup className="max-w-96 whitespace-normal break-words text-left">
-                            {task.taskType?.name ?? "Task"}: {task.name}
+                            {task.name}
                           </TooltipPopup>
                         </Tooltip>
                         {!!task.tags?.length && (
@@ -127,20 +133,6 @@ export function ClickUpSprintTable({
                           </Tooltip>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell compact className="max-w-56">
-                      <div className="truncate text-muted-foreground">
-                        <ClickUpProjectBadge task={task} />
-                      </div>
-                    </TableCell>
-                    <TableCell compact>
-                      <ClickUpStatusPicker
-                        environmentId={environmentId}
-                        input={{ workspaceId, userId, taskId: task.taskId }}
-                        taskName={task.name}
-                        status={task.status}
-                        color={task.statusColor}
-                      />
                     </TableCell>
                     <TableCell compact>
                       <div className="mr-3">

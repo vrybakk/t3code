@@ -6,6 +6,10 @@ export function taskDate(value: string | null | undefined): string {
     : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+export function taskColor(value: string | null | undefined): string | undefined {
+  return value && /^#[0-9a-f]{3,8}$/i.test(value) ? value : undefined;
+}
+
 export function taskDuration(value: number | null | undefined): string {
   if (value == null) return "Not set";
   if (value === 0) return "0m";

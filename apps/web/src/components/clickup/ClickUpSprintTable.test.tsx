@@ -19,7 +19,7 @@ vi.mock("../../state/server", () => ({ serverEnvironment: { clickUpThreads: stat
 vi.mock("../../rpc/atomRegistry", () => ({ appAtomRegistry: { refresh: state.refresh } }));
 vi.mock("./ClickUpBackgroundAction", () => ({ ClickUpBackgroundAction: () => null }));
 vi.mock("./ClickUpTaskLauncher", () => ({ ClickUpTaskLauncher: () => null }));
-vi.mock("./ClickUpTaskEditors", () => ({ ClickUpStatusPicker: () => null }));
+vi.mock("./ClickUpTaskEditors", () => ({ ClickUpStatusIconPicker: () => null }));
 vi.mock("@tanstack/react-router", () => ({ Link: "a" }));
 vi.mock("../ui/button", async () => {
   const { cloneElement } = await import("react");
