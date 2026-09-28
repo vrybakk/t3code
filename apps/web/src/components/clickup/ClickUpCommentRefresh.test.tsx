@@ -1,7 +1,7 @@
 import { EnvironmentId, type ClickUpTaskDetails } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { act } from "react";
+import { act, type ReactElement, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
@@ -30,6 +30,19 @@ vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.com
 vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/textarea", () => ({ Textarea: "textarea" }));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
+vi.mock("../../hooks/useLocalStorage", async () => {
+  const { useState } = await import("react");
+  return { useLocalStorage: (_key: string, initial: boolean) => useState(initial) };
+});
+vi.mock("../ui/tooltip", async () => {
+  const { cloneElement } = await import("react");
+  return {
+    Tooltip: ({ children }: { children: ReactNode }) => children,
+    TooltipTrigger: ({ render, children }: { render: ReactElement; children: ReactNode }) =>
+      cloneElement(render, {}, children),
+    TooltipPopup: () => null,
+  };
+});
 vi.mock("../ChatMarkdown", () => ({ default: () => null }));
 vi.mock("./ClickUpTaskFields", () => ({
   ClickUpTaskFields: () => null,
@@ -176,7 +189,7 @@ it.each(["post", "reply", "resolve"] as const)(
   },
 );
 
-it("keeps comment and reply drafts through failed refreshes and successful retries", async () => {
+it("keeps comment and reply drafts through collapse, refresh failures and retries", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const input = { workspaceId: "42", taskId: "task", userId: 17 };
   const details: ClickUpTaskDetails = {
@@ -213,6 +226,15 @@ it("keeps comment and reply drafts through failed refreshes and successful retri
         target: { value: `${label} draft` },
       });
     });
+  }
+  await act(async () => {
+    renderer.root.findByProps({ "aria-label": "Hide activity and comments" }).props.onClick();
+  });
+  await act(async () => {
+    renderer.root.findByProps({ "aria-label": "Show activity and comments" }).props.onClick();
+  });
+  for (const label of ["Write a comment", "Write a reply"]) {
+    expect(renderer.root.findByProps({ "aria-label": label }).props.value).toBe(`${label} draft`);
   }
   for (const [query, success] of [
     ["comments", comments],
