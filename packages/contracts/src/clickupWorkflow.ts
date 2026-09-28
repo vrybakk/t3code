@@ -12,6 +12,8 @@ export const ClickUpWorkflowText = TrimmedNonEmptyString.check(
   Schema.isMaxLength(2000),
   Schema.isPattern(
     /^(?![\s\S]*\b(?:we|us|our)\b)(?![\s\S]*[—–`])(?![\s\S]*\n[\s\S]*\n[\s\S]*\n[\s\S]*\n)[\s\S]+$/i,
+    // Provider JSON schema engines reject lookarounds; enforce these rules during local decoding.
+    { toJsonSchema: () => ({}) },
   ),
 );
 export const ClickUpWorkflowEvidence = Schema.Struct({

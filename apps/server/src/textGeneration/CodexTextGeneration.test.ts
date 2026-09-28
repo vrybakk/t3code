@@ -31,6 +31,7 @@ interface FakeCodexInput {
   exitCode?: number;
   stderr?: string;
   requireImage?: boolean;
+  requireTaskAnalysisSchema?: boolean;
   requireServiceTier?: string;
   requireReasoningEffort?: string;
   forbidReasoningEffort?: boolean;
@@ -47,6 +48,7 @@ interface FakeCodexInput {
 function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
   const check = JSON.stringify({
     requireImage: input.requireImage ?? false,
+    requireTaskAnalysisSchema: input.requireTaskAnalysisSchema ?? false,
     requireServiceTier: input.requireServiceTier ?? null,
     requireReasoningEffort: input.requireReasoningEffort ?? null,
     forbidReasoningEffort: input.forbidReasoningEffort ?? false,
@@ -65,10 +67,12 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
       name: "codex",
       source: [
         'import * as NodeFS from "node:fs";',
+        'import assert from "node:assert/strict";',
         `const check = ${check};`,
         "const args = process.argv.slice(2);",
         'const originalArgs = ` ${args.join(" ")} `;',
         "let outputPath = null;",
+        "let schemaPath = null;",
         "let seenImage = false;",
         'let seenServiceTier = "";',
         'let seenReasoningEffort = "";',
@@ -81,10 +85,18 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
         '    const value = args[index] ?? "";',
         '    if (value.startsWith("service_tier=")) seenServiceTier = value;',
         '    if (value.startsWith("model_reasoning_effort=")) seenReasoningEffort = value;',
+        '  } else if (args[index] === "--output-schema") {',
+        "    schemaPath = args[++index];",
         '  } else if (args[index] === "--output-last-message") {',
         "    index += 1;",
         "    outputPath = args[index] ?? null;",
         "  }",
+        "}",
+        "if (check.requireTaskAnalysisSchema) {",
+        '  const schema = JSON.parse(NodeFS.readFileSync(schemaPath, "utf8"));',
+        '  assert.deepEqual(schema.required.toSorted(), ["estimateMinutes", "findings", "summary"]);',
+        "  assert.equal(schema.additionalProperties, false);",
+        '  assert.deepEqual(schema.properties.findings.anyOf, [{ type: "string", minLength: 1, maxLength: 2000 }, { type: "null" }]);',
         "}",
         "const chunks = [];",
         "for await (const chunk of process.stdin) chunks.push(chunk);",
@@ -162,7 +174,10 @@ function withFakeCodexEnv<A, E, R>(
 it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
   it.effect("generates structured task analysis with the selected model", () =>
     withFakeCodexEnv(
-      { output: '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}' },
+      {
+        output: '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}',
+        requireTaskAnalysisSchema: true,
+      },
       (generation) =>
         Effect.gen(function* () {
           const result = yield* generation.generateTaskAnalysis({
@@ -175,6 +190,34 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
             estimateMinutes: 30,
             findings: null,
           });
+        }),
+    ),
+  );
+
+  it.effect("rejects findings that violate local validation after generation", () =>
+    withFakeCodexEnv(
+      {
+        output: JSON.stringify({
+          summary: "Missing details",
+          estimateMinutes: null,
+          findings: "We need the expected image.",
+        }),
+        requireTaskAnalysisSchema: true,
+      },
+      (generation) =>
+        Effect.gen(function* () {
+          const result = yield* Effect.result(
+            generation.generateTaskAnalysis({
+              cwd: process.cwd(),
+              prompt: "Check the task requirements",
+              modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+            }),
+          );
+          expect(Result.isFailure(result)).toBe(true);
+          if (Result.isFailure(result)) {
+            expect(result.failure).toBeInstanceOf(TextGenerationError);
+            expect(result.failure.detail).toBe("Codex returned invalid structured output.");
+          }
         }),
     ),
   );
