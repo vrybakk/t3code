@@ -3,7 +3,7 @@ import type { ClickUpTask } from "@t3tools/contracts";
 const PRIORITIES = ["urgent", "high", "normal", "low"];
 const DELIVERY_STATUSES = ["qa testing", "staging", "in production"];
 
-export function taskPriorityRank(priority: string | null | undefined): number {
+function taskPriorityRank(priority: string | null | undefined): number {
   const rank = PRIORITIES.indexOf(priority?.trim().toLowerCase() ?? "");
   return rank === -1 ? PRIORITIES.length : rank;
 }
