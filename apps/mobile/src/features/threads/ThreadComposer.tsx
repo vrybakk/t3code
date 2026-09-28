@@ -369,6 +369,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   }, [currentModelSelection.instanceId, onShowUsageLimits, props.serverConfig]);
 
   const composerMenu = useComposerCommandMenu({
+    supportsStudioWorkflow: props.serverConfig?.environment.capabilities.clickUpTasks === true,
     draftMessage: props.draftMessage,
     ownerKey: composerOwnerKey,
     environmentId: props.environmentId,
