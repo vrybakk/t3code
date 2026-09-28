@@ -1,4 +1,4 @@
-import { TaskAnalysis } from "@t3tools/contracts";
+import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
 import {
   type ModelSelection,
   type ProviderSetupError,
@@ -388,6 +388,17 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
       return { branch: sanitizeBranchFragment(generated.branch) };
     });
 
+  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] = (
+    input,
+  ) =>
+    runAntigravityJson({
+      operation: "researchTaskEstimate",
+
+      prompt: input.prompt,
+      outputSchema: TaskEstimationResponse,
+      modelSelection: input.modelSelection,
+    });
+
   const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
     input,
   ) =>
@@ -423,5 +434,6 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
     generateBranchName,
     generateThreadTitle,
     generateTaskAnalysis,
+    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

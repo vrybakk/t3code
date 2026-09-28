@@ -10,21 +10,25 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
-import { getClientSettings, useClientSettings } from "../hooks/useSettings";
+import { useClientSettings } from "../hooks/useSettings";
 import { useEnvironments } from "../state/environments";
 import { environmentShell } from "../state/shell";
 import {
   hasDesktopNotifications,
   hasNotificationSound,
-  playNotificationSound,
   setNotificationBadge,
   unlockNotificationAudio,
 } from "../threadNotifications";
 import { resolveSidebarThreadStatus } from "./Sidebar.logic";
-import { toastManager } from "./ui/toast";
+import { presentActivityNotification } from "./activityNotification";
+import {
+  subscribeTaskAnalysisNotifications,
+  taskAnalysisFeedback,
+} from "./clickup/taskAnalysisFeedback";
 
 export function ThreadNotificationCoordinator() {
   const { environments } = useEnvironments();
+  const navigate = useNavigate();
   const mode = useClientSettings((settings) => settings.notificationMode);
   const inAppNotificationsEnabled = useClientSettings(
     (settings) => settings.inAppNotificationsEnabled,
@@ -37,6 +41,31 @@ export function ThreadNotificationCoordinator() {
     pending.current.set(notification.tag, { environmentId, notification });
     setNotificationBadge(pending.current.size);
   }, []);
+
+  useEffect(
+    () =>
+      subscribeTaskAnalysisNotifications(({ environmentId, input, taskName, state }) => {
+        if (!environments.some((environment) => environment.environmentId === environmentId))
+          return;
+        const feedback = taskAnalysisFeedback(input.action, state);
+        presentActivityNotification({
+          environmentId,
+          ...feedback,
+          body: taskName,
+          actionLabel: "View task",
+          tag: `task:${JSON.stringify([environmentId, input.userId, input.workspaceId, input.taskId, input.action])}`,
+          kind: feedback.type === "success" ? "completion" : "input",
+          onNotification,
+          onOpen: () => {
+            void navigate({
+              to: "/tasks",
+              search: { environmentId, workspaceId: input.workspaceId, taskId: input.taskId },
+            });
+          },
+        });
+      }),
+    [environments, navigate, onNotification],
+  );
 
   useEffect(() => {
     const activeIds = new Set(environments.map(({ environmentId }) => environmentId));
@@ -95,10 +124,6 @@ function EnvironmentNotifications({
   onNotification: (environmentId: EnvironmentId, notification: Notification) => void;
 }) {
   const shell = useAtomValue(environmentShell.stateValueAtom(environmentId));
-  const mode = useClientSettings((settings) => settings.notificationMode);
-  const inAppNotificationsEnabled = useClientSettings(
-    (settings) => settings.inAppNotificationsEnabled,
-  );
   const navigate = useNavigate();
   const { environmentId: activeEnvironmentId, threadId: activeThreadId } = useParams({
     strict: false,
@@ -145,84 +170,36 @@ function EnvironmentNotifications({
             : status === "failed"
               ? "Thread failed"
               : "Input needed";
-      if (hasNotificationSound(mode)) {
-        void playNotificationSound(kind, () =>
-          hasNotificationSound(getClientSettings().notificationMode),
-        );
-      }
-      if (
-        inAppNotificationsEnabled &&
-        document.visibilityState === "visible" &&
-        document.hasFocus() &&
-        (activeEnvironmentId !== environmentId || activeThreadId !== thread.id)
-      ) {
-        const toastId = toastManager.add({
-          type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
-          title,
-          description: thread.title,
-          data: {
-            hideCopyButton: true,
-            leadingIcon:
-              kind === "completion" ? (
-                <CircleCheckIcon aria-hidden className="size-4 text-success-foreground" />
-              ) : status === "approval" ? (
-                <ShieldQuestionIcon aria-hidden className="size-4 text-warning-foreground" />
-              ) : status === "failed" ? (
-                <CircleAlertIcon aria-hidden className="size-4 text-destructive-foreground" />
-              ) : (
-                <MessageCircleQuestionIcon aria-hidden className="size-4 text-info-foreground" />
-              ),
-          },
-          actionProps: {
-            children: "Open thread",
-            onClick: () => {
-              toastManager.close(toastId);
-              void navigate({
-                to: "/$environmentId/$threadId",
-                params: { environmentId, threadId: thread.id },
-              });
-            },
-          },
-        });
-        continue;
-      }
-      if (
-        !hasDesktopNotifications(mode) ||
-        (document.visibilityState === "visible" && document.hasFocus()) ||
-        typeof Notification === "undefined" ||
-        Notification.permission !== "granted"
-      )
-        continue;
-      try {
-        const notification = new Notification(title, {
-          body: thread.title,
-          tag: `${environmentId}:${thread.id}`,
-          silent: true,
-        });
-        onNotification(environmentId, notification);
-        notification.addEventListener("click", () => {
-          notification.close();
-          window.focus();
+      presentActivityNotification({
+        environmentId,
+        title,
+        body: thread.title,
+        actionLabel: "Open thread",
+        tag: `${environmentId}:${thread.id}`,
+        kind,
+        type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
+        showInApp: activeEnvironmentId !== environmentId || activeThreadId !== thread.id,
+        icon:
+          kind === "completion" ? (
+            <CircleCheckIcon aria-hidden className="size-4 text-success-foreground" />
+          ) : status === "approval" ? (
+            <ShieldQuestionIcon aria-hidden className="size-4 text-warning-foreground" />
+          ) : status === "failed" ? (
+            <CircleAlertIcon aria-hidden className="size-4 text-destructive-foreground" />
+          ) : (
+            <MessageCircleQuestionIcon aria-hidden className="size-4 text-info-foreground" />
+          ),
+        onNotification,
+        onOpen: () => {
           void navigate({
             to: "/$environmentId/$threadId",
             params: { environmentId, threadId: thread.id },
           });
-        });
-      } catch {
-        // Some browsers expose Notification but reject desktop presentation.
-      }
+        },
+      });
     }
     previous.current = next;
-  }, [
-    activeEnvironmentId,
-    activeThreadId,
-    environmentId,
-    inAppNotificationsEnabled,
-    mode,
-    navigate,
-    onNotification,
-    shell,
-  ]);
+  }, [activeEnvironmentId, activeThreadId, environmentId, navigate, onNotification, shell]);
 
   return null;
 }

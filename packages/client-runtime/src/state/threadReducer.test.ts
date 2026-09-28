@@ -1709,3 +1709,35 @@ describe("applyThreadDetailEvent", () => {
     });
   });
 });
+
+it("preserves the primary when context links are added, replayed, and removed", () => {
+  const primary = { workspaceId: "42", taskId: "main", name: "Original", primary: true };
+  const context = { workspaceId: "42", taskId: "context", name: "Context", primary: false };
+  const event = {
+    ...baseEventFields,
+    sequence: 1,
+    occurredAt: baseThread.updatedAt,
+    aggregateKind: "thread" as const,
+    aggregateId: baseThread.id,
+    type: "thread.task-linked" as const,
+    payload: { threadId: baseThread.id, link: context, updatedAt: baseThread.updatedAt },
+  };
+  const linked = applyThreadDetailEvent({ ...baseThread, clickUpTasks: [primary] }, event);
+  expect(linked.kind).toBe("updated");
+  if (linked.kind !== "updated") return;
+  const replayed = applyThreadDetailEvent(linked.thread, event);
+  if (replayed.kind !== "updated") throw new Error("Expected task link update");
+  expect(replayed.thread.clickUpTasks).toEqual([primary, context]);
+  const removed = applyThreadDetailEvent(replayed.thread, {
+    ...event,
+    type: "thread.task-unlinked",
+    payload: {
+      threadId: baseThread.id,
+      workspaceId: "42",
+      taskId: "context",
+      updatedAt: baseThread.updatedAt,
+    },
+  });
+  if (removed.kind !== "updated") throw new Error("Expected task unlink update");
+  expect(removed.thread.clickUpTasks).toEqual([primary]);
+});

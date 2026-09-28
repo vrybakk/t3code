@@ -1,3 +1,4 @@
+import { readClickUpWorkflowContext } from "../../../clickup/ClickUpWorkflowContext.ts";
 import { ClickUpError, ClickUpTaskInput } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -26,7 +27,7 @@ const make = Effect.gen(function* () {
       SELECT tasks.workspace_id AS "workspaceId", tasks.task_id AS "taskId"
       FROM projection_thread_clickup_tasks AS tasks
       JOIN projection_threads AS threads ON threads.thread_id = tasks.thread_id
-      WHERE tasks.thread_id = ${scope.threadId} AND threads.deleted_at IS NULL
+      WHERE tasks.thread_id = ${scope.threadId} AND tasks.is_primary = 1 AND threads.deleted_at IS NULL
     `.pipe(
       Effect.mapError(
         () => new ClickUpError({ message: "Could not read this thread's linked ClickUp task." }),
@@ -51,7 +52,13 @@ const make = Effect.gen(function* () {
   });
   return ClickUpToolkit.of({
     get_studio_task_workflow: (input) =>
-      linkedTask().pipe(Effect.map(() => getStudioTaskWorkflow(input.mode))),
+      Effect.gen(function* () {
+        const task = yield* linkedTask().pipe(Effect.flatMap(tasks.detail));
+        const scope = yield* requireMcpCapability("clickup");
+        const context = yield* readClickUpWorkflowContext(task.task, scope.threadId);
+        const instructions = getStudioTaskWorkflow(input.mode);
+        return { ...instructions, instructions: `${instructions.instructions}\n\n${context}` };
+      }),
     start_linked_clickup_implementation: () => linkedTask().pipe(Effect.flatMap(workflow.start)),
     post_linked_clickup_findings: (input) =>
       linkedTask().pipe(Effect.flatMap((task) => workflow.findings(task, input))),

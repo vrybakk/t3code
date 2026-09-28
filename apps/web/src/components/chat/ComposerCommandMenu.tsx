@@ -1,3 +1,4 @@
+import type { ComposerSkill } from "@t3tools/client-runtime/providerSkills";
 import {
   formatProviderSkillDisplayName,
   resolveProviderSkillSourceKind,
@@ -7,7 +8,6 @@ import {
   type ProjectEntry,
   type ProviderDriverKind,
   type PullRequestContextMetadata,
-  type ServerProviderSkill,
   type ServerProviderSlashCommand,
 } from "@t3tools/contracts";
 import {
@@ -56,7 +56,7 @@ export type ComposerCommandItem =
       id: string;
       type: "skill";
       provider: ProviderDriverKind;
-      skill: ServerProviderSkill;
+      skill: ComposerSkill;
       label: string;
       description: string;
     }

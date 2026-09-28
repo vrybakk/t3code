@@ -42,8 +42,11 @@ wins: Project field, List, Folder, then Space; removing a mapping restores the b
 Use the Project field to link tasks with the same field value across locations, a List for tasks
 in that list, a Folder for its lists, or a Space for all its folders and lists. Search local
 repositories by name or path, or show only linked repositories while editing.
-The repository picker suggests the linked repositories; **Show all repositories** allows a manual
-choice. Project badges use the ClickUp Project-field color when available.
+The repository picker preselects a linked repository and remembers your choice for tasks in the
+same ClickUp project or location on this client. Without a mapping, it suggests an exact name
+match or the first available project. Review the selection before preparing the thread;
+**Show all repositories** allows a manual choice. Project badges use the ClickUp Project-field
+color when available.
 
 Linked repositories appear with their local paths even before you create a thread. The mapping
 editor suggests an exact repository-name match when there is only one match. Save the selection
@@ -55,28 +58,43 @@ destination folder before downloading. Nerd remembers the location and waits for
 to finish before preparing task work. Reopen existing mappings and save their links once to
 retain their repository URLs too. Mappings belong to the selected environment; other developers'
 computers are not configured automatically.
+If a linked workspace contains existing repository folders, Nerd checks their remotes before
+offering a download. Tasks started from such a parent folder use a local thread with those
+repository paths in the prepared request.
 
 Use **Check requirements** or **Estimate task** from the sprint table or task page to run
 background analysis with your environment's default text-generation model. Results appear in
-the action dialog and a completion notification; you can close the dialog while it runs.
+the action dialog; you can close it while analysis runs. Enable notifications in **Settings → General**
+to receive task alerts while Nerd is open. Clicking an alert opens the task. Task analysis uses the same
+sound and in-app notification preferences as threads.
 Reopening shows the same run or its last result for this app session. Use **Run again** for a fresh analysis.
-These actions use the task description and supplied comments. They do not inspect repository
-code or attachment contents, and report missing information when the context is insufficient.
+Requirements checks use the task description and supplied comments. Estimation also searches and
+reads the mapped repositories, including relevant implementation, instructions and tests. It does
+not change code or run project scripts. Set up the task’s linked repositories first.
 
 **Check requirements** identifies gaps and questions without implementing or changing status.
 It posts one short, plain-language findings comment only when something needs attention.
+Research-backed estimates currently support Codex, Claude, OpenCode and Antigravity. Cursor and Grok report that research is unavailable. Codex estimation uses your existing sign-in with isolated CLI configuration; custom launch flags and user tools are not loaded.
+
 A clean check does not post a comment. **Estimate task** estimates AI-assisted time to a
 review-ready result, including implementation, verification, and likely fixes, excluding waiting
 for CTO review or deployment. It saves a missing estimate without posting a comment, then
 removes **estimation needed** if present. Existing estimates are preserved and hide the action.
-Unclear requirements need clarification first. If tag removal fails, the saved estimate remains.
+Estimates show implementation, verification and specific likely follow-up separately, with the
+files inspected and any limitations. Missing evidence or low confidence produces **More
+investigation needed** without saving a number. Estimates have no fixed minimum or generic
+buffer, and are not automatically scaled from human hours or incomplete runtime records.
+Text attachments from supported ClickUp attachment hosts are read; Codex can also inspect PNG,
+JPEG and WebP images. Other providers and unsupported formats (including PDF/video), inaccessible
+attachments and truncated content are disclosed. Essential missing evidence needs clarification.
+If tag removal fails, the saved estimate remains.
 
 Use **Start task**, choose a repository and select **Prepare thread** to create a linked draft
 with the studio workflow skill and task reference. Review the model and permissions, then send
-it to begin. The agent loads the current task through its link. Configure research,
-implementation, and review model defaults in **Settings → Integrations → ClickUp**, or override
-them for one launch. An unset role uses the thread's model. If a provider cannot use a requested
-model, the agent asks how to continue.
+it to begin. The agent loads the current task through its link. Configure research and review
+models for all tasks in **Settings → Integrations → ClickUp**. An unset role uses the thread's
+model. Implementation always uses the model selected in the thread. If a provider cannot use a
+requested model, the agent asks how to continue.
 
 **Start task** coordinates the linked repositories, moves the task to In Progress when coding
 starts, verifies the result, and requests an independent review. It fixes findings before preparing

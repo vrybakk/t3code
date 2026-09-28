@@ -29,6 +29,7 @@ import {
 import {
   dedupeProviderSkillsByName,
   getProviderSkillsForSlashMenu,
+  getComposerSkills,
   getProviderSlashCommandsForSlashMenu,
   isProviderSkillUserInvocable,
   resolveProviderSkillsForCwd,
@@ -168,6 +169,7 @@ export function useComposerCommandMenu({
   pullRequestProjectId = null,
   pullRequestRepository = null,
   selectedProviderStatus,
+  supportsStudioWorkflow,
   hasThread,
   hasCompactableConversation,
   offersUsageLimits = false,
@@ -183,6 +185,7 @@ export function useComposerCommandMenu({
   readonly pullRequestProjectId?: ProjectId | null;
   readonly pullRequestRepository?: string | null;
   readonly selectedProviderStatus: ServerProvider | null;
+  readonly supportsStudioWorkflow: boolean;
   readonly hasThread: boolean;
   readonly hasCompactableConversation: boolean;
   /** Whether T3 itself offers /usage-limits for the selected provider. */
@@ -227,8 +230,13 @@ export function useComposerCommandMenu({
 
   const skills = useMemo(
     () =>
-      selectedProviderStatus ? resolveProviderSkillsForCwd(selectedProviderStatus, projectCwd) : [],
-    [projectCwd, selectedProviderStatus],
+      getComposerSkills(
+        selectedProviderStatus
+          ? resolveProviderSkillsForCwd(selectedProviderStatus, projectCwd)
+          : [],
+        supportsStudioWorkflow,
+      ),
+    [projectCwd, selectedProviderStatus, supportsStudioWorkflow],
   );
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     reportFailure: false,

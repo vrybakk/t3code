@@ -1,20 +1,24 @@
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import type {
-  ClickUpTaskDetails,
-  ClickUpWorkflowModels,
-  EnvironmentId,
-  ProjectId,
-} from "@t3tools/contracts";
+import { ProjectId, type ClickUpTaskDetails, type EnvironmentId } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { useRef, useState } from "react";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
-import { useEnvironmentSettings } from "../../hooks/useSettings";
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useClickUpRepositories } from "./useClickUpRepositories";
-import { ClickUpLinkedRepositories } from "./ClickUpLinkedRepositories";
+import { ClickUpRepositoryClone } from "./ClickUpRepositoryClone";
+import { ClickUpRepositoryMappings } from "./ClickUpRepositoryMappings";
+import { CircleCheckIcon, FolderGit2Icon } from "lucide-react";
+import { Spinner } from "../ui/spinner";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { buildClickUpTaskPrompt } from "./taskPrompt";
-import { ClickUpWorkflowModelPicker } from "./ClickUpWorkflowModels";
+import {
+  clickUpLaunchProjectStorageKey,
+  resolveClickUpLaunchProject,
+} from "./taskProjectSelection";
+
+const SavedProjectId = Schema.NullOr(ProjectId);
 
 export function ClickUpTaskLauncher({
   environmentId,
@@ -29,23 +33,35 @@ export function ClickUpTaskLauncher({
     allProjects: projects,
     missing,
     unavailableLocalIds,
+    localCheckouts,
+    checking,
+    discoveryFailed,
+    retryDiscovery,
   } = useClickUpRepositories(details.task, environmentId);
-  const repositoriesUnavailable = missing.length > 0 || unavailableLocalIds.length > 0;
-  const defaults = useEnvironmentSettings(
-    environmentId,
-    (settings) => settings.clickUpWorkflowModels,
-  );
-  const [models, setModels] = useState<ClickUpWorkflowModels | null>(null);
+  const repositoriesUnavailable =
+    checking || discoveryFailed || missing.length > 0 || unavailableLocalIds.length > 0;
   const blocked = details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
   const [showAllRepositories, setShowAllRepositories] = useState(false);
-  const availableProjects = mapping && !showAllRepositories ? mappedProjects : projects;
-  const [projectId, setProjectId] = useState<ProjectId | null>(null);
+  const [projectId, setProjectId] = useLocalStorage(
+    clickUpLaunchProjectStorageKey(details.task, environmentId),
+    null,
+    SavedProjectId,
+  );
+  const availableProjects =
+    mapping && !showAllRepositories
+      ? projects.filter(
+          (project) =>
+            project.id === projectId || mappedProjects.some((mapped) => mapped.id === project.id),
+        )
+      : projects;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const newThread = useNewThreadHandler();
-  const selectedProject = availableProjects.find(
-    (project) =>
-      project.id === (projectId ?? (mappedProjects.length === 1 ? mappedProjects[0]?.id : null)),
+  const selectedProject = resolveClickUpLaunchProject(
+    details.task,
+    availableProjects,
+    mappedProjects,
+    projectId,
   );
   const launching = useRef(false);
   async function prepareThread() {
@@ -55,7 +71,13 @@ export function ClickUpTaskLauncher({
     setError(null);
     try {
       const draft = await newThread(scopeProjectRef(environmentId, selectedProject.id), {
-        envMode: "worktree",
+        envMode: localCheckouts.some(
+          (checkout) =>
+            checkout.projectId === selectedProject.id &&
+            checkout.cwd !== selectedProject.workspaceRoot,
+        )
+          ? "local"
+          : "worktree",
       });
       if (!draft) return;
       const store = useComposerDraftStore.getState();
@@ -70,21 +92,7 @@ export function ClickUpTaskLauncher({
         environmentSelection: "manual",
         interactionMode,
       });
-      store.setPrompt(
-        draft.draftId,
-        buildClickUpTaskPrompt(details, {
-          models: models ?? defaults,
-          repositories: [
-            ...new Map(
-              [...mappedProjects, selectedProject].map((project) => [project.id, project]),
-            ).values(),
-          ].map((project) => ({
-            id: project.id,
-            title: project.title,
-            cwd: project.workspaceRoot,
-          })),
-        }),
-      );
+      store.setPrompt(draft.draftId, buildClickUpTaskPrompt(details));
     } catch {
       setError("Could not prepare the coding thread. Try again.");
     } finally {
@@ -93,19 +101,28 @@ export function ClickUpTaskLauncher({
     }
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 p-3">
-      <div className="min-w-48 flex-1">
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Workspace</span>
+          {mapping && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowAllRepositories((value) => !value)}
+            >
+              {showAllRepositories ? "Show linked repositories" : "Show all repositories"}
+            </Button>
+          )}
+        </div>
         <Select
           value={selectedProject?.id ?? null}
           onValueChange={(value) => setProjectId(value as ProjectId | null)}
           disabled={busy}
-          items={availableProjects.map((project) => ({
-            value: project.id,
-            label: project.title,
-          }))}
+          items={availableProjects.map((project) => ({ value: project.id, label: project.title }))}
         >
-          <SelectTrigger aria-label="Repository project">
-            <SelectValue placeholder="Choose a project" />
+          <SelectTrigger aria-label="Workspace">
+            <SelectValue placeholder="Choose a workspace" />
           </SelectTrigger>
           <SelectPopup>
             {availableProjects.map((project) => (
@@ -115,67 +132,87 @@ export function ClickUpTaskLauncher({
             ))}
           </SelectPopup>
         </Select>
-      </div>
-      <Button
-        size="sm"
-        disabled={!selectedProject || busy || blocked || repositoriesUnavailable}
-        onClick={() => void prepareThread()}
-      >
-        {busy ? "Preparing…" : "Prepare thread"}
-      </Button>
-      {mapping && (
-        <div className="flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>
-            Linked to {mapping.sources.map((source) => source.name).join(", ")} ·{" "}
-            {mappedProjects.length} repositories
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowAllRepositories((value) => !value)}
-          >
-            {showAllRepositories ? "Show linked repositories" : "Show all repositories"}
-          </Button>
-        </div>
-      )}
-      {repositoriesUnavailable && (
-        <div className="w-full space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Set up the linked repositories before preparing this task.
+        {selectedProject && (
+          <p className="flex items-start gap-2 text-xs text-muted-foreground">
+            <FolderGit2Icon aria-hidden className="size-4 shrink-0" />
+            <span className="break-all">{selectedProject.workspaceRoot}</span>
           </p>
-          <ClickUpLinkedRepositories task={details.task} environmentId={environmentId} />
+        )}
+      </div>
+      {checking ? (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner size="sm" />
+          Checking existing repository folders…
+        </p>
+      ) : discoveryFailed ? (
+        <div role="alert" className="space-y-2 text-sm">
+          <p>Could not check existing folders.</p>
+          <Button size="sm" variant="outline" onClick={retryDiscovery}>
+            Retry check
+          </Button>
+        </div>
+      ) : repositoriesUnavailable ? (
+        <div className="space-y-3 rounded-lg border p-3">
+          <p className="text-sm font-medium">Some linked repositories aren’t available locally</p>
+          <p className="text-xs text-muted-foreground">
+            Manage links to correct the mapping, or download the missing repository.
+          </p>
+          {missing.map((repository) => (
+            <ClickUpRepositoryClone
+              key={repository.remoteUrl}
+              repository={repository}
+              task={details.task}
+              environmentId={environmentId}
+            />
+          ))}
+          {unavailableLocalIds.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              A linked workspace is unavailable or its download has not finished.
+            </p>
+          )}
+        </div>
+      ) : (
+        selectedProject && (
+          <p role="status" className="flex items-center gap-2 text-sm">
+            <CircleCheckIcon aria-hidden className="size-4 text-success-foreground" />
+            {localCheckouts.some((checkout) => checkout.projectId === selectedProject.id)
+              ? "Existing repositories found in this workspace"
+              : "Workspace ready"}
+          </p>
+        )
+      )}
+      {mapping && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
+            Linked to {mapping.sources.map((source) => source.name).join(", ")}
+          </span>
+          <ClickUpRepositoryMappings task={details.task} environmentId={environmentId} />
         </div>
       )}
-      <details className="w-full space-y-3">
-        <summary className="cursor-pointer text-xs text-muted-foreground">Workflow models</summary>
-        <ClickUpWorkflowModelPicker
-          environmentId={environmentId}
-          value={models ?? defaults}
-          onChange={setModels}
-          disabled={busy}
-        />
-        {models && (
-          <Button size="sm" variant="ghost" onClick={() => setModels(null)}>
-            Use environment defaults
-          </Button>
-        )}
-      </details>
       {blocked && (
-        <p role="alert" className="w-full text-sm text-muted-foreground">
+        <p role="alert" className="text-sm text-destructive">
           Remove the no agent tag to allow implementation.
         </p>
       )}
-      <p className="w-full text-xs text-muted-foreground">
-        Review the task request, model and permissions in the thread, then send it to start.
-      </p>
       {!projects.length && (
-        <p className="text-xs text-muted-foreground">Add a project to start a coding thread.</p>
+        <p className="text-sm text-muted-foreground">Add a project to start a coding thread.</p>
       )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}
+      <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-4">
+        <p className="min-w-48 flex-1 text-xs text-muted-foreground">
+          Opens a prepared thread. Review it, then send to start.
+        </p>
+        <Button
+          disabled={!selectedProject || busy || blocked || repositoriesUnavailable}
+          onClick={() => void prepareThread()}
+        >
+          {busy ? "Preparing…" : "Prepare thread"}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -135,6 +135,9 @@ export function applyThreadDetailEvent(
           snoozedUntil: null,
           snoozedAt: null,
           deletedAt: null,
+          clickUpTasks: event.payload.clickUpTask
+            ? [{ ...event.payload.clickUpTask, primary: true }]
+            : [],
           pullRequests: [],
           messages: [],
           proposedPlans: [],
@@ -289,6 +292,37 @@ export function applyThreadDetailEvent(
           ...(event.payload.activeOrderKey !== undefined
             ? { activeOrderKey: event.payload.activeOrderKey }
             : {}),
+          updatedAt: event.payload.updatedAt,
+        },
+      };
+
+    case "thread.task-linked":
+      return {
+        kind: "updated",
+        thread: {
+          ...thread,
+          clickUpTasks: [
+            ...(thread.clickUpTasks ?? []).filter(
+              (task) =>
+                task.workspaceId !== event.payload.link.workspaceId ||
+                task.taskId !== event.payload.link.taskId,
+            ),
+            event.payload.link,
+          ],
+          updatedAt: event.payload.updatedAt,
+        },
+      };
+    case "thread.task-unlinked":
+      return {
+        kind: "updated",
+        thread: {
+          ...thread,
+          clickUpTasks: (thread.clickUpTasks ?? []).filter(
+            (task) =>
+              task.primary ||
+              task.workspaceId !== event.payload.workspaceId ||
+              task.taskId !== event.payload.taskId,
+          ),
           updatedAt: event.payload.updatedAt,
         },
       };

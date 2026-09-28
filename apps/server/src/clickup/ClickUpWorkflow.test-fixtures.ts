@@ -89,10 +89,10 @@ export const harness = Effect.fn("workflowHarness")(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* migration;
   yield* sql`CREATE TABLE projection_threads(thread_id TEXT, project_id TEXT, deleted_at TEXT)`;
-  yield* sql`CREATE TABLE projection_thread_clickup_tasks(thread_id TEXT, task_id TEXT, workspace_id TEXT)`;
+  yield* sql`CREATE TABLE projection_thread_clickup_tasks(thread_id TEXT, task_id TEXT, workspace_id TEXT, is_primary INTEGER NOT NULL DEFAULT 1)`;
   yield* sql`CREATE TABLE projection_thread_pull_requests(thread_id TEXT, host TEXT, repository TEXT, number INTEGER, url TEXT)`;
   yield* sql`INSERT INTO projection_threads VALUES ('thread', 'project', NULL)`;
-  yield* sql`INSERT INTO projection_thread_clickup_tasks VALUES ('thread', 'task', '42')`;
+  yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, task_id, workspace_id) VALUES ('thread', 'task', '42')`;
   yield* sql`INSERT INTO projection_thread_pull_requests VALUES ('thread', 'github.com', 'studio/repo', 1, ${url})`;
   const state = {
     tags: [] as string[],

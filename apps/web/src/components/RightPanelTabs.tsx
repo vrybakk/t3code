@@ -15,6 +15,8 @@ import type {
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
 import {
   Bot,
+  ListTodo,
+  ClipboardList,
   Smartphone,
   ChevronDown,
   ChevronLeft,
@@ -123,6 +125,8 @@ interface RightPanelTabsProps {
   onAddGitButler: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
+  onAddTask?: (() => void) | undefined;
+  onAddTasks?: (() => void) | undefined;
   onAddAgents: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
@@ -132,6 +136,8 @@ interface RightPanelTabsProps {
   gitButlerAvailable: boolean;
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
+  taskAvailable?: boolean | undefined;
+  tasksAvailable?: boolean | undefined;
   agentsAvailable: boolean;
   deviceAvailable: boolean;
   pullRequestStatusSeeds?: Readonly<Record<string, PullRequestTabStatusSeed>>;
@@ -330,6 +336,8 @@ function RightPanelEmptyState(props: {
   onAddGitButler: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
+  onAddTask?: (() => void) | undefined;
+  onAddTasks?: (() => void) | undefined;
   onAddAgents: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
@@ -339,6 +347,8 @@ function RightPanelEmptyState(props: {
   gitButlerAvailable: boolean;
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
+  taskAvailable?: boolean | undefined;
+  tasksAvailable?: boolean | undefined;
   agentsAvailable: boolean;
   deviceAvailable: boolean;
   liveAgentCount: number;
@@ -400,6 +410,24 @@ function RightPanelEmptyState(props: {
       available: props.pullRequestAvailable,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequest,
       onClick: props.onAddPullRequest,
+      badgeCount: 0,
+    },
+    {
+      label: "Task",
+      icon: ClipboardList,
+      shortcut: "K",
+      available: props.taskAvailable === true,
+      disabledReason: "No task is linked to this thread.",
+      onClick: () => props.onAddTask?.(),
+      badgeCount: 0,
+    },
+    {
+      label: "Linked tasks",
+      icon: ListTodo,
+      shortcut: "J",
+      available: props.tasksAvailable === true,
+      disabledReason: "Task links are not available in this environment.",
+      onClick: () => props.onAddTasks?.(),
       badgeCount: 0,
     },
     {
@@ -645,6 +673,10 @@ function surfaceTitle(
       return `#${surface.number}`;
     case "pull-requests":
       return "Pull requests";
+    case "task":
+      return surface.task.name;
+    case "tasks":
+      return "Linked tasks";
     case "agents":
       return "Agents";
     case "device":
@@ -732,6 +764,10 @@ function SurfaceIcon({
       );
     case "pull-requests":
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
+    case "task":
+      return <ClipboardList className="size-3 shrink-0" />;
+    case "tasks":
+      return <ListTodo className="size-3 shrink-0" />;
     case "agents":
       return <Bot className="size-3 shrink-0" />;
     case "device":
@@ -937,6 +973,24 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       available: props.pullRequestAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.pullRequest,
       onClick: props.onAddPullRequest,
+    },
+    {
+      label: "Task",
+      icon: ClipboardList,
+      shortcut: "K",
+      available: props.taskAvailable === true,
+      disabledReason: "No task is linked to this thread.",
+      onClick: () => props.onAddTask?.(),
+      badgeCount: 0,
+    },
+    {
+      label: "Linked tasks",
+      icon: ListTodo,
+      shortcut: "J",
+      available: props.tasksAvailable === true,
+      disabledReason: "Task links are not available in this environment.",
+      onClick: () => props.onAddTasks?.(),
+      badgeCount: 0,
     },
     {
       label: "Linked pull requests",
@@ -1444,6 +1498,10 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddGitButler={props.onAddGitButler}
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
+            onAddTask={props.onAddTask}
+            onAddTasks={props.onAddTasks}
+            taskAvailable={props.taskAvailable}
+            tasksAvailable={props.tasksAvailable}
             onAddAgents={props.onAddAgents}
             onAddDevice={props.onAddDevice}
             browserAvailable={props.browserAvailable}

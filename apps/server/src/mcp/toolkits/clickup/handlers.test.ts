@@ -1,6 +1,19 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import { ProjectCloneTracker } from "../../../project/ProjectCloneTracker.ts";
+import * as Option from "effect/Option";
+import { ServerSettingsService } from "../../../serverSettings.ts";
+import { ProjectionSnapshotQuery } from "../../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import { RepositoryIdentityResolver } from "../../../project/RepositoryIdentityResolver.ts";
 import { assert, it } from "@effect/vitest";
 import {
   ClickUpError,
+  DEFAULT_SERVER_SETTINGS,
+  ProjectId,
+  type ServerSettings,
+  type ProjectCloneSnapshot,
+  type OrchestrationProjectShell,
   EnvironmentId,
   ProviderInstanceId,
   ThreadId,
@@ -25,6 +38,10 @@ import { ClickUpToolkit } from "./tools.ts";
 
 const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
   options: {
+    resolve?: RepositoryIdentityResolver["Service"]["resolve"];
+    clones?: ReadonlyArray<ProjectCloneSnapshot>;
+    settings?: ServerSettings;
+    projects?: ReadonlyArray<OrchestrationProjectShell>;
     linked?: boolean;
     deleted?: boolean;
     userId?: number | null;
@@ -34,9 +51,10 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`CREATE TABLE projection_threads (thread_id TEXT PRIMARY KEY, deleted_at TEXT)`;
-  yield* sql`CREATE TABLE projection_thread_clickup_tasks (thread_id TEXT PRIMARY KEY, workspace_id TEXT, task_id TEXT)`;
+  yield* sql`CREATE TABLE projection_thread_clickup_tasks (thread_id TEXT, workspace_id TEXT, task_id TEXT, is_primary INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (thread_id, workspace_id, task_id))`;
   yield* sql`INSERT INTO projection_threads (thread_id, deleted_at) VALUES ('own-thread', ${options.deleted ? "2026-09-24T12:00:00.000Z" : null}), ('other-thread', NULL)`;
   yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id) VALUES ('other-thread', 'other-workspace', 'other-task')`;
+  yield* sql`INSERT INTO projection_thread_clickup_tasks VALUES ('own-thread', '42', 'context-task', 0)`;
   if (options.linked !== false)
     yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id) VALUES ('own-thread', '42', 'own-task')`;
   const calls = {
@@ -48,6 +66,26 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
   };
   const userId = options.userId === undefined ? 73 : options.userId;
   const baseDependencies = Layer.mergeAll(
+    Layer.mock(ProjectCloneTracker)({ stream: Stream.succeed(options.clones ?? []) }),
+    Layer.mock(ServerSettingsService)({
+      getSettings: Effect.sync(() => options.settings ?? DEFAULT_SERVER_SETTINGS),
+    }),
+    Layer.mock(RepositoryIdentityResolver)({
+      resolve: options.resolve ?? (() => Effect.succeed(null)),
+    }),
+    Layer.mock(ProjectionSnapshotQuery)({
+      getProjectShells: () => Effect.succeed(options.projects ?? []),
+      getThreadRuntimeContext: (id) =>
+        Effect.succeed(
+          Option.some({
+            id,
+            projectId: ProjectId.make("manual"),
+            title: "Task",
+            titleState: null,
+            session: null,
+          }),
+        ),
+    }),
     Layer.succeed(ClickUpApi, {
       request: (path) =>
         Effect.sync(() => {
@@ -106,6 +144,10 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
               status: "open",
               listName: "Sprint",
               description: "Current requirements",
+              sources: [
+                { kind: "list", id: "list", name: "Sprint" },
+                { kind: "space", id: "space", name: "Studio" },
+              ],
             },
             comments: [],
             commentsMayHaveMore: false,
@@ -318,5 +360,157 @@ for (const options of [{ linked: false }, { deleted: true }]) {
         assert.deepEqual(harness.calls.requests, []);
         assert.equal(harness.calls.accountReads, 0);
       }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+  );
+}
+
+it.effect(
+  "supplies current model preferences and scoped repositories through the workflow tool",
+  () =>
+    Effect.gen(function* () {
+      const project = (id: string): OrchestrationProjectShell => ({
+        id: ProjectId.make(id),
+        title: id,
+        workspaceRoot: `/workspace/${id}`,
+        defaultModelSelection: null,
+        scripts: [],
+        createdAt: "2026-09-28T00:00:00.000Z",
+        updatedAt: "2026-09-28T00:00:00.000Z",
+      });
+      const settings = {
+        ...DEFAULT_SERVER_SETTINGS,
+        clickUpWorkflowModels: {
+          research: {
+            instanceId: ProviderInstanceId.make("codex"),
+            model: "research-model",
+            options: [{ id: "reasoningEffort", value: "high" }],
+          },
+          implementation: { instanceId: ProviderInstanceId.make("codex"), model: "legacy-model" },
+          review: { instanceId: ProviderInstanceId.make("claude-code"), model: "review-model" },
+        },
+        clickUpProjectMappings: {
+          "42:list::list": [ProjectId.make("mapped")],
+          "42:space::space": [ProjectId.make("unrelated")],
+        },
+      };
+      const projects = [project("manual"), project("mapped"), project("unrelated")];
+      const harness = yield* makeHarness({ settings, projects });
+      const result = yield* harness.call("get_studio_task_workflow", { mode: "implement" });
+      assert.include(result.instructions, '"research"');
+      assert.include(result.instructions, '"model":"research-model"');
+      assert.include(result.instructions, '"value":"high"');
+      assert.include(result.instructions, '"instanceId":"claude-code"');
+      assert.include(result.instructions, '"model":"review-model"');
+      assert.notInclude(result.instructions, "legacy-model");
+      assert.include(result.instructions, "/workspace/mapped");
+      assert.include(result.instructions, "/workspace/manual");
+      assert.notInclude(result.instructions, "/workspace/unrelated");
+      settings.clickUpWorkflowModels.research.model = "updated-model";
+      const refreshed = yield* harness.call("get_studio_task_workflow", { mode: "implement" });
+      assert.include(refreshed.instructions, "updated-model");
+      assert.notInclude(refreshed.instructions, "research-model");
+      projects.splice(1, 1);
+      const missing = yield* harness.call("get_studio_task_workflow", { mode: "implement" });
+      assert.include(missing.instructions, 'Unavailable linked workspaces: ["mapped"]');
+      assert.notInclude(missing.instructions, "/workspace/mapped");
+    }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect(
+  "includes verified child checkouts and reports missing links without exposing unrelated paths",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped().pipe(Effect.flatMap(fs.realPath));
+      const child = path.join(root, "culture-queer");
+      yield* fs.makeDirectory(path.join(child, ".git"), { recursive: true });
+      const remoteUrl = "https://github.com/company/site";
+      const clones: ProjectCloneSnapshot[] = [];
+      const harness = yield* makeHarness({
+        clones,
+        settings: {
+          ...DEFAULT_SERVER_SETTINGS,
+          clickUpProjectMappings: { "42:list::list": [ProjectId.make("parent")] },
+          clickUpRepositoryMappings: {
+            "42:list::list": [{ remoteUrl }, { remoteUrl: "https://github.com/company/missing" }],
+          },
+        },
+        projects: [
+          {
+            id: ProjectId.make("parent"),
+            title: "Parent",
+            workspaceRoot: root,
+            defaultModelSelection: null,
+            scripts: [],
+            createdAt: "2026-09-28T00:00:00.000Z",
+            updatedAt: "2026-09-28T00:00:00.000Z",
+          },
+        ],
+        resolve: (cwd) =>
+          Effect.succeed(
+            cwd === child
+              ? {
+                  canonicalKey: "github.com/company/site",
+                  rootPath: cwd,
+                  locator: { source: "git-remote", remoteName: "origin", remoteUrl },
+                }
+              : null,
+          ),
+      });
+      const result = yield* harness.call("get_studio_task_workflow", { mode: "implement" });
+      assert.include(result.instructions, child);
+      assert.include(
+        result.instructions,
+        'Unavailable repository links: [{"remoteUrl":"https://github.com/company/missing"}]',
+      );
+      assert.notInclude(
+        result.instructions,
+        'Unavailable repository links: [{"remoteUrl":"https://github.com/company/site"}',
+      );
+      for (const phase of ["running", "failed", "cancelled"] as const) {
+        clones.splice(0, clones.length, {
+          projectId: ProjectId.make("child"),
+          remoteUrl,
+          destinationPath: child,
+          repository: null,
+          phase,
+          stage: "receiving",
+          percent: null,
+          detail: null,
+          error: null,
+          startedAt: "2026-09-28T00:00:00.000Z",
+          endedAt: null,
+          sequence: 1,
+        });
+        const unavailable = yield* harness.call("get_studio_task_workflow", { mode: "implement" });
+        assert.notInclude(unavailable.instructions, child);
+        assert.include(
+          unavailable.instructions,
+          'Unavailable repository links: [{"remoteUrl":"https://github.com/company/site"}',
+        );
+      }
+      clones[0] = { ...clones[0]!, projectId: ProjectId.make("parent") };
+      const unavailableRoot = yield* harness.call("get_studio_task_workflow", {
+        mode: "implement",
+      });
+      assert.notInclude(unavailableRoot.instructions, root);
+      assert.include(unavailableRoot.instructions, 'Unavailable linked workspaces: ["parent"]');
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(NodeSqliteClient.layer({ filename: ":memory:" }), NodeServices.layer),
+      ),
+    ),
+);
+for (const options of [{ linked: false }, { deleted: true }]) {
+  it.effect("does not reveal workflow setup without an active linked thread", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness(options);
+      const error = yield* harness
+        .call("get_studio_task_workflow", { mode: "implement" })
+        .pipe(Effect.flip);
+      assert.equal(error._tag, "ClickUpError");
+      assert.equal(harness.calls.reads.length, 0);
+    }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
 }

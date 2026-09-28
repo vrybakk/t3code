@@ -1018,3 +1018,12 @@ it("validates remote device hosts and rejects ambiguous host ids", () => {
   ).toThrow();
   expect(() => decodeDeviceHostSettings({ deviceHosts: [{ ...host, port: 0 }] })).toThrow();
 });
+
+it("defaults GitButler integration on and preserves an explicit off value", () => {
+  expect(decodeServerSettings({}).enableGitButler).toBe(true);
+  const saved = JSON.parse(
+    JSON.stringify(encodeServerSettings(decodeServerSettings({ enableGitButler: false }))),
+  );
+  expect(decodeServerSettings(saved).enableGitButler).toBe(false);
+  expect(decodeServerSettingsPatch({ enableGitButler: false })).toEqual({ enableGitButler: false });
+});

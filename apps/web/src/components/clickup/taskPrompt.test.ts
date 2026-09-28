@@ -16,9 +16,7 @@ describe("ClickUp task context", () => {
       commentsMayHaveMore: true,
       attachments: [{ name: "Recording", url: "https://attachments.example.test/video.mp4" }],
     });
-    expect(prompt).toContain("$studio-task-workflow Start task abc: Checkout fix");
-    expect(prompt).toContain('mode "implement"');
-    expect(prompt).toContain("get_linked_clickup_task");
+    expect(prompt).toBe("$studio-task-workflow Start task: Checkout fix");
     expect(prompt).not.toContain("Handle an empty cart.");
     expect(prompt).not.toContain("Verify the mobile layout.");
     expect(prompt).not.toContain("attachments.example.test");
