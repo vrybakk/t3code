@@ -1,3 +1,7 @@
+import { ProjectCloneTracker } from "../../../project/ProjectCloneTracker.ts";
+import { ServerSettingsService } from "../../../serverSettings.ts";
+import { ProjectionSnapshotQuery } from "../../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import { RepositoryIdentityResolver } from "../../../project/RepositoryIdentityResolver.ts";
 import {
   ClickUpError,
   ClickUpHandoff,
@@ -88,7 +92,7 @@ const CompleteEstimation = Tool.make("complete_clickup_estimation", {
 
 const StudioWorkflow = Tool.make("get_studio_task_workflow", {
   description:
-    "Read the app-shipped studio workflow for this linked task. Read at every run or resume; follow the returned mode instructions.",
+    "Read the app-shipped studio workflow for this linked task. Read at every run or resume; follow the returned mode instructions, current model preferences and repository candidates.",
   parameters: Schema.Struct({ mode: Schema.Literals(["requirements", "estimate", "implement"]) }),
   success: Schema.Struct({
     version: Schema.String,
@@ -96,7 +100,13 @@ const StudioWorkflow = Tool.make("get_studio_task_workflow", {
     instructions: Schema.String,
   }),
   failure,
-  dependencies,
+  dependencies: [
+    ...dependencies,
+    ServerSettingsService,
+    ProjectionSnapshotQuery,
+    RepositoryIdentityResolver,
+    ProjectCloneTracker,
+  ],
 })
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Idempotent, true);

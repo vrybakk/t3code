@@ -25,7 +25,7 @@ export function ClickUpWorkflowSettings({ environmentId }: { environmentId: Envi
     try {
       const result = await update({
         environmentId,
-        input: { patch: { clickUpWorkflowModels: draft } },
+        input: { patch: { clickUpWorkflowModels: { ...draft, implementation: null } } },
       });
       if (result._tag === "Success") setDraft(null);
       else {
@@ -46,7 +46,8 @@ export function ClickUpWorkflowSettings({ environmentId }: { environmentId: Envi
     <div className="space-y-3 rounded-lg border border-border p-4">
       <h3 className="text-sm font-medium">Task workflow models</h3>
       <p className="text-xs text-muted-foreground">
-        Defaults for this environment. Developers can override them when preparing a task thread.
+        Research and review models for all tasks in this environment. Choose the implementation
+        model in the task's thread.
       </p>
       <ClickUpWorkflowModelPicker
         environmentId={environmentId}

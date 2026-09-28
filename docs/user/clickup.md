@@ -39,8 +39,11 @@ Use **Link repositories** in a task’s **Linked work** section to connect its P
 source List, Folder, or Space to one or more local repositories. A shared API repository can
 belong to several mappings. Mappings are saved on the selected environment. The first match
 wins: Project field, List, Folder, then Space; removing a mapping restores the broader fallback.
-The repository picker suggests the linked repositories; **Show all repositories** allows a manual
-choice. Project badges use the ClickUp Project-field color when available.
+The repository picker preselects a linked repository and remembers your choice for tasks in the
+same ClickUp project or location on this client. Without a mapping, it suggests an exact name
+match or the first available project. Review the selection before preparing the thread;
+**Show all repositories** allows a manual choice. Project badges use the ClickUp Project-field
+color when available.
 
 Linked repositories appear with their local paths even before you create a thread. The mapping
 editor suggests an exact repository-name match when there is only one match. Save the selection
@@ -52,6 +55,9 @@ destination folder before downloading. Nerd remembers the location and waits for
 to finish before preparing task work. Reopen existing mappings and save their links once to
 retain their repository URLs too. Mappings belong to the selected environment; other developers'
 computers are not configured automatically.
+If a linked workspace contains existing repository folders, Nerd checks their remotes before
+offering a download. Tasks started from such a parent folder use a local thread with those
+repository paths in the prepared request.
 
 Use **Check requirements** or **Estimate task** from the sprint table or task page to run
 background analysis with your environment's default text-generation model. Results appear in
@@ -70,10 +76,10 @@ Unclear requirements need clarification first. If tag removal fails, the saved e
 
 Use **Start task**, choose a repository and select **Prepare thread** to create a linked draft
 with the studio workflow skill and task reference. Review the model and permissions, then send
-it to begin. The agent loads the current task through its link. Configure research,
-implementation, and review model defaults in **Settings → Integrations → ClickUp**, or override
-them for one launch. An unset role uses the thread's model. If a provider cannot use a requested
-model, the agent asks how to continue.
+it to begin. The agent loads the current task through its link. Configure research and review
+models for all tasks in **Settings → Integrations → ClickUp**. An unset role uses the thread's
+model. Implementation always uses the model selected in the thread. If a provider cannot use a
+requested model, the agent asks how to continue.
 
 **Start task** coordinates the linked repositories, moves the task to In Progress when coding
 starts, verifies the result, and requests an independent review. It fixes findings before preparing

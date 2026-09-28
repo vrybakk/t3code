@@ -1113,6 +1113,11 @@ export function createServerEnvironmentAtoms<R, E>(
       staleTimeMs: 5_000,
       refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
     }),
+    clickUpLocalRepositories: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:clickup:clickUpLocalRepositories",
+      tag: WS_METHODS.clickUpLocalRepositories,
+      staleTimeMs: 30_000,
+    }),
     clickUpAnalyzeTask: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:clickup:clickUpAnalyzeTask",
       tag: WS_METHODS.clickUpAnalyzeTask,
