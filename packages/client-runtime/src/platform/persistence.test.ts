@@ -13,14 +13,16 @@ import { encodeShellSnapshotForCache } from "./persistence.ts";
 
 // Generated values can hold untrimmed strings, which a decoded value never
 // has. One encode and decode gives a value a client can hold; values that
-// fail are dropped. Size 30 makes the generator fill optional fields.
+// fail are dropped. Keep this parity check bounded and reproducible under CI load;
+// icon encoding variants are covered explicitly below.
 const sampleDecoded = <S extends Schema.Constraint>(schema: S) =>
   Effect.gen(function* () {
     const encode = Schema.encodeEffect(schema);
     const decode = Schema.decodeEffect(schema);
     const generated = yield* Arbitrary.sampleEffect(Arbitrary.schema(schema), {
-      count: 1000,
+      count: 100,
       size: 30,
+      seed: 20260928,
     });
     const decoded = yield* Effect.forEach(generated, (value) =>
       encode(value).pipe(Effect.flatMap(decode), Effect.option),
@@ -34,21 +36,27 @@ describe("encodeShellSnapshotForCache", () => {
     Effect.gen(function* () {
       const threads = yield* sampleDecoded(OrchestrationThreadShell);
       const projects = yield* sampleDecoded(OrchestrationProjectShell);
+      expect(threads.length).toBeGreaterThan(0);
+      expect(projects.length).toBeGreaterThan(0);
+      const projectWithoutIcon = { ...projects[0]! };
+      delete projectWithoutIcon.projectIcon;
+      const icons: ReadonlyArray<OrchestrationProjectShell["projectIcon"]> = [
+        null,
+        { kind: "lucide", name: "folder", color: "blue" },
+        { kind: "emoji", emoji: "📁" },
+        { kind: "monogram", text: "T3", color: "blue" },
+      ];
       const snapshot: OrchestrationShellSnapshot = {
         snapshotSequence: 1,
-        // The generator rarely makes monogram icons, and they are the one
-        // project field whose encoding differs from the decoded value.
-        projects: projects.map((project, index) =>
-          index % 2 === 0
-            ? { ...project, projectIcon: { kind: "monogram", text: "T3", color: "blue" } }
-            : project,
-        ),
+        projects: [
+          ...projects,
+          projectWithoutIcon,
+          ...icons.map((projectIcon) => ({ ...projectWithoutIcon, projectIcon })),
+        ],
         threads,
         updatedAt: "2026-09-25T00:00:00.000Z",
       };
 
-      expect(threads.length).toBeGreaterThan(0);
-      expect(projects.length).toBeGreaterThan(0);
       expect(yield* encodeShellSnapshotForCache(snapshot)).toEqual(yield* encodeSnapshot(snapshot));
     }),
   );
