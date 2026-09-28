@@ -35,7 +35,9 @@ describe("GitButler discovery settings", () => {
     ["incompatible", "0.21.9", "Update required"],
     ["error", null, "Check failed"],
   ] as const)("renders the %s state", (status, version, expected) => {
-    const text = renderText(<GitButlerDiscoveryRow item={item(status, version)} />);
+    const text = renderText(
+      <GitButlerDiscoveryRow item={item(status, version)} enabled control={null} />,
+    );
 
     expect(text).toContain(expected);
   });
