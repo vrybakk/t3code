@@ -27,7 +27,7 @@ const make = Effect.gen(function* () {
       SELECT tasks.workspace_id AS "workspaceId", tasks.task_id AS "taskId"
       FROM projection_thread_clickup_tasks AS tasks
       JOIN projection_threads AS threads ON threads.thread_id = tasks.thread_id
-      WHERE tasks.thread_id = ${scope.threadId} AND threads.deleted_at IS NULL
+      WHERE tasks.thread_id = ${scope.threadId} AND tasks.is_primary = 1 AND threads.deleted_at IS NULL
     `.pipe(
       Effect.mapError(
         () => new ClickUpError({ message: "Could not read this thread's linked ClickUp task." }),

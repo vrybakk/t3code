@@ -1,4 +1,4 @@
-import { ClickUpTaskReference } from "./clickup.ts";
+import { ClickUpTaskReference, ThreadClickUpTaskLink } from "./clickup.ts";
 import { PROVIDER_SEND_TURN_MAX_VIDEO_BYTES, isFileAttachmentWithinSizeLimit } from "./video.ts";
 export { PROVIDER_SEND_TURN_MAX_FILE_BYTES } from "./video.ts";
 import * as Effect from "effect/Effect";
@@ -805,6 +805,7 @@ export const OrchestrationThread = Schema.Struct({
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   // Optional so payloads from pre-link servers still decode.
+  clickUpTasks: Schema.optionalKey(Schema.Array(ThreadClickUpTaskLink)),
   pullRequests: Schema.Array(ThreadPullRequestLink).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
@@ -895,6 +896,7 @@ export const OrchestrationThreadShell = Schema.Struct({
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+  clickUpTasks: Schema.optionalKey(Schema.Array(ThreadClickUpTaskLink)),
   pullRequests: Schema.Array(ThreadPullRequestLink).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
@@ -1260,6 +1262,20 @@ const ThreadMetaUpdateCommand = Schema.Struct({
   ),
 );
 
+const ThreadTaskLinkCommand = Schema.Struct({
+  type: Schema.Literal("thread.task.link"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  task: ClickUpTaskReference,
+});
+const ThreadTaskUnlinkCommand = Schema.Struct({
+  type: Schema.Literal("thread.task.unlink"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  workspaceId: ClickUpTaskReference.fields.workspaceId,
+  taskId: ClickUpTaskReference.fields.taskId,
+});
+
 const ThreadPullRequestLinkCommand = Schema.Struct({
   type: Schema.Literal("thread.pull-request.link"),
   commandId: CommandId,
@@ -1446,6 +1462,8 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadAutoSettleSetCommand,
   ThreadActiveReorderCommand,
   ThreadMetaUpdateCommand,
+  ThreadTaskLinkCommand,
+  ThreadTaskUnlinkCommand,
   ThreadPullRequestLinkCommand,
   ThreadPullRequestUnlinkCommand,
   ThreadRuntimeModeSetCommand,
@@ -1480,6 +1498,8 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadAutoSettleSetCommand,
   ThreadActiveReorderCommand,
   ThreadMetaUpdateCommand,
+  ThreadTaskLinkCommand,
+  ThreadTaskUnlinkCommand,
   ThreadPullRequestLinkCommand,
   ThreadPullRequestUnlinkCommand,
   ThreadRuntimeModeSetCommand,
@@ -1708,6 +1728,8 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.pin-reordered",
   "thread.auto-settle-set",
   "thread.meta-updated",
+  "thread.task-linked",
+  "thread.task-unlinked",
   "thread.pull-request-linked",
   "thread.pull-request-unlinked",
   "thread.pull-request-synced",
@@ -1874,6 +1896,18 @@ export const ThreadMetaUpdatedPayload = Schema.Struct({
   // thread.pull-request-linked still decode and replay into the link table.
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   branchPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+  updatedAt: IsoDateTime,
+});
+
+export const ThreadTaskLinkedPayload = Schema.Struct({
+  threadId: ThreadId,
+  link: ThreadClickUpTaskLink,
+  updatedAt: IsoDateTime,
+});
+export const ThreadTaskUnlinkedPayload = Schema.Struct({
+  threadId: ThreadId,
+  workspaceId: ClickUpTaskReference.fields.workspaceId,
+  taskId: ClickUpTaskReference.fields.taskId,
   updatedAt: IsoDateTime,
 });
 
@@ -2126,6 +2160,16 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.meta-updated"),
     payload: ThreadMetaUpdatedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.task-linked"),
+    payload: ThreadTaskLinkedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.task-unlinked"),
+    payload: ThreadTaskUnlinkedPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

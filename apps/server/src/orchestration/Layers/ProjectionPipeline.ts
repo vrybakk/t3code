@@ -611,8 +611,8 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           );
           if (event.payload.clickUpTask) {
             const task = event.payload.clickUpTask;
-            yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id, name)
-              VALUES (${event.payload.threadId}, ${task.workspaceId}, ${task.taskId}, ${task.name})`.pipe(
+            yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id, name, is_primary)
+              VALUES (${event.payload.threadId}, ${task.workspaceId}, ${task.taskId}, ${task.name}, 1)`.pipe(
               Effect.mapError(toPersistenceSqlError("ClickUpThreadTasks.insert")),
             );
           }
@@ -881,6 +881,32 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
               });
             }
           }
+          return;
+        }
+
+        case "thread.task-linked":
+        case "thread.task-unlinked": {
+          const row = yield* projectionThreadRepository.getById({
+            threadId: event.payload.threadId,
+          });
+          if (Option.isNone(row)) return;
+          if (event.type === "thread.task-linked") {
+            const task = event.payload.link;
+            yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id, name, is_primary)
+              VALUES (${event.payload.threadId}, ${task.workspaceId}, ${task.taskId}, ${task.name}, ${task.primary ? 1 : 0})
+              ON CONFLICT(thread_id, workspace_id, task_id) DO UPDATE SET name = excluded.name`.pipe(
+              Effect.mapError(toPersistenceSqlError("ThreadTasks.link")),
+            );
+          } else {
+            yield* sql`DELETE FROM projection_thread_clickup_tasks WHERE thread_id = ${event.payload.threadId}
+              AND workspace_id = ${event.payload.workspaceId} AND task_id = ${event.payload.taskId} AND is_primary = 0`.pipe(
+              Effect.mapError(toPersistenceSqlError("ThreadTasks.unlink")),
+            );
+          }
+          yield* projectionThreadRepository.upsert({
+            ...row.value,
+            updatedAt: event.payload.updatedAt,
+          });
           return;
         }
 

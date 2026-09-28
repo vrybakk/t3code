@@ -183,7 +183,8 @@ export const layer = Layer.effect(
 
     const threads = Effect.fn("ClickUpTasks.threads")(function* (input: ClickUpTaskInput) {
       const rows = yield* sql`
-      SELECT threads.thread_id AS "threadId", threads.project_id AS "projectId", threads.title
+      SELECT threads.thread_id AS "threadId", threads.project_id AS "projectId", threads.title,
+        CASE WHEN tasks.is_primary = 1 THEN 'primary' ELSE 'context' END AS role
       FROM projection_thread_clickup_tasks AS tasks
       JOIN projection_threads AS threads ON threads.thread_id = tasks.thread_id
       WHERE tasks.workspace_id = ${input.workspaceId} AND tasks.task_id = ${input.taskId}

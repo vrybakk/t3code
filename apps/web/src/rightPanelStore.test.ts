@@ -993,3 +993,15 @@ describe("rightPanelStore", () => {
     ).toEqual(["terminal:term-1", "browser:tab-b", "browser:tab-c"]);
   });
 });
+
+it("keeps task tabs distinct by workspace and scoped to a thread", () => {
+  const store = useRightPanelStore.getState();
+  store.openTask(refA, { workspaceId: "42", taskId: "task", name: "Original" });
+  store.openTask(refA, { workspaceId: "42", taskId: "task", name: "Renamed" });
+  store.openTask(refA, { workspaceId: "43", taskId: "task", name: "Other workspace" });
+  store.open(refA, "tasks");
+  const state = useRightPanelStore.getState();
+  expect(selectThreadRightPanelState(state.byThreadKey, refA).surfaces).toHaveLength(3);
+  expect(selectThreadRightPanelState(state.byThreadKey, refB).surfaces).toEqual([]);
+  expect(migratePersistedRightPanelState(state).byThreadKey).toEqual(state.byThreadKey);
+});

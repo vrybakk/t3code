@@ -1057,6 +1057,54 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       };
     }
 
+    case "thread.task.link":
+    case "thread.task.unlink": {
+      const thread = yield* requireThread({ readModel, command, threadId: command.threadId });
+      const key = command.type === "thread.task.link" ? command.task : command;
+      const existing = (thread.clickUpTasks ?? []).find(
+        (task) => task.workspaceId === key.workspaceId && task.taskId === key.taskId,
+      );
+      const detail =
+        command.type === "thread.task.link"
+          ? existing
+            ? "This task is already linked."
+            : null
+          : !existing
+            ? "This task is not linked."
+            : existing.primary
+              ? "The original workflow task cannot be removed. Additional task links can be removed."
+              : null;
+      if (detail)
+        return yield* new OrchestrationCommandInvariantError({ commandType: command.type, detail });
+      const occurredAt = yield* nowIso;
+      const base = yield* withEventBase({
+        aggregateKind: "thread",
+        aggregateId: command.threadId,
+        occurredAt,
+        commandId: command.commandId,
+      });
+      return command.type === "thread.task.link"
+        ? {
+            ...base,
+            type: "thread.task-linked",
+            payload: {
+              threadId: command.threadId,
+              link: { ...command.task, primary: false },
+              updatedAt: occurredAt,
+            },
+          }
+        : {
+            ...base,
+            type: "thread.task-unlinked",
+            payload: {
+              threadId: command.threadId,
+              workspaceId: command.workspaceId,
+              taskId: command.taskId,
+              updatedAt: occurredAt,
+            },
+          };
+    }
+
     case "thread.pull-request.link": {
       const thread = yield* requireThread({
         readModel,

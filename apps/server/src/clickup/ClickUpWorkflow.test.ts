@@ -184,7 +184,7 @@ it.effect("collects reviewed PRs across repositories but excludes other tasks", 
     const apiUrl = "https://github.com/studio/api/pull/2";
     const foreignUrl = "https://github.com/studio/other/pull/3";
     yield* sql`INSERT INTO projection_threads VALUES ('api-thread', 'api-project', NULL), ('foreign-thread', 'foreign-project', NULL)`;
-    yield* sql`INSERT INTO projection_thread_clickup_tasks VALUES ('api-thread', 'task', '42'), ('foreign-thread', 'other-task', '42')`;
+    yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, task_id, workspace_id) VALUES ('api-thread', 'task', '42'), ('foreign-thread', 'other-task', '42')`;
     yield* sql`INSERT INTO projection_thread_pull_requests VALUES ('api-thread', 'github.com', 'studio/api', 2, ${apiUrl}), ('foreign-thread', 'github.com', 'studio/other', 3, ${foreignUrl})`;
     const handoff = yield* service.prepare(task, threadId, {
       ...input,
@@ -203,5 +203,15 @@ it.effect("collects reviewed PRs across repositories but excludes other tasks", 
       ))._tag,
       "Failure",
     );
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("does not attribute a thread's implementation PRs to a context task", () =>
+  Effect.gen(function* () {
+    const { service, sql, state } = yield* harness();
+    yield* sql`UPDATE projection_thread_clickup_tasks SET is_primary = 0`;
+    assert.equal((yield* Effect.result(service.prepare(task, threadId, input)))._tag, "Failure");
+    assert.deepEqual(state.writes, []);
+    assert.deepEqual(state.comments, []);
   }).pipe(Effect.provide(database)),
 );

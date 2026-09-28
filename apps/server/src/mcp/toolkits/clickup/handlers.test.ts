@@ -51,9 +51,10 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`CREATE TABLE projection_threads (thread_id TEXT PRIMARY KEY, deleted_at TEXT)`;
-  yield* sql`CREATE TABLE projection_thread_clickup_tasks (thread_id TEXT PRIMARY KEY, workspace_id TEXT, task_id TEXT)`;
+  yield* sql`CREATE TABLE projection_thread_clickup_tasks (thread_id TEXT, workspace_id TEXT, task_id TEXT, is_primary INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (thread_id, workspace_id, task_id))`;
   yield* sql`INSERT INTO projection_threads (thread_id, deleted_at) VALUES ('own-thread', ${options.deleted ? "2026-09-24T12:00:00.000Z" : null}), ('other-thread', NULL)`;
   yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id) VALUES ('other-thread', 'other-workspace', 'other-task')`;
+  yield* sql`INSERT INTO projection_thread_clickup_tasks VALUES ('own-thread', '42', 'context-task', 0)`;
   if (options.linked !== false)
     yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id) VALUES ('own-thread', '42', 'own-task')`;
   const calls = {
