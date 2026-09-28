@@ -24,6 +24,7 @@ it.layer(NodeSqliteClient.layer({ filename: ":memory:" }))(
           assert.deepEqual(yield* runMigrations(), [
             [58, "ProjectionThreadsAutoSettleDisabledAt"],
             [59, "ThreadTaskLinks"],
+            [60, "ClickUpTimeExports"],
           ]);
           assert.deepEqual(
             yield* sql`SELECT migration_id, name FROM effect_sql_migrations WHERE migration_id <= 57 ORDER BY migration_id`,
@@ -57,6 +58,7 @@ it.layer(NodeSqliteClient.layer({ filename: ":memory:" }))(
             [57, "ClickUpWorkflow"],
             [58, "ProjectionThreadsAutoSettleDisabledAt"],
             [59, "ThreadTaskLinks"],
+            [60, "ClickUpTimeExports"],
           ]);
           assert.deepEqual(
             yield* sql`SELECT name FROM effect_sql_migrations WHERE migration_id = 54`,

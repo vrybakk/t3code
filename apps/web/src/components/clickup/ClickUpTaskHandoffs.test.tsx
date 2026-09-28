@@ -23,6 +23,7 @@ vi.mock("@tanstack/react-router", () => ({ Link: "a" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/badge", () => ({ Badge: "span" }));
 vi.mock("../ui/checkbox", () => ({ Checkbox: "input" }));
+vi.mock("./ClickUpTimeSync", () => ({ ClickUpTimeSync: () => null }));
 import { ClickUpTaskHandoffs } from "./ClickUpTaskHandoffs";
 
 const handoff: ClickUpHandoff = {
