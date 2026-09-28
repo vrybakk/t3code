@@ -1117,12 +1117,21 @@ export const DesktopPreviewAutomationWaitForInputSchema = Schema.Struct({
 export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
+export const DesktopKeepAwakeState = Schema.Struct({
+  enabled: Schema.Boolean,
+  error: Schema.NullOr(Schema.String),
+});
+export type DesktopKeepAwakeState = typeof DesktopKeepAwakeState.Type;
+
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
   /** Absolute path of a dropped or picked file; absent on desktop builds predating it. */
   getPathForFile?: (file: File) => string;
   /** The desktop client's OS platform, read from Electron's preload process. */
   getClientPlatform?: () => string;
+  getKeepAwakeState?: () => Promise<DesktopKeepAwakeState>;
+  setKeepAwakeEnabled?: (enabled: boolean) => Promise<DesktopKeepAwakeState>;
+  onKeepAwakeState?: (listener: (state: DesktopKeepAwakeState) => void) => () => void;
   setNotificationBadge?: (badge: { count: number; image: string | null }) => Promise<void>;
   onNotificationBadgeClear?: (listener: () => void) => () => void;
   onTrackpadScrollEnd?: (listener: () => void) => () => void;
