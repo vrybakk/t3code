@@ -54,10 +54,10 @@ export function DesktopKeepAwakeToggle({ onBackdrop }: { onBackdrop: boolean }) 
           <Button
             aria-label={label}
             aria-pressed={enabled}
-            className="relative top-auto z-10 translate-y-0"
+            className="relative top-auto z-10 ml-auto translate-y-0 md:mr-3"
             disabled={!state || pending}
-            size="icon-sm"
-            variant={enabled ? "secondary" : onBackdrop ? "media-navigation" : "ghost"}
+            size="compact"
+            variant={enabled ? "default" : onBackdrop ? "media-navigation" : "ghost"}
             onClick={() => {
               setPending(true);
               void bridge.setKeepAwakeEnabled!(!enabled)
@@ -68,6 +68,9 @@ export function DesktopKeepAwakeToggle({ onBackdrop }: { onBackdrop: boolean }) 
             }}
           >
             <CoffeeIcon />
+            <span className="min-w-[3ch] text-center">
+              {state ? (enabled ? "On" : "Off") : "…"}
+            </span>
           </Button>
         }
       />
