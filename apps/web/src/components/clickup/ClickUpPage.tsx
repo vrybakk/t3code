@@ -59,7 +59,10 @@ function TasksHeader({
   const navigate = useNavigate({ from: "/tasks" });
   const { environments } = useEnvironments();
   return (
-    <WorkspacePageHeader electron={isElectron} className="border-b border-border">
+    <WorkspacePageHeader
+      electron={isElectron}
+      className="h-auto flex-wrap border-b border-border py-1"
+    >
       {search.taskId ? (
         <Link
           to="/tasks"
@@ -75,9 +78,9 @@ function TasksHeader({
         <span className="truncate text-xs text-muted-foreground">/ {search.taskId}</span>
       )}
       {controls}
-      <div className="ml-auto flex min-w-0 items-center gap-3">
+      <div className="ml-auto flex min-w-0 flex-wrap items-center gap-3">
         {actions}
-        <div className="w-52 max-w-[40vw]">
+        <div className="w-52 min-w-36 max-w-[40vw] shrink-0">
           <Select
             value={environmentId ?? null}
             onValueChange={(value) => {
@@ -118,7 +121,7 @@ function ConnectedTasks({ environmentId }: { environmentId: EnvironmentId }) {
         controls={
           !search.taskId && (
             <>
-              <div className="w-48 min-w-0">
+              <div className="w-48 shrink-0">
                 <Select
                   value={workspaceId ?? null}
                   onValueChange={(value) => {
