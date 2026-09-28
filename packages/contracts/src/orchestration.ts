@@ -1150,6 +1150,19 @@ const ThreadArchiveCommand = Schema.Struct({
   threadId: ThreadId,
 });
 
+const ThreadTaskAutoArchiveCommand = Schema.Struct({
+  type: Schema.Literal("thread.task.auto-archive"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  snapshotSequence: NonNegativeInt,
+  tasks: Schema.Array(
+    Schema.Struct({
+      workspaceId: TrimmedNonEmptyString,
+      taskId: TrimmedNonEmptyString,
+    }),
+  ),
+});
+
 const ThreadUnarchiveCommand = Schema.Struct({
   type: Schema.Literal("thread.unarchive"),
   commandId: CommandId,
@@ -1683,6 +1696,7 @@ const ThreadPullRequestLinkSyncCommand = Schema.Struct({
 });
 
 const InternalOrchestrationCommand = Schema.Union([
+  ThreadTaskAutoArchiveCommand,
   ThreadAutoSettleCommand,
   ThreadPullRequestSyncCommand,
   ThreadPullRequestLinkSyncCommand,

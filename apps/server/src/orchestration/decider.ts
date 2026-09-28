@@ -433,13 +433,35 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       };
     }
 
-    case "thread.archive": {
-      yield* requireThreadNotArchived({
+    case "thread.archive":
+    case "thread.task.auto-archive": {
+      const thread = yield* requireThreadNotArchived({
         readModel,
         command,
         threadId: command.threadId,
       });
       const occurredAt = yield* nowIso;
+      if (command.type === "thread.task.auto-archive") {
+        const links = thread.clickUpTasks ?? [];
+        if (
+          links.length === 0 ||
+          links.length !== command.tasks.length ||
+          !links.every((link) =>
+            command.tasks.some(
+              (task) => task.workspaceId === link.workspaceId && task.taskId === link.taskId,
+            ),
+          ) ||
+          thread.session?.status === "starting" ||
+          thread.session?.status === "running" ||
+          openRequests(thread).size > 0 ||
+          hasQueuedTurnStartForThread(thread, occurredAt)
+        ) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `thread ${command.threadId} is not idle with exactly the completed tasks linked`,
+          });
+        }
+      }
       return {
         ...(yield* withEventBase({
           aggregateKind: "thread",

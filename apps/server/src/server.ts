@@ -1,5 +1,7 @@
 import * as ClickUpTimeSync from "./clickup/ClickUpTimeSync.ts";
+import * as ClickUpTaskEstimation from "./clickup/ClickUpTaskEstimation.ts";
 import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
+import * as ClickUpTaskArchiver from "./clickup/ClickUpTaskArchiver.ts";
 import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpWorkflowStore from "./clickup/ClickUpWorkflowStore.ts";
 import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
@@ -604,6 +606,7 @@ const commandReadinessLayer = HttpRouter.middleware(
 );
 
 export const makeRoutesLayer = Layer.mergeAll(
+  ClickUpTaskArchiver.layer,
   Layer.mergeAll(
     HttpApiBuilder.layer(EnvironmentHttpApi).pipe(
       Layer.provide(authHttpApiLayer),
@@ -627,7 +630,14 @@ export const makeRoutesLayer = Layer.mergeAll(
 ).pipe(
   // Both transports consume the same service instance, so caches single-flight across clients
   // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
-  Layer.provide(ClickUpTaskAnalysis.layer.pipe(Layer.provide(TextGenerationLayerLive))),
+  Layer.provide(
+    ClickUpTaskAnalysis.layer.pipe(
+      Layer.provide(ClickUpTaskEstimation.layer),
+      Layer.provide(TextGenerationLayerLive),
+      Layer.provide(WorkspaceFileSystemLayerLive),
+      Layer.provide(WorkspaceEntriesLayerLive),
+    ),
+  ),
   Layer.provide(ClickUpTimeSync.layer),
   Layer.provide(ClickUpWorkflow.layer),
   Layer.provide(ClickUpWorkflowStore.layer),

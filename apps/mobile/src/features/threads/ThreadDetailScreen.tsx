@@ -10,7 +10,10 @@ import type {
   EnvironmentThreadStatus,
 } from "@t3tools/client-runtime/state/threads";
 import { useKeyboardChatComposerInset, useKeyboardScrollToEnd } from "@legendapp/list/keyboard";
-import { resolveProviderSkillsForCwd } from "@t3tools/client-runtime/providerSkills";
+import {
+  getComposerSkills,
+  resolveProviderSkillsForCwd,
+} from "@t3tools/client-runtime/providerSkills";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { HeaderHeightContext } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
@@ -692,9 +695,12 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     const provider = props.serverConfig?.providers.find(
       (candidate) => candidate.instanceId === selectedInstanceId,
     );
-    return provider
-      ? resolveProviderSkillsForCwd(provider, props.threadCwd ?? props.projectWorkspaceRoot)
-      : [];
+    return getComposerSkills(
+      provider
+        ? resolveProviderSkillsForCwd(provider, props.threadCwd ?? props.projectWorkspaceRoot)
+        : [],
+      props.serverConfig?.environment.capabilities.clickUpTasks === true,
+    );
   }, [props.projectWorkspaceRoot, props.serverConfig, props.threadCwd, selectedInstanceId]);
 
   useLayoutEffect(() => {

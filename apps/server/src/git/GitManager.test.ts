@@ -291,6 +291,7 @@ function createTextGeneration(
   overrides: Partial<FakeGitTextGeneration> = {},
 ): TextGeneration.TextGeneration["Service"] {
   const implementation: FakeGitTextGeneration = {
+    researchTaskEstimate: () => Effect.die("Estimation research is not used by this test"),
     generateTaskAnalysis: () => Effect.die("Task analysis is not used by GitManager"),
     generateCommitMessage: (input) =>
       Effect.succeed({
@@ -315,6 +316,7 @@ function createTextGeneration(
   };
 
   return {
+    researchTaskEstimate: () => Effect.die("Estimation research is not used by this test"),
     generateTaskAnalysis: () => Effect.die("Task analysis is not used by GitManager"),
     generateCommitMessage: (input) =>
       implementation.generateCommitMessage(input).pipe(

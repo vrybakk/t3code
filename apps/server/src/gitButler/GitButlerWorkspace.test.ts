@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
+import { ServerSettingsService, layerTest as settingsLayerTest } from "../serverSettings.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as GitButlerProjectRegistry from "./GitButlerProjectRegistry.ts";
 import * as GitButlerWorkspace from "./GitButlerWorkspace.ts";
@@ -83,6 +84,8 @@ const readyStatus = JSON.stringify({
 });
 
 function testLayer(input: {
+  readonly enabled?: boolean;
+  readonly onRegistryRead?: () => void;
   readonly registration?: GitButlerProjectRegistry.GitButlerRegistrationStatus;
   readonly statusOutput?: string;
   readonly statusFailure?: VcsProcessExitError | VcsProcessTimeoutError;
@@ -124,10 +127,15 @@ function testLayer(input: {
   } satisfies Partial<VcsProcess.VcsProcess["Service"]>;
 
   return GitButlerWorkspace.layer.pipe(
+    Layer.provideMerge(settingsLayerTest({ enableGitButler: input.enabled ?? true })),
     Layer.provide(Layer.mock(VcsProcess.VcsProcess)(processMock)),
     Layer.provide(
       Layer.succeed(GitButlerProjectRegistry.GitButlerProjectRegistry, {
-        registrationStatus: () => Effect.succeed(input.registration ?? "registered"),
+        registrationStatus: () =>
+          Effect.sync(() => {
+            input.onRegistryRead?.();
+            return input.registration ?? "registered";
+          }),
       }),
     ),
   );
@@ -326,3 +334,34 @@ it.effect("fails closed for malformed, non-zero, and timed-out status output", (
     });
   });
 });
+
+it.effect(
+  "stops all workspace operations while disabled and honors re-enabling without restart",
+  () => {
+    let processCalls = 0;
+    let registryCalls = 0;
+    return Effect.gen(function* () {
+      const workspace = yield* GitButlerWorkspace.GitButlerWorkspace;
+      const settings = yield* ServerSettingsService;
+      assert.strictEqual((yield* workspace.read(workspaceRoot)).status, "ready");
+      yield* settings.updateSettings({ enableGitButler: false });
+      processCalls = 0;
+      registryCalls = 0;
+      const disabled = yield* workspace.read(workspaceRoot);
+      assert.deepStrictEqual(disabled, {
+        status: "error",
+        detail: "GitButler integration is turned off in Settings → Source Control.",
+      });
+      assert.strictEqual(processCalls, 0);
+      assert.strictEqual(registryCalls, 0);
+      yield* settings.updateSettings({ enableGitButler: true });
+      assert.strictEqual((yield* workspace.read(workspaceRoot)).status, "ready");
+      assert.isAbove(processCalls, 0);
+      assert.strictEqual(registryCalls, 1);
+    }).pipe(
+      Effect.provide(
+        testLayer({ onRun: () => processCalls++, onRegistryRead: () => registryCalls++ }),
+      ),
+    );
+  },
+);

@@ -1,3 +1,4 @@
+import { readClickUpWorkflowContext } from "../../../clickup/ClickUpWorkflowContext.ts";
 import { ClickUpError, ClickUpTaskInput } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -51,7 +52,13 @@ const make = Effect.gen(function* () {
   });
   return ClickUpToolkit.of({
     get_studio_task_workflow: (input) =>
-      linkedTask().pipe(Effect.map(() => getStudioTaskWorkflow(input.mode))),
+      Effect.gen(function* () {
+        const task = yield* linkedTask().pipe(Effect.flatMap(tasks.detail));
+        const scope = yield* requireMcpCapability("clickup");
+        const context = yield* readClickUpWorkflowContext(task.task, scope.threadId);
+        const instructions = getStudioTaskWorkflow(input.mode);
+        return { ...instructions, instructions: `${instructions.instructions}\n\n${context}` };
+      }),
     start_linked_clickup_implementation: () => linkedTask().pipe(Effect.flatMap(workflow.start)),
     post_linked_clickup_findings: (input) =>
       linkedTask().pipe(Effect.flatMap((task) => workflow.findings(task, input))),

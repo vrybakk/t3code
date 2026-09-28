@@ -38,6 +38,7 @@ import {
 } from "@t3tools/client-runtime/environment";
 import {
   resolveEnvironmentMachineKind,
+  type ContextMenuItem,
   type EnvironmentMachineKind,
   type ProjectIconOverride,
   type ScopedThreadRef,
@@ -113,6 +114,7 @@ import {
 } from "../sidebarPendingFileDropStore";
 import { getProjectOrderKey, selectProjectGroupingSettings } from "../logicalProject";
 import {
+  buildSidebarProjectPickerEntries,
   buildSidebarProjectSnapshots,
   projectGroupsSpanEnvironments,
   type SidebarProjectSnapshot,
@@ -125,7 +127,7 @@ import {
 import { useThreadActions } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
-import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import { resolveThreadActionProjectRef, startNewThreadFromContext } from "../lib/chatThreadActions";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -244,11 +246,14 @@ import {
   SidebarProjectThreadGroupRow,
   SortableSidebarProjectGroupList,
 } from "./sidebar/SidebarProjectThreadGroup";
+import { useProjectGroupContextActions } from "./sidebar/useProjectGroupContextActions";
 import {
   countSidebarProjectThreadStatuses,
   getVisibleSidebarProjectThreads,
   groupSidebarThreadsByProject,
   planSidebarProjectGroupReorder,
+  resolveSidebarProjectGroupActionThreads,
+  type SidebarProjectThreadSection,
 } from "./Sidebar.grouped";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut, MenuTrigger } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
@@ -2251,6 +2256,10 @@ export default function Sidebar() {
       );
     },
   });
+  const projectContextActions = useProjectGroupContextActions({
+    threads,
+    copyPath: (path) => copyPathToClipboard(path, { path }),
+  });
   const { copyToClipboard: copyBranchToClipboard } = useCopyToClipboard<{ branch: string }>({
     target: "branch name",
     onCopy: ({ branch }) => {
@@ -2844,6 +2853,16 @@ export default function Sidebar() {
     () => groupSidebarThreadsByProject(projectGroups, visibleSnoozedThreads),
     [projectGroups, visibleSnoozedThreads],
   );
+  const allSnoozedProjectThreadGroupsByKey = useMemo(
+    () =>
+      new Map(
+        groupSidebarThreadsByProject(projectGroups, snoozedThreads).map((group) => [
+          group.key,
+          group,
+        ]),
+      ),
+    [projectGroups, snoozedThreads],
+  );
   const settledProjectThreadGroups = useMemo(
     () => groupSidebarThreadsByProject(projectGroups, renderedSettledThreads),
     [projectGroups, renderedSettledThreads],
@@ -3224,6 +3243,21 @@ export default function Sidebar() {
       })();
     },
     [planForwardNavigation, settleThread],
+  );
+  const settleThreads = useCallback(
+    (threadsToSettle: readonly EnvironmentThreadShell[]) => {
+      const coSettlingKeys = new Set(
+        threadsToSettle.map((thread) =>
+          scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+        ),
+      );
+      for (const thread of threadsToSettle) {
+        if (thread.settledOverride !== "settled") {
+          attemptSettle(scopeThreadRef(thread.environmentId, thread.id), { coSettlingKeys });
+        }
+      }
+    },
+    [attemptSettle],
   );
   const attemptUnsettle = useCallback(
     (threadRef: ScopedThreadRef) => {
@@ -3892,6 +3926,43 @@ export default function Sidebar() {
     },
     [performSnooze],
   );
+  const snoozeThreads = useCallback(
+    async (
+      threadsToSnooze: readonly EnvironmentThreadShell[],
+      preset: Pick<SnoozePreset, "snoozedUntil">,
+    ) => {
+      const coSnoozingKeys = new Set(
+        threadsToSnooze.map((thread) =>
+          scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+        ),
+      );
+      const outcomes = await Promise.all(
+        threadsToSnooze.map(async (thread) => {
+          const threadRef = scopeThreadRef(thread.environmentId, thread.id);
+          const outcome = await performSnooze(threadRef, preset, { coSnoozingKeys });
+          return { outcome, threadRef };
+        }),
+      );
+      const snoozedCount = outcomes.filter(({ outcome }) => outcome.status === "success").length;
+      const failures = outcomes.flatMap(({ outcome }) =>
+        outcome.status === "failure" ? [outcome.error] : [],
+      );
+      if (failures.length > 0) {
+        const firstError = failures[0];
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title:
+              snoozedCount > 0
+                ? `Failed to snooze ${failures.length} thread${failures.length === 1 ? "" : "s"}`
+                : "Failed to snooze threads",
+            description: firstError instanceof Error ? firstError.message : "An error occurred.",
+          }),
+        );
+      }
+    },
+    [performSnooze],
+  );
 
   const removeFromSelection = useThreadSelectionStore((s) => s.removeFromSelection);
   const handleMultiSelectContextMenu = useCallback(
@@ -3978,38 +4049,8 @@ export default function Sidebar() {
             ? await requestCustomSnooze()
             : snoozePresets.find((candidate) => `snooze:${candidate.id}` === clicked.value);
         if (preset) {
-          // Post-snooze navigation must skip threads snoozing in this same
-          // batch — they are all leaving the card block together.
-          const coSnoozingKeys = new Set(threadKeys);
           clearSelection();
-          const outcomes = await Promise.all(
-            selectedThreads.map(async (thread) => {
-              const threadRef = scopeThreadRef(thread.environmentId, thread.id);
-              const outcome = await performSnooze(threadRef, preset, { coSnoozingKeys });
-              return { outcome, threadRef };
-            }),
-          );
-          const snoozedThreadRefs = outcomes.flatMap(({ outcome, threadRef }) =>
-            outcome.status === "success" ? [threadRef] : [],
-          );
-          const failures = outcomes.flatMap(({ outcome }) =>
-            outcome.status === "failure" ? [outcome.error] : [],
-          );
-
-          if (failures.length > 0) {
-            const firstError = failures[0];
-            toastManager.add(
-              stackedThreadToast({
-                type: "error",
-                title:
-                  snoozedThreadRefs.length > 0
-                    ? `Failed to snooze ${failures.length} thread${failures.length === 1 ? "" : "s"}`
-                    : "Failed to snooze threads",
-                description:
-                  firstError instanceof Error ? firstError.message : "An error occurred.",
-              }),
-            );
-          }
+          await snoozeThreads(selectedThreads, preset);
         }
         return;
       }
@@ -4044,17 +4085,7 @@ export default function Sidebar() {
         return;
       }
       if (clicked.value === "settle") {
-        // Post-settle navigation must skip threads settling in this same
-        // batch — they are all leaving the card block together. Rows that
-        // are already explicitly settled are skipped: nothing to do on a
-        // valid mixed selection. Pinned rows ARE included: the decider
-        // clears the pin as part of settling, so they park like the rest.
-        const coSettlingKeys = new Set(threadKeys);
-        for (const threadKey of threadKeys) {
-          const thread = threadByKeyRef.current.get(threadKey);
-          if (!thread || thread.settledOverride === "settled") continue;
-          attemptSettle(scopeThreadRef(thread.environmentId, thread.id), { coSettlingKeys });
-        }
+        settleThreads(selectedThreads);
         clearSelection();
         return;
       }
@@ -4107,15 +4138,15 @@ export default function Sidebar() {
       );
     },
     [
-      attemptSettle,
       attemptUnpin,
       clearSelection,
       confirmThreadDelete,
       deleteThread,
       markThreadUnread,
-      performSnooze,
       removeFromSelection,
       serverConfigs,
+      settleThreads,
+      snoozeThreads,
       updateThreadMetadata,
       timestampFormat,
     ],
@@ -4407,6 +4438,178 @@ export default function Sidebar() {
       setThreadAutoSettle,
       startThreadRename,
       updateThreadMetadata,
+      timestampFormat,
+    ],
+  );
+
+  const handleNewThreadInGroup = useCallback(
+    async (project: SidebarProjectSnapshot) => {
+      const preferredProjectRef = resolveThreadActionProjectRef({
+        activeDraftThread: newThreadContext.activeDraftThread,
+        activeThread: newThreadContext.activeThread ?? undefined,
+        defaultProjectRef: newThreadContext.defaultProjectRef,
+        handleNewThread: newThreadContext.handleNewThread,
+      });
+      const targetProject = buildSidebarProjectPickerEntries({
+        groups: [project],
+        preferredProjectRef,
+      })[0]?.targetProject;
+      if (!targetProject) return;
+      const result = await settlePromise(() =>
+        handleNewThreadRef.current(scopeProjectRef(targetProject.environmentId, targetProject.id)),
+      );
+      if (result._tag === "Failure") {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not create thread",
+            description: error instanceof Error ? error.message : "An error occurred.",
+          }),
+        );
+      }
+    },
+    [newThreadContext],
+  );
+  const handleProjectGroupContextMenu = useCallback(
+    (
+      group: (typeof activeProjectThreadGroups)[number],
+      section: SidebarProjectThreadSection,
+      position: { x: number; y: number },
+    ) => {
+      void (async () => {
+        const api = readLocalApi();
+        if (!api) return;
+        const threadsInGroup = resolveSidebarProjectGroupActionThreads(group, section, {
+          snoozed: allSnoozedProjectThreadGroupsByKey,
+          settled: allSettledProjectThreadGroupsByKey,
+        });
+        const supportsSettlement = threadsInGroup.every(
+          (thread) =>
+            serverConfigs.get(thread.environmentId)?.environment.capabilities.threadSettlement ===
+            true,
+        );
+        const supportsSnooze = threadsInGroup.every(
+          (thread) =>
+            serverConfigs.get(thread.environmentId)?.environment.capabilities.threadSnooze === true,
+        );
+        const now = new Date();
+        const canSnoozeGroup =
+          supportsSnooze &&
+          threadsInGroup.every((thread) => canSnooze(thread, { now: now.toISOString() }));
+        const snoozePresets = resolveSnoozePresets(now, timestampFormat);
+        const count = threadsInGroup.length;
+        const items: ContextMenuItem[] = [];
+        const projectActions = group.project
+          ? projectContextActions.projectItems(group.project)
+          : null;
+        if (group.project) {
+          items.push(
+            { id: "new-thread", label: "New thread in project", icon: "message-square-plus" },
+            { id: "project-settings", label: "Project settings", icon: "settings" },
+            {
+              id: "filter-by-project",
+              label:
+                projectScopeKey === group.project.projectKey
+                  ? "Show all projects"
+                  : `Filter by ${group.project.displayName}`,
+              icon: "folder-tree",
+            },
+          );
+        }
+        if (supportsSettlement && section !== "snoozed") {
+          items.push({
+            id: section === "settled" ? "unsettle-all" : "settle-all",
+            label: `${section === "settled" ? "Un-settle" : "Settle"} all chats (${count})`,
+            icon: "circle-check",
+            separatorBefore: true,
+          });
+        }
+        if (section === "active" && supportsSnooze) {
+          items.push({
+            id: "snooze-all",
+            label: `Snooze all chats (${count})`,
+            icon: "clock",
+            disabled: !canSnoozeGroup,
+            children: [
+              ...snoozePresets.map((preset) => ({
+                id: `snooze:${preset.id}`,
+                label: `${preset.label} (${preset.whenLabel})`,
+              })),
+              { id: "snooze:custom", label: "Custom…", separatorBefore: true },
+            ],
+          });
+        }
+        if (section === "snoozed" && supportsSnooze) {
+          items.push({
+            id: "wake-all",
+            label: `Wake all chats (${count})`,
+            icon: "clock",
+            separatorBefore: true,
+          });
+        }
+        if (projectActions) {
+          items.push(
+            ...projectActions.items.map((item, index) =>
+              index === 0 ? { ...item, separatorBefore: true } : item,
+            ),
+          );
+        }
+        if (items.length === 0) return;
+        const clicked = await settlePromise(() => api.contextMenu.show(items, position));
+        if (clicked._tag === "Failure") return;
+        if (clicked.value?.startsWith("snooze:")) {
+          const preset =
+            clicked.value === "snooze:custom"
+              ? await requestCustomSnooze()
+              : snoozePresets.find((candidate) => `snooze:${candidate.id}` === clicked.value);
+          if (preset) await snoozeThreads(threadsInGroup, preset);
+          return;
+        }
+        switch (clicked.value) {
+          case "new-thread":
+            if (group.project) await handleNewThreadInGroup(group.project);
+            return;
+          case "project-settings":
+            if (group.project) openProjectSettings(group.project);
+            return;
+          case "filter-by-project":
+            if (group.project) {
+              setProjectScopeKey(
+                projectScopeKey === group.project.projectKey ? null : group.project.projectKey,
+              );
+            }
+            return;
+          case "settle-all":
+            settleThreads(threadsInGroup);
+            return;
+          case "unsettle-all":
+            for (const thread of threadsInGroup) {
+              attemptUnsettle(scopeThreadRef(thread.environmentId, thread.id));
+            }
+            return;
+          case "wake-all":
+            for (const thread of threadsInGroup) {
+              attemptUnsnooze(scopeThreadRef(thread.environmentId, thread.id));
+            }
+            return;
+        }
+        if (clicked.value) await projectActions?.handlers.get(clicked.value)?.();
+      })();
+    },
+    [
+      allSettledProjectThreadGroupsByKey,
+      allSnoozedProjectThreadGroupsByKey,
+      attemptUnsettle,
+      attemptUnsnooze,
+      handleNewThreadInGroup,
+      openProjectSettings,
+      projectScopeKey,
+      projectContextActions,
+      serverConfigs,
+      setProjectScopeKey,
+      settleThreads,
+      snoozeThreads,
       timestampFormat,
     ],
   );
@@ -4941,26 +5144,45 @@ export default function Sidebar() {
                           group: (typeof activeProjectThreadGroups)[number],
                           section: "active" | "snoozed" | "settled",
                           statusThreads = group.threads,
-                        ) => (
-                          <SidebarProjectThreadGroupRow
-                            key={`${section}:${group.key}`}
-                            group={group}
-                            section={section}
-                            statusCounts={countSidebarProjectThreadStatuses(statusThreads)}
-                            sortable={group.project !== null}
-                            renderThread={(thread) => {
-                              const threadKey = scopedThreadKey(
-                                scopeThreadRef(thread.environmentId, thread.id),
-                              );
-                              return renderThreadRowInner(
-                                thread,
-                                sectionByThreadKey.get(threadKey) ?? section,
-                                undefined,
-                                false,
-                              );
-                            }}
-                          />
-                        );
+                        ) => {
+                          const project = group.project;
+                          return (
+                            <SidebarProjectThreadGroupRow
+                              key={`${section}:${group.key}`}
+                              group={group}
+                              section={section}
+                              statusCounts={countSidebarProjectThreadStatuses(statusThreads)}
+                              sortable={project !== null}
+                              onContextMenu={(position) =>
+                                handleProjectGroupContextMenu(group, section, position)
+                              }
+                              onNewThread={
+                                project ? () => void handleNewThreadInGroup(project) : undefined
+                              }
+                              onSettleAll={
+                                section === "active" &&
+                                group.threads.every(
+                                  (thread) =>
+                                    serverConfigs.get(thread.environmentId)?.environment
+                                      .capabilities.threadSettlement === true,
+                                )
+                                  ? () => settleThreads(group.threads)
+                                  : undefined
+                              }
+                              renderThread={(thread) => {
+                                const threadKey = scopedThreadKey(
+                                  scopeThreadRef(thread.environmentId, thread.id),
+                                );
+                                return renderThreadRowInner(
+                                  thread,
+                                  sectionByThreadKey.get(threadKey) ?? section,
+                                  undefined,
+                                  false,
+                                );
+                              }}
+                            />
+                          );
+                        };
 
                         items.push(
                           <SortableSidebarProjectGroupList
@@ -4990,7 +5212,13 @@ export default function Sidebar() {
                               key="snoozed-project-groups"
                               groups={snoozedProjectThreadGroups}
                               onReorder={handleProjectGroupReorder}
-                              renderGroup={(group) => renderProjectGroup(group, "snoozed")}
+                              renderGroup={(group) =>
+                                renderProjectGroup(
+                                  group,
+                                  "snoozed",
+                                  allSnoozedProjectThreadGroupsByKey.get(group.key)?.threads,
+                                )
+                              }
                             />,
                           );
                         }
@@ -5177,6 +5405,7 @@ export default function Sidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarChromeFooter />
+      {projectContextActions.dialogs}
     </>
   );
 }

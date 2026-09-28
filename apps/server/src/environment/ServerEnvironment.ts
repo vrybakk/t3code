@@ -225,6 +225,7 @@ export const make = Effect.gen(function* () {
       threadTaskLinks: true,
       clickUpTimeSync: true,
       clickUpRepositorySetup: true,
+      clickUpLocalRepositories: true,
       clickUpOAuthConfiguration: true,
       requiredWorktreeBootstrap: true,
       gitButlerWorkspace: true,

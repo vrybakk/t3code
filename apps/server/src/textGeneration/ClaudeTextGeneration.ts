@@ -1,4 +1,4 @@
-import { TaskAnalysis } from "@t3tools/contracts";
+import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
 /**
  * ClaudeTextGeneration – Text generation layer using the Claude CLI.
  *
@@ -104,6 +104,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       | "generatePrContent"
       | "generateBranchName"
       | "generateThreadTitle"
+      | "researchTaskEstimate"
       | "generateTaskAnalysis",
     value: unknown,
     detail: string,
@@ -135,6 +136,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       | "generatePrContent"
       | "generateBranchName"
       | "generateThreadTitle"
+      | "researchTaskEstimate"
       | "generateTaskAnalysis";
     cwd: string;
     prompt: string;
@@ -390,6 +392,17 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       };
     });
 
+  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] = (
+    input,
+  ) =>
+    runClaudeJson({
+      operation: "researchTaskEstimate",
+      cwd: input.cwd,
+      prompt: input.prompt,
+      outputSchemaJson: TaskEstimationResponse,
+      modelSelection: input.modelSelection,
+    });
+
   const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
     input,
   ) =>
@@ -430,5 +443,6 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
     generateBranchName,
     generateThreadTitle,
     generateTaskAnalysis,
+    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

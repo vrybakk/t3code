@@ -172,7 +172,8 @@ const makeOrchestrationEngine = Effect.gen(function* () {
         }
 
         if (
-          envelope.command.type === "thread.auto-settle" &&
+          (envelope.command.type === "thread.auto-settle" ||
+            envelope.command.type === "thread.task.auto-archive") &&
           (yield* eventStore.hasEventAfter({
             aggregateKind: "thread",
             aggregateId: envelope.command.threadId,
@@ -181,7 +182,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
         ) {
           return yield* new OrchestrationCommandInvariantError({
             commandType: envelope.command.type,
-            detail: `thread ${envelope.command.threadId} changed before automatic settlement`,
+            detail: `thread ${envelope.command.threadId} changed before automatic thread cleanup`,
           });
         }
 
@@ -203,7 +204,8 @@ const makeOrchestrationEngine = Effect.gen(function* () {
         }
 
         if (
-          envelope.command.type === "thread.auto-settle" &&
+          (envelope.command.type === "thread.auto-settle" ||
+            envelope.command.type === "thread.task.auto-archive") &&
           threadBackgroundLiveness.getThreadBackgroundLiveness(envelope.command.threadId) !== null
         ) {
           return yield* new OrchestrationCommandInvariantError({

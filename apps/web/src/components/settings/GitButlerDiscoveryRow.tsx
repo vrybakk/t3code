@@ -1,12 +1,22 @@
 import type { GitButlerDiscoveryItem } from "@t3tools/contracts";
+import type { ReactNode } from "react";
 import * as Option from "effect/Option";
 import { GitBranchIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
 import { Badge } from "~/components/ui/badge";
-import { Switch } from "~/components/ui/switch";
 
-export function GitButlerDiscoveryRow({ item }: { readonly item: GitButlerDiscoveryItem }) {
+export function GitButlerDiscoveryRow({
+  item,
+  enabled,
+  control,
+  environmentOnly = false,
+}: {
+  readonly item: GitButlerDiscoveryItem;
+  readonly enabled: boolean;
+  readonly control: ReactNode;
+  readonly environmentOnly?: boolean;
+}) {
   const version = Option.getOrNull(item.version);
   const detail = Option.getOrNull(item.detail);
   const isAvailable = item.status === "available";
@@ -20,7 +30,9 @@ export function GitButlerDiscoveryRow({ item }: { readonly item: GitButlerDiscov
           : null;
   const summary =
     item.status === "available"
-      ? "Available on this server. Open GitButler from a project thread to inspect a configured workspace."
+      ? enabled
+        ? "Available on this server. Open GitButler from a project thread to inspect a configured workspace."
+        : "Installed on this server. GitButler integration is turned off."
       : item.status === "missing"
         ? item.installHint
         : (detail ?? `GitButler ${item.minimumVersion} or newer is required.`);
@@ -49,8 +61,13 @@ export function GitButlerDiscoveryRow({ item }: { readonly item: GitButlerDiscov
             ) : null}
           </div>
           <p className="text-sm leading-snug text-muted-foreground/80">{summary}</p>
+          {environmentOnly ? (
+            <p className="text-xs text-muted-foreground">
+              Change this setting for the environment.
+            </p>
+          ) : null}
         </div>
-        <Switch checked={isAvailable} disabled aria-label="GitButler availability" />
+        {control}
       </div>
     </div>
   );

@@ -5,6 +5,10 @@ import {
   ClickUpTimeSyncResult,
 } from "./clickupTimeSync.ts";
 import {
+  ClickUpLocalRepositoriesInput,
+  ClickUpLocalRepositories,
+} from "./clickupLocalRepositories.ts";
+import {
   ClickUpAnalyzeTaskInput,
   ClickUpTaskAnalysis,
   ClickUpWorkflow,
@@ -419,6 +423,7 @@ export const WS_METHODS = {
   clickUpAnalyzeTask: "clickup.analyzeTask",
   clickUpTimePreview: "clickup.timePreview",
   clickUpTimeSync: "clickup.timeSync",
+  clickUpLocalRepositories: "clickup.localRepositories",
   clickUpWorkflow: "clickup.workflow",
   clickUpSubmitWorkflow: "clickup.submitWorkflow",
   clickUpSetStatus: "clickup.setStatus",
@@ -721,6 +726,12 @@ const WsServerDiscoverSourceControlRpc = Rpc.make(WS_METHODS.serverDiscoverSourc
   payload: Schema.Struct({}),
   success: SourceControlDiscoveryResult,
   error: EnvironmentAuthorizationError,
+});
+
+const WsClickUpLocalRepositoriesRpc = Rpc.make(WS_METHODS.clickUpLocalRepositories, {
+  payload: ClickUpLocalRepositoriesInput,
+  success: ClickUpLocalRepositories,
+  error: Schema.Union([ClickUpError, EnvironmentAuthorizationError]),
 });
 
 const WsClickUpAnalyzeTaskRpc = Rpc.make(WS_METHODS.clickUpAnalyzeTask, {
@@ -1776,6 +1787,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsClickUpAnalyzeTaskRpc,
   WsClickUpTimePreviewRpc,
   WsClickUpTimeSyncRpc,
+  WsClickUpLocalRepositoriesRpc,
   WsClickUpWorkflowRpc,
   WsClickUpSubmitWorkflowRpc,
   WsClickUpOAuthConfigRpc,

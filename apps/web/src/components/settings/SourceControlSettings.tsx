@@ -57,6 +57,7 @@ import {
   type Icon,
 } from "../Icons";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
+import { ScopedSwitch } from "./ScopedSwitch";
 import { GitButlerDiscoveryRow } from "./GitButlerDiscoveryRow";
 import { SourceControlWritingSettingsSection } from "./SourceControlWritingSettings";
 import {
@@ -501,6 +502,8 @@ function EmptySourceControlDiscovery({
 }
 
 export function SourceControlSettingsPanel() {
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
   const { scope, environment, connectedEnvironments } = useSettingsScope();
   // Discovery scans one machine's tools, so it shows the representative
   // environment (named in the section title when several are selected);
@@ -596,8 +599,21 @@ export function SourceControlSettingsPanel() {
           ) : null}
 
           {result.gitButler ? (
-            <SettingsSection title="Workspace Management">
-              <GitButlerDiscoveryRow item={result.gitButler} />
+            <SettingsSection title={`Workspace Management${environmentSuffix}`}>
+              <GitButlerDiscoveryRow
+                item={result.gitButler}
+                enabled={settings.enableGitButler}
+                environmentOnly={scope.kind === "project" || scope.kind === "checkout"}
+                control={
+                  <ScopedSwitch
+                    settingKeys={["enableGitButler"]}
+                    checked={settings.enableGitButler}
+                    disabled={scope.kind === "project" || scope.kind === "checkout"}
+                    onCheckedChange={(enabled) => updateSettings({ enableGitButler: enabled })}
+                    aria-label="Enable GitButler integration"
+                  />
+                }
+              />
             </SettingsSection>
           ) : null}
         </>

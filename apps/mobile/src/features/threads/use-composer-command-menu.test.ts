@@ -1,3 +1,4 @@
+import { getComposerSkills } from "@t3tools/client-runtime/providerSkills";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { ProviderDriverKind } from "@t3tools/contracts";
 vi.mock("react-native", () => ({ Alert: { alert: vi.fn() } }));
@@ -100,4 +101,22 @@ describe("mobile slash commands", () => {
       }),
     ).toEqual({ text: "/plan ", cursor: 6, interactionMode: null });
   });
+});
+
+it("inserts the app workflow token without invoking a provider-native command", () => {
+  const skill = getComposerSkills([], true)[0]!;
+  expect(
+    resolveComposerCommandSelection({
+      draftMessage: "$stud",
+      trigger: { rangeStart: 0, rangeEnd: 5 },
+      item: {
+        id: "skill:studio-task-workflow",
+        type: "skill",
+        skill,
+        label: "Studio Task Workflow",
+        description: "",
+      },
+      allowInteractionMode: true,
+    }),
+  ).toEqual({ text: "$studio-task-workflow ", cursor: 22, interactionMode: null });
 });

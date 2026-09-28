@@ -64,6 +64,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.clickUpTasks]: AuthOrchestrationReadScope,
   [WS_METHODS.clickUpTask]: AuthOrchestrationReadScope,
   [WS_METHODS.clickUpThreads]: AuthOrchestrationReadScope,
+  [WS_METHODS.clickUpLocalRepositories]: AuthOrchestrationReadScope,
   [WS_METHODS.clickUpSprints]: AuthOrchestrationReadScope,
   [WS_METHODS.clickUpTaskOptions]: AuthOrchestrationReadScope,
   [WS_METHODS.clickUpAnalyzeTask]: AuthOrchestrationOperateScope,

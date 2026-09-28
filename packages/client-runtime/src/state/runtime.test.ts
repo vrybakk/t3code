@@ -81,6 +81,7 @@ function queryConnectionState(
 
 const makeEnvironmentQueryHarness = Effect.fn("TestEnvironmentQuery.makeHarness")(function* <A, E>(
   execute: Effect.Effect<A, E>,
+  options: { retainSnapshot?: boolean; refreshTrigger?: () => Atom.Atom<unknown> } = {},
 ) {
   const supervisorState = yield* SubscriptionRef.make(queryConnectionState());
   const supervisorSession = yield* SubscriptionRef.make(Option.some(QUERY_RPC_SESSION));
@@ -110,6 +111,7 @@ const makeEnvironmentQueryHarness = Effect.fn("TestEnvironmentQuery.makeHarness"
   const family = createEnvironmentQueryAtomFamily(runtime, {
     label: "test.environment-query",
     staleTimeMs: 60_000,
+    ...options,
     execute: () => execute,
   });
 
@@ -471,6 +473,48 @@ describe("environment query lifecycle", () => {
             suspendOnWaiting: true,
           }),
         ).toBe("recovered");
+      }),
+    ),
+  );
+
+  it.effect("retains a passive snapshot without refreshing hidden queries", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const revision = Atom.make(0).pipe(Atom.keepAlive);
+        const resumed = Latch.makeUnsafe();
+        const finish = Latch.makeUnsafe();
+        let calls = 0;
+        const harness = yield* makeEnvironmentQueryHarness(
+          Effect.suspend(() => {
+            calls++;
+            if (calls === 1) return Effect.succeed("saved");
+            resumed.openUnsafe();
+            return finish.await.pipe(Effect.as("updated"));
+          }),
+          { retainSnapshot: true, refreshTrigger: () => revision },
+        );
+        const registry = AtomRegistry.make();
+        yield* Effect.addFinalizer(() => Effect.sync(() => registry.dispose()));
+        const unmount = registry.mount(harness.atom);
+        expect(
+          yield* AtomRegistry.getResult(registry, harness.atom, { suspendOnWaiting: true }),
+        ).toBe("saved");
+        unmount();
+        yield* Effect.yieldNow;
+        expect(registry.getNodes().has(harness.atom)).toBe(false);
+        registry.set(revision, 1);
+        yield* Effect.yieldNow;
+        expect(calls).toBe(1);
+        const unmountAgain = registry.mount(harness.atom);
+        expect(Option.getOrNull(AsyncResult.value(registry.get(harness.atom)))).toBe("saved");
+        yield* resumed.await;
+        expect(calls).toBe(2);
+        expect(registry.get(harness.atom).waiting).toBe(true);
+        finish.openUnsafe();
+        expect(
+          yield* AtomRegistry.getResult(registry, harness.atom, { suspendOnWaiting: true }),
+        ).toBe("updated");
+        unmountAgain();
       }),
     ),
   );
