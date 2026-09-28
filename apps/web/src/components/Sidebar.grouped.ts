@@ -22,6 +22,18 @@ export interface SidebarProjectThreadGroup<TProject, TThread> {
 
 export type SidebarProjectThreadSection = "active" | "snoozed" | "settled";
 
+export function resolveSidebarProjectGroupActionThreads<TProject, TThread>(
+  group: SidebarProjectThreadGroup<TProject, TThread>,
+  section: SidebarProjectThreadSection,
+  fullGroups: {
+    readonly snoozed: ReadonlyMap<string, SidebarProjectThreadGroup<TProject, TThread>>;
+    readonly settled: ReadonlyMap<string, SidebarProjectThreadGroup<TProject, TThread>>;
+  },
+): readonly TThread[] {
+  if (section === "active") return group.threads;
+  return fullGroups[section].get(group.key)?.threads ?? group.threads;
+}
+
 export function sidebarProjectThreadGroupExpansionKey(
   section: SidebarProjectThreadSection,
   groupKey: string,
