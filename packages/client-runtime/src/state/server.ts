@@ -1084,16 +1084,19 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:clickup:clickUpConnection",
       tag: WS_METHODS.clickUpConnection,
       staleTimeMs: 30_000,
+      retainSnapshot: true,
     }),
     clickUpSprints: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:clickup:clickUpSprints",
       tag: WS_METHODS.clickUpSprints,
       staleTimeMs: 30_000,
+      retainSnapshot: true,
     }),
     clickUpTasks: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:clickup:clickUpTasks",
       tag: WS_METHODS.clickUpTasks,
       staleTimeMs: 30_000,
+      retainSnapshot: ({ listId }) => listId !== undefined,
       refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
     }),
     clickUpTask: createEnvironmentRpcQueryAtomFamily(runtime, {

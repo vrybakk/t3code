@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useClickUpCachedQuery } from "./useClickUpCachedQuery";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import * as Option from "effect/Option";
@@ -79,7 +79,7 @@ function ConnectedTasks({ environmentId }: { environmentId: EnvironmentId }) {
   const search = useSearch({ from: "/tasks" });
   const navigate = useNavigate({ from: "/tasks" });
   const query = serverEnvironment.clickUpConnection({ environmentId, input: {} });
-  const result = useAtomValue(query);
+  const result = useClickUpCachedQuery(query);
   const account = Option.getOrNull(AsyncResult.value(result));
   const workspaceId = account?.workspaces.some((item) => item.id === search.workspaceId)
     ? search.workspaceId

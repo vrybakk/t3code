@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useClickUpCachedQuery } from "./useClickUpCachedQuery";
 import type { ClickUpSprint, EnvironmentId } from "@t3tools/contracts";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import * as Option from "effect/Option";
@@ -32,7 +32,7 @@ export function SprintTasks({
     environmentId,
     input: { workspaceId, page: 0, userId, listId: sprint.id, showAll },
   });
-  const result = useAtomValue(query);
+  const result = useClickUpCachedQuery(query);
   const data = Option.getOrNull(AsyncResult.value(result));
   const groups = groupSprintTasks(data?.tasks ?? []);
   const tableProps = { environmentId, workspaceId, userId, sprintId: sprint.id, showAll };
@@ -71,12 +71,17 @@ export function SprintTasks({
             onClick={() => appAtomRegistry.refresh(query)}
             aria-label="Refresh tasks"
           >
-            <RefreshCwIcon className="size-4" /> Refresh
+            <RefreshCwIcon className="size-4" /> {result.waiting && data ? "Updating…" : "Refresh"}
           </Button>
         </div>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        {AsyncResult.isFailure(result) ? (
+        {data && AsyncResult.isFailure(result) && (
+          <p role="alert" className="px-5 py-3 text-xs text-destructive">
+            Could not refresh tasks. Showing saved data. Refresh to try again.
+          </p>
+        )}
+        {!data && AsyncResult.isFailure(result) ? (
           <p role="alert" className="p-5 text-sm text-destructive">
             Could not load sprint tasks. Refresh to try again.
           </p>
