@@ -34,6 +34,7 @@ import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPr
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
+import { DesktopKeepAwakeToggle } from "./DesktopKeepAwakeToggle";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 
@@ -68,6 +69,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
         className="relative top-auto z-10 translate-y-0 md:hidden"
       />
       <SidebarBrand isElectron={isElectron} onBackdrop={backdropVariant !== null} />
+      {isElectron ? <DesktopKeepAwakeToggle onBackdrop={backdropVariant !== null} /> : null}
       {pillLabel ? (
         <Badge
           className="relative z-10 ml-1 hidden @[15rem]/sidebar-header:inline-flex"
@@ -87,7 +89,7 @@ function SidebarBrand({ isElectron, onBackdrop }: { isElectron: boolean; onBackd
     <Link
       aria-label="Go to threads"
       className={cn(
-        "relative z-10 ml-[var(--workspace-titlebar-content-left)] h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2",
+        "relative z-10 ml-[var(--workspace-titlebar-content-left)] h-7 w-fit min-w-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2",
         isElectron ? "flex" : "hidden md:flex",
         onBackdrop ? "text-white" : "text-foreground",
       )}

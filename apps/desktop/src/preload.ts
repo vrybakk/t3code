@@ -1,5 +1,6 @@
 import type {
   DesktopBridge,
+  DesktopKeepAwakeState,
   DesktopPreviewPointerEvent,
   DesktopPreviewRecordingInputEvent,
   DesktopPreviewRecordingFrame,
@@ -72,6 +73,15 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   },
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   getClientPlatform: () => clientPlatform,
+  getKeepAwakeState: () => ipcRenderer.invoke(IpcChannels.GET_KEEP_AWAKE_STATE_CHANNEL),
+  setKeepAwakeEnabled: (enabled) =>
+    ipcRenderer.invoke(IpcChannels.SET_KEEP_AWAKE_ENABLED_CHANNEL, enabled),
+  onKeepAwakeState: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: DesktopKeepAwakeState) =>
+      listener(state);
+    ipcRenderer.on(IpcChannels.KEEP_AWAKE_STATE_CHANNEL, handler);
+    return () => ipcRenderer.removeListener(IpcChannels.KEEP_AWAKE_STATE_CHANNEL, handler);
+  },
   setNotificationBadge: (badge) =>
     ipcRenderer.invoke(IpcChannels.SET_NOTIFICATION_BADGE_CHANNEL, badge),
   onNotificationBadgeClear: (listener) => {
