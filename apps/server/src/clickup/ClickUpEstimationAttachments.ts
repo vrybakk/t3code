@@ -5,7 +5,7 @@ import { type ClickUpAttachment } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 
-export const allowedEstimationAttachmentUrl = (value: string) => {
+const allowedEstimationAttachmentUrl = (value: string) => {
   const url = new URL(value);
   return (
     url.protocol === "https:" &&
