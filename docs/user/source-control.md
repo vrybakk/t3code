@@ -13,6 +13,8 @@ GitButler is optional. Install GitButler CLI 0.22.3 or newer on the machine runn
 ensure `but` is on that server's `PATH`. Settings reports whether that server has a compatible
 version. It does not set up repositories or change GitButler workspaces during discovery.
 
+You can turn the GitButler integration off in **Settings → Source Control → Workspace Management** for an environment. This stops workspace reads in T3 Code without changing repository setup. Turn it back on to use existing workspace tabs again.
+
 ## View a GitButler workspace
 
 From a project thread in a Git repository, open the right panel and choose **GitButler**. The panel

@@ -1,3 +1,4 @@
+import { TaskEstimationEvidence } from "./taskEstimation.ts";
 import * as Schema from "effect/Schema";
 import { ClickUpTaskInput } from "./clickup.ts";
 import {
@@ -12,6 +13,8 @@ export const ClickUpWorkflowText = TrimmedNonEmptyString.check(
   Schema.isMaxLength(2000),
   Schema.isPattern(
     /^(?![\s\S]*\b(?:we|us|our)\b)(?![\s\S]*[—–`])(?![\s\S]*\n[\s\S]*\n[\s\S]*\n[\s\S]*\n)[\s\S]+$/i,
+    // Provider JSON schema engines reject lookarounds; enforce these rules during local decoding.
+    { toJsonSchema: () => ({}) },
   ),
 );
 export const ClickUpWorkflowEvidence = Schema.Struct({
@@ -86,6 +89,8 @@ export type TaskAnalysis = typeof TaskAnalysis.Type;
 export const ClickUpTaskAnalysis = Schema.Struct({
   ...TaskAnalysis.fields,
   estimateSaved: Schema.Boolean,
+  estimatePreserved: Schema.optionalKey(Schema.Boolean),
+  estimationEvidence: Schema.optionalKey(TaskEstimationEvidence),
   tagRemoved: Schema.Boolean,
   findingsPosted: Schema.Boolean,
 });

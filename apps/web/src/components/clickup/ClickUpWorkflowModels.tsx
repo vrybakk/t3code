@@ -14,7 +14,7 @@ import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import { Button } from "../ui/button";
 
-const roles = ["research", "implementation", "review"] as const;
+const roles = ["research", "review"] as const;
 
 export function ClickUpWorkflowModelPicker({
   environmentId,
@@ -105,8 +105,9 @@ export function ClickUpWorkflowModelPicker({
         );
       })}
       <p className="text-xs text-muted-foreground">
-        Roles inherit the lead model unless selected here. If a provider cannot use a selected model
-        or an independent reviewer, the agent asks how to proceed.
+        Research and review use the thread's model unless selected here. Implementation always uses
+        the thread's model. If a provider cannot use a selected model or an independent reviewer,
+        the agent asks how to proceed.
       </p>
     </div>
   );

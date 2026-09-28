@@ -19,7 +19,7 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => state.navigate,
   useParams: () => ({}),
 }));
-vi.mock("./ui/toast", () => ({ toastManager: { add: state.toast } }));
+vi.mock("./ui/toast", () => ({ toastManager: { add: state.toast, close: vi.fn() } }));
 vi.mock("../state/shell", () => ({ environmentShell: { stateValueAtom: (id: string) => id } }));
 vi.mock("../state/environments", () => ({
   useEnvironments: () => ({
@@ -30,7 +30,10 @@ vi.mock("../hooks/useSettings", () => ({
   useClientSettings: (
     select: (settings: { notificationMode: string; inAppNotificationsEnabled: boolean }) => unknown,
   ) => select({ notificationMode: state.mode, inAppNotificationsEnabled: state.inApp }),
-  getClientSettings: () => ({ notificationMode: state.mode }),
+  getClientSettings: () => ({
+    notificationMode: state.mode,
+    inAppNotificationsEnabled: state.inApp,
+  }),
 }));
 vi.mock("../threadNotifications", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../threadNotifications")>()),
@@ -39,6 +42,7 @@ vi.mock("../threadNotifications", async (importOriginal) => ({
   setNotificationBadge: state.badge,
 }));
 
+import { publishTaskAnalysisNotification } from "./clickup/taskAnalysisFeedback";
 import { ThreadNotificationCoordinator } from "./ThreadNotificationCoordinator";
 
 class TestNotification extends EventTarget {
@@ -257,3 +261,77 @@ it("badges background failures with in-app notifications enabled", async () => {
   expect(state.badge).toHaveBeenLastCalledWith(1);
   expect(state.toast).not.toHaveBeenCalled();
 });
+
+it("combines task and thread badges and opens the exact task when clicked", async () => {
+  await render();
+  complete();
+  await render();
+  publishTaskAnalysisNotification({
+    environmentId: EnvironmentId.make("two"),
+    input: { userId: 7, workspaceId: "workspace", taskId: "task-42", action: "estimate" },
+    taskName: "Hero slider",
+    state: {
+      error: null,
+      result: {
+        summary: "Estimated",
+        estimateMinutes: 45,
+        estimateSaved: true,
+        tagRemoved: true,
+        findings: null,
+        findingsPosted: false,
+      },
+    },
+  });
+  expect(state.badge).toHaveBeenLastCalledWith(2);
+  const notification = TestNotification.sent.at(-1)!;
+  expect(notification.title).toBe("Estimate saved · 45 min");
+  expect(notification.options.body).toBe("Hero slider");
+  notification.dispatchEvent(new Event("click"));
+  expect(state.navigate).toHaveBeenCalledWith({
+    to: "/tasks",
+    search: { environmentId: "two", workspaceId: "workspace", taskId: "task-42" },
+  });
+  expect(window.focus).toHaveBeenCalledOnce();
+  window.dispatchEvent(new Event("focus"));
+  expect(state.badge).toHaveBeenLastCalledWith(0);
+});
+
+it.each(["off", "sound"])("does not show task desktop notifications in %s mode", async (mode) => {
+  state.mode = mode;
+  await render();
+  publishTaskFailure();
+  expect(TestNotification.sent).toHaveLength(0);
+});
+
+it("respects denied notification permission", async () => {
+  TestNotification.permission = "denied";
+  await render();
+  publishTaskFailure();
+  expect(TestNotification.sent).toHaveLength(0);
+});
+
+it("shows a foreground task toast with a task link instead of a desktop alert", async () => {
+  focused = true;
+  state.inApp = true;
+  await render();
+  publishTaskFailure();
+  expect(TestNotification.sent).toHaveLength(0);
+  const toast = state.toast.mock.calls[0]![0];
+  expect(toast.title).toBe("Requirements check failed");
+  expect(toast.description).toBe("Hero slider");
+  expect(toast.actionProps.children).toBe("View task");
+  toast.actionProps.onClick();
+  expect(state.navigate).toHaveBeenCalledWith({
+    to: "/tasks",
+    search: { environmentId: "one", workspaceId: "workspace", taskId: "task-42" },
+  });
+});
+
+function publishTaskFailure() {
+  publishTaskAnalysisNotification({
+    environmentId: EnvironmentId.make("one"),
+    input: { userId: 7, workspaceId: "workspace", taskId: "task-42", action: "requirements" },
+    taskName: "Hero slider",
+    state: { result: null, error: "Long private diagnostic" },
+  });
+}

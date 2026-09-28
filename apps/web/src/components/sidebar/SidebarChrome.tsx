@@ -69,7 +69,6 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
         className="relative top-auto z-10 translate-y-0 md:hidden"
       />
       <SidebarBrand isElectron={isElectron} onBackdrop={backdropVariant !== null} />
-      {isElectron ? <DesktopKeepAwakeToggle onBackdrop={backdropVariant !== null} /> : null}
       {pillLabel ? (
         <Badge
           className="relative z-10 ml-1 hidden @[15rem]/sidebar-header:inline-flex"
@@ -80,6 +79,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
           {pillLabel}
         </Badge>
       ) : null}
+      {isElectron ? <DesktopKeepAwakeToggle onBackdrop={backdropVariant !== null} /> : null}
     </div>
   );
 });

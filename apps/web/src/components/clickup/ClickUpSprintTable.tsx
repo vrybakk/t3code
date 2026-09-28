@@ -1,12 +1,11 @@
 import type { ClickUpTask, EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
-import { FlagIcon, TagIcon } from "lucide-react";
+import { TagIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { ClickUpStatusPicker } from "./ClickUpTaskEditors";
-import { taskPriorityRank } from "./sprintTaskGroups";
 import { ClickUpProjectBadge } from "./ClickUpProjectBadge";
 import { ClickUpTaskActionButtons, ClickUpTaskActionDialog } from "./ClickUpTaskActions";
 import type { ClickUpTaskAction } from "./taskPrompt";
@@ -37,11 +36,10 @@ export function ClickUpSprintTable({
         <TableHeader>
           <TableRow>
             <TableHead>
-              <span className="ml-3">Task</span>
+              <span className="ml-3">Name</span>
             </TableHead>
-            <TableHead className="w-24">Priority</TableHead>
-            <TableHead className="w-40">Status</TableHead>
             <TableHead className="w-36">Project</TableHead>
+            <TableHead className="w-40">Status</TableHead>
             <TableHead className="w-32 text-right">
               <span className="mr-3">Actions</span>
             </TableHead>
@@ -54,9 +52,9 @@ export function ClickUpSprintTable({
               <Fragment key={group.label ?? "working"}>
                 {group.label && (
                   <tr>
-                    <td colSpan={5} className="p-0 pt-4">
-                      <div className="flex items-center gap-3 border-y border-border bg-muted px-5 py-3">
-                        <span className="text-sm font-semibold">{group.label}</span>
+                    <td colSpan={4} className="p-0 pt-2">
+                      <div className="flex items-center gap-3 border-y border-border bg-muted px-5 py-2">
+                        <span className="text-xs font-semibold">{group.label}</span>
                         <Badge variant="outline">
                           <span className="tabular-nums">{group.tasks.length}</span>
                         </Badge>
@@ -66,8 +64,8 @@ export function ClickUpSprintTable({
                 )}
                 {group.tasks.map((task) => (
                   <TableRow key={task.taskId}>
-                    <TableCell className="min-w-64 max-w-lg whitespace-normal">
-                      <div className="ml-3 flex min-w-0 items-center gap-2 py-1">
+                    <TableCell compact className="min-w-64 max-w-lg whitespace-normal">
+                      <div className="ml-3 flex min-w-0 items-center gap-2">
                         <Tooltip>
                           <TooltipTrigger
                             render={
@@ -80,7 +78,7 @@ export function ClickUpSprintTable({
                                   showAll,
                                   taskId: task.taskId,
                                 }}
-                                className="flex min-w-0 items-start gap-3 text-sm font-medium hover:text-primary"
+                                className="flex min-w-0 items-start gap-2 text-xs font-medium hover:text-primary"
                               />
                             }
                           >
@@ -116,10 +114,12 @@ export function ClickUpSprintTable({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <TaskPriority priority={task.priority} />
+                    <TableCell compact className="max-w-56">
+                      <div className="truncate text-muted-foreground">
+                        <ClickUpProjectBadge task={task} />
+                      </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell compact>
                       <ClickUpStatusPicker
                         environmentId={environmentId}
                         input={{ workspaceId, userId, taskId: task.taskId }}
@@ -128,22 +128,7 @@ export function ClickUpSprintTable({
                         color={task.statusColor}
                       />
                     </TableCell>
-                    <TableCell className="max-w-56">
-                      <div className="truncate text-muted-foreground">
-                        <ClickUpProjectBadge task={task} />
-                        {task.sources?.some((source) => source.kind === "project") && (
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={<span className="mt-1 block truncate text-xs" />}
-                            >
-                              {task.listName}
-                            </TooltipTrigger>
-                            <TooltipPopup>{task.listName}</TooltipPopup>
-                          </Tooltip>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                    <TableCell compact>
                       <div className="mr-3">
                         <ClickUpTaskActionButtons
                           compact
@@ -168,17 +153,5 @@ export function ClickUpSprintTable({
         />
       )}
     </>
-  );
-}
-
-function TaskPriority({ priority }: { priority: string | null | undefined }) {
-  const rank = taskPriorityRank(priority);
-  const label = ["Urgent", "High", "Normal", "Low", "No priority"][rank];
-  const variant = rank === 0 ? "error" : rank === 1 ? "warning" : rank === 2 ? "info" : "secondary";
-  return (
-    <Badge variant={variant}>
-      <FlagIcon className="size-3" />
-      {label}
-    </Badge>
   );
 }

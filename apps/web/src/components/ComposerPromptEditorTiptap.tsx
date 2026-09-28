@@ -1,3 +1,4 @@
+import type { ComposerSkill } from "@t3tools/client-runtime/providerSkills";
 import { Extension, Node, wrappingInputRule, type JSONContent } from "@tiptap/core";
 import { TaskList } from "@tiptap/extension-task-list";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
@@ -6,11 +7,7 @@ import { type Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { splitBlockKeepMarks } from "@tiptap/pm/commands";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import type {
-  AssistantCitation,
-  ComposerContextClipboardFragment,
-  ServerProviderSkill,
-} from "@t3tools/contracts";
+import type { AssistantCitation, ComposerContextClipboardFragment } from "@t3tools/contracts";
 import {
   serializeAssistantCitation,
   withAssistantCitationComment,
@@ -118,7 +115,7 @@ export interface ComposerPromptEditorProps {
   importContextFragment?:
     | ((fragment: ComposerContextClipboardFragment) => ReadonlyMap<string, string>)
     | undefined;
-  skills: ReadonlyArray<ServerProviderSkill>;
+  skills: ReadonlyArray<ComposerSkill>;
   disabled: boolean;
   placeholder: string;
   containerClassName?: string;
@@ -164,7 +161,7 @@ const ComposerCitationCommentContext = createContext<{
   onSubmitAndSend: () => void;
 }>({ openComment: null, onOpenChange: () => {}, onSubmitAndSend: () => {} });
 
-const RichComposerSkillsContext = createContext<ReadonlyArray<ServerProviderSkill>>([]);
+const RichComposerSkillsContext = createContext<ReadonlyArray<ComposerSkill>>([]);
 
 const SURROUND_CLOSE: Record<string, string> = {
   "(": ")",
@@ -277,6 +274,7 @@ function ComposerSkillNodeView({ node }: NodeViewProps) {
   const skillLabel = (node.attrs.skillLabel as string) || skillName;
   const skillDescription = (node.attrs.skillDescription as string | null) ?? null;
   const skill = skills.find((candidate) => candidate.name === skillName);
+  const skillPath = skill?.path;
   return (
     <NodeViewWrapper as="span" className={CHIP_NODE_SELECTION_CLASS_NAME}>
       <ContextChipPopover
@@ -289,11 +287,12 @@ function ComposerSkillNodeView({ node }: NodeViewProps) {
           <p className="font-medium">{skillLabel}</p>
           <p>
             {skill?.description ??
+              skill?.shortDescription ??
               skillDescription ??
               "No description is available for this skill."}
           </p>
-          {skill?.path ? (
-            <Button variant="outline" size="sm" onClick={() => actions.openMention(skill.path)}>
+          {skillPath ? (
+            <Button variant="outline" size="sm" onClick={() => actions.openMention(skillPath)}>
               View instructions
             </Button>
           ) : null}

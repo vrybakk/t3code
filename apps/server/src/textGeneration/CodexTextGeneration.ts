@@ -1,4 +1,4 @@
-import { TaskAnalysis } from "@t3tools/contracts";
+import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -105,6 +105,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       | "generatePrContent"
       | "generateBranchName"
       | "generateThreadTitle"
+      | "researchTaskEstimate"
       | "generateTaskAnalysis",
     value: unknown,
   ): Effect.Effect<string, TextGenerationError> =>
@@ -125,6 +126,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       | "generatePrContent"
       | "generateBranchName"
       | "generateThreadTitle"
+      | "researchTaskEstimate"
       | "generateTaskAnalysis",
     attachments: TextGeneration.BranchNameGenerationInput["attachments"],
   ): Effect.fn.Return<MaterializedImageAttachments, TextGenerationError> {
@@ -168,6 +170,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       | "generatePrContent"
       | "generateBranchName"
       | "generateThreadTitle"
+      | "researchTaskEstimate"
       | "generateTaskAnalysis";
     cwd: string;
     prompt: string;
@@ -200,8 +203,38 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       const spawnCommand = yield* resolveSpawnCommand(
         codexConfig.binaryPath || "codex",
         [
+          ...(operation === "researchTaskEstimate" ? ["--no-daemon"] : []),
           "exec",
-          ...codexExecLaunchArgs(launchArgs),
+          ...(operation === "researchTaskEstimate"
+            ? [
+                "--ignore-user-config",
+                "--ignore-rules",
+                "--config",
+                "mcp_servers={}",
+                "--config",
+                'web_search="disabled"',
+                "--config",
+                "agents.max_concurrent_threads_per_session=1",
+                ...[
+                  "shell_tool",
+                  "unified_exec",
+                  "apps",
+                  "plugins",
+                  "remote_plugin",
+                  "multi_agent",
+                  "multi_agent_v2",
+                  "skill_search",
+                  "skill_mcp_dependency_install",
+                  "code_mode_host",
+                  "view_image",
+                  "browser_use",
+                  "computer_use",
+                  "hooks",
+                  "goals",
+                  "sleep_tool",
+                ].flatMap((feature) => ["--disable", feature]),
+              ]
+            : codexExecLaunchArgs(launchArgs)),
           "--ephemeral",
           "--skip-git-repo-check",
           "-s",
@@ -394,6 +427,18 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       };
     });
 
+  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] = (
+    input,
+  ) =>
+    runCodexJson({
+      operation: "researchTaskEstimate",
+      cwd: input.cwd,
+      prompt: input.prompt,
+      outputSchemaJson: TaskEstimationResponse,
+      modelSelection: input.modelSelection,
+      imagePaths: input.imagePaths ?? [],
+    });
+
   const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
     input,
   ) =>
@@ -439,5 +484,6 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
     generateBranchName,
     generateThreadTitle,
     generateTaskAnalysis,
+    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

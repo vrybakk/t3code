@@ -1,3 +1,4 @@
+export * from "./taskEstimation.ts";
 export * from "./clickupWorkflow.ts";
 export * from "./clickupTaskEditing.ts";
 export * from "./baseSchemas.ts";
@@ -61,3 +62,5 @@ export {
 export * from "./clickup.ts";
 export * from "./clickupSprints.ts";
 export * from "./clickupInteractions.ts";
+
+export * from "./clickupLocalRepositories.ts";

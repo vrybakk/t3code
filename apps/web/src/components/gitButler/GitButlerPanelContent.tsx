@@ -39,11 +39,15 @@ export function StateMessage({
   );
 }
 
-export function GitButlerUnavailableState() {
+export function GitButlerUnavailableState({ disabled = false }: { readonly disabled?: boolean }) {
   return (
     <StateMessage
-      title="GitButler unavailable"
-      detail="Update this environment's T3 Code server to inspect GitButler workspaces."
+      title={disabled ? "GitButler is turned off" : "GitButler unavailable"}
+      detail={
+        disabled
+          ? "Turn it on in Settings → Source Control to view this workspace."
+          : "Update this environment's T3 Code server to inspect GitButler workspaces."
+      }
     />
   );
 }

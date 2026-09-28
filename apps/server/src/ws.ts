@@ -1,3 +1,5 @@
+import { ClickUpError } from "@t3tools/contracts";
+import { findClickUpLocalRepositories } from "./clickup/ClickUpLocalRepositories.ts";
 import * as ClickUpTaskAnalysis from "./clickup/ClickUpTaskAnalysis.ts";
 import * as ClickUpWorkflow from "./clickup/ClickUpWorkflow.ts";
 import * as ClickUpTaskEditing from "./clickup/ClickUpTaskEditing.ts";
@@ -2678,6 +2680,23 @@ const makeWsRpcLayer = (
         [WS_METHODS.clickUpDisconnect]: () => clickUpConnection.disconnect,
         [WS_METHODS.clickUpTasks]: (input) => clickUpTasks.list(input),
         [WS_METHODS.clickUpSprints]: (input) => clickUpSprints.list(input),
+        [WS_METHODS.clickUpLocalRepositories]: (input) =>
+          Effect.gen(function* () {
+            const projects = yield* Effect.forEach(
+              input.projectIds,
+              (id) => projectionSnapshotQuery.getProjectShellById(id),
+              { concurrency: 4 },
+            ).pipe(
+              Effect.mapError(
+                () => new ClickUpError({ message: "Could not load linked projects." }),
+              ),
+            );
+            return yield* findClickUpLocalRepositories(
+              projects.flatMap(Option.toArray),
+              input.remoteUrls,
+              repositoryIdentityResolver,
+            );
+          }),
         [WS_METHODS.clickUpAnalyzeTask]: (input) => clickUpTaskAnalysis.run(input),
         [WS_METHODS.clickUpWorkflow]: (input) => clickUpWorkflow.read(input),
         [WS_METHODS.clickUpSubmitWorkflow]: (input) => clickUpWorkflow.submit(input),
