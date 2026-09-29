@@ -1,4 +1,5 @@
 import { ClickUpTimeSync } from "./ClickUpTimeSync";
+import { HandoffPullRequestLink } from "./HandoffPullRequestLink";
 import { useAtomValue } from "@effect/atom-react";
 import type { ClickUpHandoff, ClickUpTaskInput, EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
@@ -74,6 +75,7 @@ export function ClickUpTaskHandoffs({
           <HandoffCard
             key={`${handoff.id}:${handoff.status}:${handoff.destination ?? "code-review"}:${handoff.taskScopeFingerprint ?? ""}`}
             handoff={handoff}
+            threadId={threadId}
             environmentId={environmentId}
             input={input}
             showTimeSync={
@@ -89,12 +91,14 @@ export function ClickUpTaskHandoffs({
 
 function HandoffCard({
   handoff,
+  threadId,
   environmentId,
   input,
   showTimeSync,
   onRefresh,
 }: {
   handoff: ClickUpHandoff;
+  threadId: ThreadId | undefined;
   environmentId: EnvironmentId;
   input: ClickUpTaskInput;
   showTimeSync: boolean;
@@ -191,14 +195,13 @@ function HandoffCard({
         {handoff.pullRequests.map((pr) => (
           <li key={pr.url}>
             {safeClickUpAttachmentUrl(pr.url) && (
-              <a
-                href={pr.url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary hover:underline"
+              <HandoffPullRequestLink
+                url={pr.url}
+                environmentId={environmentId}
+                threadId={threadId}
               >
                 {pr.repository} #{pr.number}
-              </a>
+              </HandoffPullRequestLink>
             )}
             <span className="ml-2 text-xs text-muted-foreground">
               {pr.merged ? "Merged" : pr.ready ? "Ready" : "Awaiting submission"}

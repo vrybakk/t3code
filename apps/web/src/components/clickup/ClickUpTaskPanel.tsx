@@ -13,6 +13,7 @@ import {
 import { useRef, useState } from "react";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { serverEnvironment } from "../../state/server";
+import { formatEnvironmentQueryError } from "../../state/query";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import ChatMarkdown from "../ChatMarkdown";
 import { Button } from "../ui/button";
@@ -105,7 +106,7 @@ export function ClickUpTaskPanel({
       </div>
       {AsyncResult.isFailure(result) && (
         <p role="alert" className="p-8 text-sm text-destructive">
-          Could not load this task. Check your connection and ClickUp access, then refresh.
+          Could not load this task. {formatEnvironmentQueryError(result.cause)}
         </p>
       )}
       {!details ? (
