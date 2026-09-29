@@ -101,6 +101,7 @@ export type ClickUpTaskInput = typeof ClickUpTaskInput.Type;
 export const ClickUpTasksInput = Schema.Struct({
   workspaceId: ClickUpId,
   query: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(200))),
+  searchPage: Schema.optional(NonNegativeInt),
   listId: Schema.optional(ClickUpId),
   showAll: Schema.optional(Schema.Boolean),
   page: NonNegativeInt,
@@ -110,6 +111,7 @@ export type ClickUpTasksInput = typeof ClickUpTasksInput.Type;
 export const ClickUpTaskPage = Schema.Struct({
   tasks: Schema.Array(ClickUpTask),
   hasMore: Schema.Boolean,
+  nextSearchPage: Schema.optional(NonNegativeInt),
 });
 
 export const ClickUpTaskDetails = Schema.Struct({

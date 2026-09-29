@@ -475,6 +475,34 @@ it.effect(
   },
 );
 
+it.effect("routes incremental search cursors without waiting for all workspace pages", () => {
+  const test = setup((path) => {
+    const page = new URL(path, "https://fixture.test").searchParams.get("page");
+    return { tasks: [{ ...task, id: `task-${page}` }], last_page: page === "1" };
+  });
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    const input = { workspaceId: "42", userId: 17, page: 0, query: "checkout", searchPage: 0 };
+    const first = yield* tasks.list(input);
+    assert.equal(first.nextSearchPage, 1);
+    assert.deepEqual(
+      first.tasks.map(({ taskId }) => taskId),
+      ["task-0"],
+    );
+    assert.equal(test.paths.length, 1);
+    const pending = yield* Effect.forkChild(tasks.list({ ...input, searchPage: 1 }));
+    yield* TestClock.adjust("1 second");
+    const second = yield* Fiber.join(pending);
+    assert.deepEqual(
+      second.tasks.map(({ taskId }) => taskId),
+      ["task-0", "task-1"],
+    );
+    assert.isUndefined(second.nextSearchPage);
+    assert.isFalse(second.hasMore);
+    assert.equal(test.paths.length, 2);
+  }).pipe(Effect.provide(test.layer));
+});
+
 it.effect("searches all workspace pages and reuses the account-scoped snapshot", () => {
   const test = setup((path) => {
     const page = new URL(path, "https://fixture.test").searchParams.get("page");
