@@ -74,8 +74,12 @@ export function matchingHandoff(
 export function currentHandoffs(
   handoffs: ReadonlyArray<ClickUpHandoff>,
 ): ReadonlyArray<ClickUpHandoff> {
+  const uncertainThreads = new Set(
+    handoffs.filter((handoff) => handoff.status === "uncertain").map((handoff) => handoff.threadId),
+  );
   const seenThreads = new Set<ThreadId>();
   return handoffs.filter((handoff) => {
+    if (uncertainThreads.has(handoff.threadId) && handoff.status !== "uncertain") return false;
     const superseded = seenThreads.has(handoff.threadId);
     seenThreads.add(handoff.threadId);
     return !superseded;

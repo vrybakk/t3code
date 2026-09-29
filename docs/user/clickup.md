@@ -115,6 +115,8 @@ and send to QA** to reconcile it. The list must have one identifiable QA status,
 or **QA Testing**. The handoff summary is posted once, including when continuing after merge.
 Merge and deployment remain with the CTO. Partial submissions show completed and failed steps;
 refresh before continuing after an unconfirmed response.
+If comment delivery needs confirmation, check ClickUp for the summary and record whether it was
+posted. If it is missing, continue the handoff after recording that result.
 
 Studio instructions are updated with app releases and loaded again when work resumes.
 Refresh task details to see agent updates; existing provider sessions may need restarting to
