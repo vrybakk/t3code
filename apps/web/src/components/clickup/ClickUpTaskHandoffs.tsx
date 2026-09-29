@@ -71,6 +71,9 @@ export function ClickUpTaskHandoffs({
             handoff={handoff}
             environmentId={environmentId}
             input={input}
+            showTimeSync={
+              data.submittedThreadIds?.includes(handoff.threadId) ?? handoff.status === "submitted"
+            }
             onRefresh={() => appAtomRegistry.refresh(query)}
           />
         ))
@@ -83,15 +86,19 @@ function HandoffCard({
   handoff,
   environmentId,
   input,
+  showTimeSync,
   onRefresh,
 }: {
   handoff: ClickUpHandoff;
   environmentId: EnvironmentId;
   input: ClickUpTaskInput;
+  showTimeSync: boolean;
   onRefresh: () => void;
 }) {
-  const supportsMergedHandoff =
-    useServerConfigs().get(environmentId)?.environment.capabilities.clickUpMergedHandoffs === true;
+  const capabilities = useServerConfigs().get(environmentId)?.environment.capabilities;
+  const supportsMergedHandoff = capabilities?.clickUpMergedHandoffs === true;
+  const canReconcileComment =
+    handoff.status === "uncertain" && capabilities?.clickUpCommentReconciliation === true;
   const submit = useAtomCommand(serverEnvironment.clickUpSubmitWorkflow, { reportFailure: false });
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -106,13 +113,22 @@ function HandoffCard({
       handoff.status === "submitted" &&
       handoff.destination !== "qa" &&
       !!handoff.taskScopeFingerprint);
-  async function send() {
-    if (!checked || !canSubmit || sending.current || unconfirmed) return;
+  async function send(commentDelivery?: "posted" | "not-posted") {
+    if (
+      !checked ||
+      sending.current ||
+      unconfirmed ||
+      (commentDelivery ? !canReconcileComment : !canSubmit)
+    )
+      return;
     sending.current = true;
     setBusy(true);
     setError(null);
     try {
-      const result = await submit({ environmentId, input: { ...input, handoffId: handoff.id } });
+      const result = await submit({
+        environmentId,
+        input: { ...input, handoffId: handoff.id, ...(commentDelivery ? { commentDelivery } : {}) },
+      });
       if (result._tag === "Success") {
         setChecked(false);
         appAtomRegistry.refresh(serverEnvironment.clickUpTask({ environmentId, input }));
@@ -204,11 +220,40 @@ function HandoffCard({
       )}
       {handoff.status === "uncertain" && (
         <p className="text-sm text-muted-foreground">
-          Check the result in GitHub and ClickUp with the agent before continuing. Automatic retry
-          is paused.
+          Check the PRs and whether this summary appears in ClickUp. Automatic retry is paused.
         </p>
       )}
-      {handoff.status === "submitted" && (
+      {canReconcileComment && (
+        <>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={checked}
+              disabled={busy || unconfirmed}
+              onCheckedChange={(value) => setChecked(value === true)}
+            />
+            I checked ClickUp and confirmed whether this summary was posted.
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!checked || busy || unconfirmed}
+              onClick={() => void send("posted")}
+            >
+              Summary is posted
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!checked || busy || unconfirmed}
+              onClick={() => void send("not-posted")}
+            >
+              Summary is missing
+            </Button>
+          </div>
+        </>
+      )}
+      {showTimeSync && (
         <ClickUpTimeSync environmentId={environmentId} threadId={handoff.threadId} />
       )}
       {canSubmit && (
