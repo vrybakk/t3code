@@ -18,7 +18,12 @@ import * as Semaphore from "effect/Semaphore";
 import { PullRequestService } from "../pullRequest/PullRequestService.ts";
 import { ClickUpTasks } from "./ClickUpTasks.ts";
 import { ClickUpTaskEditing } from "./ClickUpTaskEditing.ts";
-import { decodeWorkflowText, handoffSummary, matchingHandoff } from "./ClickUpWorkflowEvidence.ts";
+import {
+  currentHandoffs,
+  decodeWorkflowText,
+  handoffSummary,
+  matchingHandoff,
+} from "./ClickUpWorkflowEvidence.ts";
 import { ClickUpWorkflowStore } from "./ClickUpWorkflowStore.ts";
 import { taskScopeFingerprint } from "./ClickUpTaskScope.ts";
 import { refreshHandoffPullRequest } from "./ClickUpWorkflowPullRequests.ts";
@@ -89,7 +94,17 @@ export const layer = Layer.effect(
     });
     const read = Effect.fn("ClickUpWorkflow.read")(function* (task: ClickUpTaskInput) {
       yield* tasks.authorize(task);
-      return { handoffs: yield* store.list(task) };
+      const handoffs = yield* store.list(task);
+      return {
+        handoffs: currentHandoffs(handoffs),
+        submittedThreadIds: [
+          ...new Set(
+            handoffs
+              .filter((item) => item.status === "submitted" || item.commentPosted)
+              .map((item) => item.threadId),
+          ),
+        ],
+      };
     });
     const start = Effect.fn("ClickUpWorkflow.start")(function* (task: ClickUpTaskInput) {
       const details = yield* current(task);
@@ -159,7 +174,14 @@ export const layer = Layer.effect(
         });
       }
       const existing = yield* store.list(task);
-      const same = matchingHandoff(existing, {
+      if (
+        existing.some((handoff) => handoff.threadId === threadId && handoff.status === "uncertain")
+      )
+        return yield* failure(
+          "A handoff comment may already have reached ClickUp. Check its delivery before preparing another handoff for this thread.",
+        );
+      const latest = existing.find((handoff) => handoff.threadId === threadId);
+      const same = matchingHandoff(latest ? [latest] : [], {
         threadId,
         taskScopeFingerprint: scope,
         summary,
@@ -186,16 +208,46 @@ export const layer = Layer.effect(
     const submit = Effect.fn("ClickUpWorkflow.submit")(function* (
       task: ClickUpSubmitWorkflowInput,
     ) {
-      const taskDetails = yield* current(task);
-      const found = (yield* store.list(task)).find((item) => item.id === task.handoffId);
+      yield* tasks.authorize(task);
+      const handoffs = yield* store.list(task);
+      const foundIndex = handoffs.findIndex((item) => item.id === task.handoffId);
+      const found = handoffs[foundIndex];
       if (!found)
         return yield* failure(
           "This handoff does not belong to the current ClickUp account and task.",
         );
+      if (task.commentDelivery) {
+        if (found.status !== "uncertain")
+          return yield* failure("Only a handoff awaiting comment confirmation can be reconciled.");
+        const posted = task.commentDelivery === "posted";
+        yield* store.reconcileComment(task, `handoff:${found.id}`, posted);
+        const reconciled: ClickUpHandoff = {
+          ...found,
+          status: posted ? "submitted" : "partial",
+          commentPosted: posted,
+          error: null,
+        };
+        yield* store.save(task, reconciled);
+        return reconciled;
+      }
+      if (found.status === "uncertain") return found;
       if (
-        found.status === "uncertain" ||
-        (found.status === "submitted" &&
-          (found.destination === "qa" || !found.taskScopeFingerprint))
+        handoffs.some(
+          (item) =>
+            item.id !== found.id && item.threadId === found.threadId && item.status === "uncertain",
+        )
+      )
+        return yield* failure(
+          "A handoff comment may already have reached ClickUp. Check its delivery before submitting another handoff for this thread.",
+        );
+      if (handoffs.slice(0, foundIndex).some((item) => item.threadId === found.threadId))
+        return yield* failure(
+          "A newer handoff is ready for this thread. Review that handoff instead.",
+        );
+      const taskDetails = yield* current(task);
+      if (
+        found.status === "submitted" &&
+        (found.destination === "qa" || !found.taskScopeFingerprint)
       )
         return found;
       const checkScope = (fingerprint: string) =>

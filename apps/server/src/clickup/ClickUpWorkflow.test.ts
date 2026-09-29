@@ -1,6 +1,10 @@
 import { assert, it } from "@effect/vitest";
+import { ClickUpHandoff } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { task, threadId, url, input, harness, database } from "./ClickUpWorkflow.test-fixtures.ts";
+
+const encodeHandoff = Schema.encodeEffect(Schema.fromJsonString(ClickUpHandoff));
 
 it.effect("starts implementation only after checking the current no agent tag", () =>
   Effect.gen(function* () {
@@ -72,6 +76,158 @@ it.effect(
         "Failure",
       );
     }).pipe(Effect.provide(database)),
+);
+
+it.effect("shows the latest handoff and blocks an older pending submission", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const original = yield* service.prepare(task, threadId, input);
+    const revised = yield* service.prepare(task, threadId, {
+      ...input,
+      summary: "Updated review summary for the same pull request.",
+    });
+    assert.notEqual(revised.id, original.id);
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [revised.id],
+    );
+    assert.equal(
+      (yield* Effect.result(service.submit({ ...task, handoffId: original.id })))._tag,
+      "Failure",
+    );
+    assert.deepEqual(state.writes, []);
+    assert.deepEqual(state.comments, []);
+    assert.equal((yield* service.submit({ ...task, handoffId: revised.id })).status, "submitted");
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [revised.id],
+    );
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("keeps time sync available after revising a submitted handoff", () =>
+  Effect.gen(function* () {
+    const { service } = yield* harness();
+    const original = yield* service.prepare(task, threadId, input);
+    assert.equal((yield* service.submit({ ...task, handoffId: original.id })).status, "submitted");
+    const revised = yield* service.prepare(task, threadId, {
+      ...input,
+      summary: "Updated review summary for the same pull request.",
+    });
+    const workflow = yield* service.read(task);
+    assert.deepEqual(
+      workflow.handoffs.map((handoff) => handoff.id),
+      [revised.id],
+    );
+    assert.deepEqual(workflow.submittedThreadIds, [threadId]);
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("keeps uncertain delivery visible and blocks another comment for the thread", () =>
+  Effect.gen(function* () {
+    const { service, state, sql } = yield* harness();
+    const original = yield* service.prepare(task, threadId, input);
+    state.failComment = true;
+    const uncertain = yield* service.submit({ ...task, handoffId: original.id });
+    assert.equal(uncertain.status, "uncertain");
+    assert.equal(
+      (yield* Effect.result(
+        service.prepare(task, threadId, {
+          ...input,
+          summary: "Updated review summary for the same pull request.",
+        }),
+      ))._tag,
+      "Failure",
+    );
+    const newer = {
+      ...original,
+      id: "newer",
+      summary: "Updated review summary for the same pull request.",
+    };
+    yield* sql`INSERT INTO clickup_workflow_handoffs(id, workspace_id, task_id, user_id, thread_id, handoff_json)
+      VALUES (${newer.id}, ${task.workspaceId}, ${task.taskId}, ${task.userId}, ${threadId}, ${yield* encodeHandoff(newer)})`;
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [uncertain.id],
+    );
+    assert.equal(
+      (yield* Effect.result(service.submit({ ...task, handoffId: newer.id })))._tag,
+      "Failure",
+    );
+    assert.equal(state.comments.length, 1);
+    const reconciled = yield* service.submit({
+      ...task,
+      handoffId: uncertain.id,
+      commentDelivery: "posted",
+    });
+    assert.equal(reconciled.status, "submitted");
+    assert.equal(reconciled.commentPosted, true);
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [newer.id],
+    );
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("continues an uncertain handoff after confirming its comment is missing", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const prepared = yield* service.prepare(task, threadId, input);
+    state.failComment = true;
+    assert.equal((yield* service.submit({ ...task, handoffId: prepared.id })).status, "uncertain");
+    state.failComment = false;
+    const reconciled = yield* service.submit({
+      ...task,
+      handoffId: prepared.id,
+      commentDelivery: "not-posted",
+    });
+    assert.equal(reconciled.status, "partial");
+    assert.equal(reconciled.commentPosted, false);
+    assert.equal((yield* service.submit({ ...task, handoffId: prepared.id })).status, "submitted");
+    assert.equal(state.comments.length, 2);
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("does not erase a confirmed comment when reconciling an uncertain receipt", () =>
+  Effect.gen(function* () {
+    const { service, state, sql } = yield* harness();
+    const prepared = yield* service.prepare(task, threadId, input);
+    const submitted = yield* service.submit({ ...task, handoffId: prepared.id });
+    assert.equal(submitted.status, "submitted");
+    yield* sql`UPDATE clickup_workflow_handoffs SET handoff_json = ${yield* encodeHandoff({ ...submitted, status: "uncertain", commentPosted: false })} WHERE id = ${prepared.id}`;
+    assert.equal(
+      (yield* Effect.result(
+        service.submit({ ...task, handoffId: prepared.id, commentDelivery: "not-posted" }),
+      ))._tag,
+      "Failure",
+    );
+    assert.equal(state.comments.length, 1);
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("replaces a failed partial handoff with the latest reviewed handoff", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const original = yield* service.prepare(task, threadId, input);
+    state.head = "changed-head";
+    const partial = yield* service.submit({ ...task, handoffId: original.id });
+    assert.equal(partial.status, "partial");
+    assert.include(partial.error, "changed after review");
+    state.head = "abc";
+    const revised = yield* service.prepare(task, threadId, {
+      ...input,
+      summary: "Updated review summary for the same pull request.",
+    });
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [revised.id],
+    );
+    assert.equal(
+      (yield* Effect.result(service.submit({ ...task, handoffId: original.id })))._tag,
+      "Failure",
+    );
+    assert.deepEqual(state.writes, []);
+  }).pipe(Effect.provide(database)),
 );
 
 it.effect("rejects changed or unlinked PR heads before any submit write", () =>
