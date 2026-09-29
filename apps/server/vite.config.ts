@@ -3,6 +3,7 @@ import { defineConfig, mergeConfig } from "vite-plus";
 
 import baseConfig from "../../vite.config.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
+import { serverBuildVersionPlugin } from "../../scripts/lib/server-build-version.ts";
 import packageJson from "./package.json" with { type: "json" };
 
 // The bundle used to inline only workspace packages, leaving every third-party
@@ -21,9 +22,8 @@ import {
 export { shouldBundleCliDependency };
 
 const repoEnv = loadRepoEnv();
-const cliBuildChannel = /^[^-+]+-(?:nightly|preview)\./.test(packageJson.version)
-  ? "nightly"
-  : "latest";
+const buildVersion = process.env.APP_VERSION?.trim() || packageJson.version;
+const cliBuildChannel = /^[^-+]+-(?:nightly|preview)\./.test(buildVersion) ? "nightly" : "latest";
 
 // `build:exe` wraps the same bundle in a Node single-executable. tsdown's exe
 // step refuses multi-chunk output and counts the sourcemap as a chunk, and the
@@ -75,6 +75,7 @@ export default mergeConfig(
       },
     },
     pack: {
+      plugins: [serverBuildVersionPlugin(buildVersion)],
       // The executable embeds one entry; the history worker becomes a hidden
       // subcommand there instead of a sibling script.
       entry: packExecutable ? ["src/bin.ts"] : ["src/bin.ts", "src/claude-history-worker.ts"],
