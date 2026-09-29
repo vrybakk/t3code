@@ -1,4 +1,3 @@
-import { useAtomValue } from "@effect/atom-react";
 import type { ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -14,6 +13,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
 import { taskColor } from "./taskFormatting";
+import { useClickUpCachedQuery } from "./useClickUpCachedQuery";
 
 interface Props {
   environmentId: EnvironmentId;
@@ -131,7 +131,7 @@ function EditorOptions({
   onDone: () => void;
 }) {
   const query = serverEnvironment.clickUpTaskOptions({ environmentId, input });
-  const result = useAtomValue(query);
+  const result = useClickUpCachedQuery(query);
   const data = Option.getOrNull(AsyncResult.value(result));
   const setStatus = useAtomCommand(serverEnvironment.clickUpSetStatus);
   const setTag = useAtomCommand(serverEnvironment.clickUpSetTag);
@@ -174,7 +174,7 @@ function EditorOptions({
   return (
     <Command mode="none" value={search} onValueChange={setSearch} aria-label={`Choose ${kind}`}>
       <CommandInput placeholder={`Search ${kind}…`} aria-label={`Search ${kind}`} />
-      {AsyncResult.isFailure(result) ? (
+      {AsyncResult.isFailure(result) && !data ? (
         <div className="space-y-2 p-3 text-xs">
           <p role="alert" className="text-destructive">
             Could not load available {kind}.
@@ -188,32 +188,38 @@ function EditorOptions({
           Loading…
         </p>
       ) : (
-        <CommandList className="max-h-80 overflow-y-auto">
-          {groups.map((group) => (
-            <div key={group}>
-              {group && <p className="px-2 pt-3 pb-1 text-xs text-muted-foreground">{group}</p>}
-              {visible
-                .filter((item) => item.group === group)
-                .map((item) => (
-                  <CommandItem
-                    key={item.name}
-                    value={item.name}
-                    disabled={busy || result.waiting || (kind === "status" && item.selected)}
-                    onClick={() => void select(item.name, item.selected)}
-                  >
-                    <ColorDot color={item.color} />
-                    <span className={`min-w-0 flex-1 ${kind === "status" ? "uppercase" : ""}`}>
-                      {item.name}
-                    </span>
-                    {item.selected && <CheckIcon className="size-3.5" />}
-                  </CommandItem>
-                ))}
-            </div>
-          ))}
-          {!visible.length && (
-            <p className="p-3 text-xs text-muted-foreground">No matching {kind}.</p>
-          )}
-        </CommandList>
+        <div className="max-h-[min(20rem,calc(var(--available-height)-4rem))] [&>div]:max-h-[inherit]">
+          <CommandList>
+            {groups.map((group) => (
+              <div key={group}>
+                {group && <p className="px-2 pt-3 pb-1 text-xs text-muted-foreground">{group}</p>}
+                {visible
+                  .filter((item) => item.group === group)
+                  .map((item) => (
+                    <CommandItem
+                      key={item.name}
+                      value={item.name}
+                      disabled={
+                        busy ||
+                        (kind === "tags" && result.waiting) ||
+                        (kind === "status" && item.selected)
+                      }
+                      onClick={() => void select(item.name, item.selected)}
+                    >
+                      <ColorDot color={item.color} />
+                      <span className={`min-w-0 flex-1 ${kind === "status" ? "uppercase" : ""}`}>
+                        {item.name}
+                      </span>
+                      {item.selected && <CheckIcon className="size-3.5" />}
+                    </CommandItem>
+                  ))}
+              </div>
+            ))}
+            {!visible.length && (
+              <p className="p-3 text-xs text-muted-foreground">No matching {kind}.</p>
+            )}
+          </CommandList>
+        </div>
       )}
       {busy && (
         <p role="status" className="px-3 pb-2 text-xs text-muted-foreground">
