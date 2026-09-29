@@ -67,12 +67,6 @@ export const layer = Layer.effect(
           message:
             "This task maps to more than eight repositories. Narrow its repository links before estimating.",
         });
-      const research = yield* collectEstimationEvidence({
-        ...input,
-        repositories,
-        snapshot: encode(input.details),
-        taskName: input.details.task.name,
-      });
       const provider = yield* registry
         .getInstance(input.modelSelection.instanceId)
         .pipe(
@@ -97,6 +91,14 @@ export const layer = Layer.effect(
           () => new ClickUpError({ message: "Could not prepare task attachment evidence." }),
         ),
       );
+      const research = yield* collectEstimationEvidence({
+        ...input,
+        repositories,
+        snapshot: encode(input.details),
+        taskName: input.details.task.name,
+        imagePaths: attachments.imagePaths,
+        attachmentContext: encode(attachments.evidence),
+      });
       const limitations = [
         ...research.limitations,
         ...attachments.limitations,
@@ -130,8 +132,8 @@ export const layer = Layer.effect(
             "Estimate AI-assisted execution in minutes, not traditional unaided developer hours, billable hours, calendar lead time, or the sum of parallel agent durations. Use the code already researched; do not budget rediscovering established facts. Base implementation on the smallest concrete change, reuse existing code and tests, and include the specific necessary verification commands/checks.",
             "Avoid generic padding: no mandatory 15/30/60-minute floors, no default percentage buffers, no repeating setup for each phase, no speculative refactors, no invented test suites. Small confirmed fixes may take a few minutes. Do not divide a human estimate by an arbitrary AI multiplier. Include follow-up minutes only for a specific likely correction justified by evidence; otherwise use zero.",
             "Separate implementationMinutes, verificationMinutes, followUpMinutes. The server sums them. Exclude waiting for approvals, review, deployment and idle time. Do not infer hands-on work from agent elapsed time. Historical timings are not calibrated because comparable estimate/outcome pairs are unavailable.",
-            "Give a concise summary of the likely change and why each phase needs its time. Cite the relevant repository/file paths. State assumptions and material unknowns separately. Tests were NOT run; only code and test configuration were inspected. Images marked supplied are attached to this request; inspect them before concluding.",
-            "Return estimate=null if the relevant code is not sufficient to identify the likely work, a required repository/attachment is missing, or acceptance criteria are unresolved. Put specific missing information in summary. Low confidence or nonempty blockers will not be saved. Do not inflate a guess to compensate for missing evidence.",
+            "Give a concise summary of the likely change and why each phase needs its time. Cite only repository labels and relative file paths present in the evidence, never paths resolved against the temporary analysis directory. State assumptions and material unknowns separately. Tests were NOT run; only code and test configuration were inspected. Images marked supplied are attached to this request; inspect them before concluding.",
+            "An estimate does not require an implemented fix or proof of every detail. When the inspected code establishes the likely scope and change path, state reasonable assumptions and include specific remaining investigation or verification in the relevant phase. Missing test execution, a truncated unrelated file, or an unknown detail that does not materially change the likely work is not itself a blocker. Return estimate=null when the likely scope cannot be bounded from inspected evidence, a required repository/attachment is missing, or unresolved acceptance criteria would materially change the work. Explain the specific missing information and the next targeted check or artifact needed. Do not tell the user merely to rerun, and do not include internal phrases such as estimate=null in the summary. Low confidence or nonempty blockers will not be saved. Do not invent a number for genuinely unknown scope.",
             'Return JSON with exactly summary, searches:[], files:[], estimate. estimate is null or {implementationMinutes,verificationMinutes,followUpMinutes,confidence:"low"|"medium"|"high",blockers:[]}. File citations belong only in summary; files/searches are research requests, not citations, and must be empty in a final estimate. Do not claim every attachment was inspected; use the per-attachment statuses.',
             `Task: ${encode(input.details)}`,
             `Repository evidence: ${research.context}`,

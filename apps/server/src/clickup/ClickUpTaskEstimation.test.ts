@@ -19,10 +19,12 @@ import { RepositoryIdentityResolver } from "../project/RepositoryIdentityResolve
 import { ServerSettingsService } from "../serverSettings.ts";
 import { ProviderInstanceRegistry } from "../provider/Services/ProviderInstanceRegistry.ts";
 import { TextGeneration } from "../textGeneration/TextGeneration.ts";
+import { collectEstimationAttachments } from "./ClickUpEstimationAttachments.ts";
 import { collectEstimationEvidence } from "./ClickUpEstimationResearch.ts";
 import { estimationRepositories } from "./ClickUpTaskRepositories.ts";
 import { ClickUpTaskEstimation, layer } from "./ClickUpTaskEstimation.ts";
 
+vi.mock("./ClickUpEstimationAttachments.ts", () => ({ collectEstimationAttachments: vi.fn() }));
 vi.mock("./ClickUpEstimationResearch.ts", () => ({
   collectEstimationEvidence: vi.fn(),
 }));
@@ -66,6 +68,9 @@ const response: TaskEstimationResponse = {
   },
 };
 beforeEach(() => {
+  vi.mocked(collectEstimationAttachments)
+    .mockReset()
+    .mockReturnValue(Effect.succeed({ imagePaths: [], evidence: [], limitations: [] }));
   vi.mocked(collectEstimationEvidence).mockReset().mockReturnValue(Effect.succeed(evidence));
   vi.mocked(estimationRepositories)
     .mockReset()
@@ -147,5 +152,23 @@ it.effect("rejects changed source evidence before returning a number", () =>
       }),
     );
     assert.equal((yield* Effect.result(run()))._tag, "Failure");
+  }),
+);
+
+it.effect("supplies prepared screenshots and attachment text before researching code", () =>
+  Effect.gen(function* () {
+    vi.mocked(collectEstimationAttachments).mockReturnValue(
+      Effect.succeed({
+        imagePaths: ["/tmp/prepared-order.png"],
+        evidence: [
+          { name: "Order note", status: "Text inspected.", text: "Unexpected Kyiv comment" },
+        ],
+        limitations: [],
+      }),
+    );
+    yield* run();
+    const research = vi.mocked(collectEstimationEvidence).mock.calls[0]![0];
+    assert.deepEqual(research.imagePaths, ["/tmp/prepared-order.png"]);
+    assert.include(research.attachmentContext!, "Unexpected Kyiv comment");
   }),
 );
