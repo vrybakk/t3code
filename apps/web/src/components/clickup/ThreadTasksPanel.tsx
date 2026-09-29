@@ -1,4 +1,5 @@
 import type { ScopedThreadRef } from "@t3tools/contracts";
+import { Link } from "@tanstack/react-router";
 import { ClipboardListIcon, PlusIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { useThreadShell } from "../../state/entities";
@@ -10,18 +11,25 @@ import { useRightPanelStore } from "../../rightPanelStore";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import { ClickUpTaskHandoffs } from "./ClickUpTaskHandoffs";
 import { LinkThreadTask } from "./LinkThreadTask";
 
 export function ThreadTasksPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const thread = useThreadShell(threadRef);
   const links = thread?.clickUpTasks ?? [];
   const [adding, setAdding] = useState(false);
+  const [handoffTaskKey, setHandoffTaskKey] = useState<string | null>(null);
+  const handoffTask =
+    links.find((task) => `${task.workspaceId}:${task.taskId}` === handoffTaskKey) ??
+    links.find((task) => task.primary) ??
+    links[0];
   const account = useEnvironmentQuery(
     serverEnvironment.clickUpConnection({ environmentId: threadRef.environmentId, input: {} }),
   );
   const unlink = useAtomCommand(threadEnvironment.unlinkTask);
   return (
-    <section className="flex min-h-0 flex-1 flex-col" aria-label="Linked tasks">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Linked tasks">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h2 className="text-sm font-medium">
           Linked tasks <span className="text-muted-foreground">{links.length}</span>
@@ -90,6 +98,68 @@ export function ThreadTasksPanel({ threadRef }: { threadRef: ScopedThreadRef }) 
               ) : null}
             </div>
           ))
+        )}
+        {handoffTask && (
+          <div className="space-y-4 p-4">
+            {links.length > 1 && (
+              <Select
+                value={`${handoffTask.workspaceId}:${handoffTask.taskId}`}
+                onValueChange={setHandoffTaskKey}
+                items={links.map((task) => ({
+                  value: `${task.workspaceId}:${task.taskId}`,
+                  label: task.name,
+                }))}
+              >
+                <SelectTrigger aria-label="Handoff task">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectPopup>
+                  {links.map((task) => (
+                    <SelectItem
+                      key={`${task.workspaceId}:${task.taskId}`}
+                      value={`${task.workspaceId}:${task.taskId}`}
+                    >
+                      {task.name}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+            )}
+            {account.error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {account.error}
+              </p>
+            ) : !account.data ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                Loading handoff connection…
+              </p>
+            ) : !account.data.user ||
+              !account.data.workspaces.some(
+                (workspace) => workspace.id === handoffTask.workspaceId,
+              ) ? (
+              <div className="space-y-2 text-sm">
+                <p>Connect ClickUp with access to this task’s workspace to view its handoff.</p>
+                <Link
+                  className="text-primary underline"
+                  to="/settings/integrations"
+                  search={{ machine: threadRef.environmentId }}
+                >
+                  ClickUp settings
+                </Link>
+              </div>
+            ) : (
+              <ClickUpTaskHandoffs
+                key={`${threadRef.environmentId}:${account.data.user.id}:${handoffTask.workspaceId}:${handoffTask.taskId}:${threadRef.threadId}`}
+                environmentId={threadRef.environmentId}
+                input={{
+                  workspaceId: handoffTask.workspaceId,
+                  taskId: handoffTask.taskId,
+                  userId: account.data.user.id,
+                }}
+                threadId={threadRef.threadId}
+              />
+            )}
+          </div>
         )}
       </ScrollArea>
     </section>

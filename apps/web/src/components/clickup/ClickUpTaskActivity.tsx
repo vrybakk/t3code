@@ -20,7 +20,6 @@ import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
-import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ClickUpCommentThread } from "./ClickUpCommentThread";
 import { ClickUpCommentComposer } from "./ClickUpCommentComposer";
@@ -77,13 +76,13 @@ export function ClickUpTaskActivity({
   return (
     <aside
       aria-label="Activity and comments"
-      className={`flex min-h-0 flex-col border-t border-border bg-muted/10 lg:shrink-0 lg:border-t-0 lg:border-l ${activityOpen ? "lg:w-80 xl:w-96" : "lg:w-12"}`}
+      className={`flex min-w-0 shrink-0 flex-col border-t border-border bg-muted/10 @[64rem]/task-panel:min-h-0 @[64rem]/task-panel:border-t-0 @[64rem]/task-panel:border-l ${activityOpen ? "@[64rem]/task-panel:w-96" : "@[64rem]/task-panel:w-12"}`}
     >
       <div
-        className={`flex items-center justify-between border-b border-border py-4 ${activityOpen ? "px-5" : "px-2 lg:justify-center"}`}
+        className={`flex items-center justify-between border-b border-border py-4 ${activityOpen ? "px-5" : "px-2 @[64rem]/task-panel:justify-center"}`}
       >
         <h3
-          className={`flex items-center gap-2 text-sm font-medium ${activityOpen ? "" : "lg:hidden"}`}
+          className={`flex items-center gap-2 text-sm font-medium ${activityOpen ? "" : "@[64rem]/task-panel:hidden"}`}
         >
           <MessageSquareIcon className="size-4" /> Activity & comments
         </h3>
@@ -131,7 +130,7 @@ export function ClickUpTaskActivity({
         hidden={!activityOpen}
         className={`${activityOpen ? "flex" : "hidden"} min-h-0 flex-1 flex-col`}
       >
-        <ScrollArea className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 @[64rem]/task-panel:overflow-y-auto">
           <div className="space-y-4 p-5">
             <p className="text-xs leading-relaxed text-muted-foreground">
               Full change history is available in ClickUp.
@@ -202,7 +201,7 @@ export function ClickUpTaskActivity({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
         <div className="shrink-0 border-t border-border p-4">
           <ClickUpCommentComposer
             environmentId={environmentId}

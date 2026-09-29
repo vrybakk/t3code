@@ -255,11 +255,37 @@ it.effect("collects reviewed PRs across repositories but excludes other tasks", 
   }).pipe(Effect.provide(database)),
 );
 
-it.effect("does not attribute a thread's implementation PRs to a context task", () =>
+it.effect(
+  "prepares and submits explicitly reviewed PRs for a context task without promoting it",
+  () =>
+    Effect.gen(function* () {
+      const { service, sql, state } = yield* harness();
+      yield* sql`UPDATE projection_thread_clickup_tasks SET is_primary = 0`;
+      const handoff = yield* service.prepare(task, threadId, input);
+      assert.deepEqual(
+        handoff.pullRequests.map((pr) => pr.url),
+        [url],
+      );
+      assert.deepEqual(state.writes, []);
+      assert.deepEqual(state.comments, []);
+      assert.equal((yield* service.submit({ ...task, handoffId: handoff.id })).status, "submitted");
+      const rows = yield* sql<{
+        is_primary: number;
+      }>`SELECT is_primary FROM projection_thread_clickup_tasks`;
+      assert.deepEqual(rows, [{ is_primary: 0 }]);
+    }).pipe(Effect.provide(database)),
+);
+
+it.effect("rejects a context task handoff after its thread link is removed", () =>
   Effect.gen(function* () {
     const { service, sql, state } = yield* harness();
     yield* sql`UPDATE projection_thread_clickup_tasks SET is_primary = 0`;
+    const handoff = yield* service.prepare(task, threadId, input);
+    yield* sql`DELETE FROM projection_thread_clickup_tasks`;
     assert.equal((yield* Effect.result(service.prepare(task, threadId, input)))._tag, "Failure");
+    const receipt = yield* service.submit({ ...task, handoffId: handoff.id });
+    assert.equal(receipt.status, "partial");
+    assert.include(receipt.error, "unlinked");
     assert.deepEqual(state.writes, []);
     assert.deepEqual(state.comments, []);
   }).pipe(Effect.provide(database)),

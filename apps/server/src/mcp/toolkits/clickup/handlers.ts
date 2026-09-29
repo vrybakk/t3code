@@ -21,13 +21,20 @@ const make = Effect.gen(function* () {
   const interactions = yield* ClickUpInteractions;
   const editing = yield* ClickUpTaskEditing;
   const workflow = yield* ClickUpWorkflow;
-  const linkedTask = Effect.fn("ClickUpToolkit.linkedTask")(function* () {
+  const linkedTask = Effect.fn("ClickUpToolkit.linkedTask")(function* (
+    target?: Pick<ClickUpTaskInput, "workspaceId" | "taskId">,
+  ) {
     const scope = yield* requireMcpCapability("clickup");
     const rows = yield* sql<{ workspaceId: string; taskId: string }>`
       SELECT tasks.workspace_id AS "workspaceId", tasks.task_id AS "taskId"
       FROM projection_thread_clickup_tasks AS tasks
       JOIN projection_threads AS threads ON threads.thread_id = tasks.thread_id
-      WHERE tasks.thread_id = ${scope.threadId} AND tasks.is_primary = 1 AND threads.deleted_at IS NULL
+      WHERE tasks.thread_id = ${scope.threadId} AND threads.deleted_at IS NULL
+        AND ${
+          target
+            ? sql`tasks.workspace_id = ${target.workspaceId} AND tasks.task_id = ${target.taskId}`
+            : sql`tasks.is_primary = 1`
+        }
     `.pipe(
       Effect.mapError(
         () => new ClickUpError({ message: "Could not read this thread's linked ClickUp task." }),
@@ -35,7 +42,11 @@ const make = Effect.gen(function* () {
     );
     const link = rows[0];
     if (!link)
-      return yield* new ClickUpError({ message: "This thread has no linked ClickUp task." });
+      return yield* new ClickUpError({
+        message: target
+          ? "The selected ClickUp task is not linked to this thread."
+          : "This thread has no linked ClickUp task.",
+      });
     const { connection: account } = yield* connection.account;
     if (!account.user)
       return yield* new ClickUpError({
@@ -53,29 +64,38 @@ const make = Effect.gen(function* () {
   return ClickUpToolkit.of({
     get_studio_task_workflow: (input) =>
       Effect.gen(function* () {
-        const task = yield* linkedTask().pipe(Effect.flatMap(tasks.detail));
+        const task = yield* linkedTask(input.task).pipe(Effect.flatMap(tasks.detail));
         const scope = yield* requireMcpCapability("clickup");
         const context = yield* readClickUpWorkflowContext(task.task, scope.threadId);
         const instructions = getStudioTaskWorkflow(input.mode);
         return { ...instructions, instructions: `${instructions.instructions}\n\n${context}` };
       }),
-    start_linked_clickup_implementation: () => linkedTask().pipe(Effect.flatMap(workflow.start)),
+    start_linked_clickup_implementation: (input) =>
+      linkedTask(input.task).pipe(Effect.flatMap(workflow.start)),
     post_linked_clickup_findings: (input) =>
-      linkedTask().pipe(Effect.flatMap((task) => workflow.findings(task, input))),
+      linkedTask(input.task).pipe(Effect.flatMap((task) => workflow.findings(task, input))),
     prepare_linked_clickup_handoff: (input) =>
       Effect.gen(function* () {
-        const task = yield* linkedTask();
+        const task = yield* linkedTask(input.task);
         const scope = yield* requireMcpCapability("clickup");
         return yield* workflow.prepare(task, scope.threadId, input);
       }),
-    get_linked_clickup_task: () => linkedTask().pipe(Effect.flatMap(tasks.detail)),
+    get_linked_clickup_task: (input) => linkedTask(input.task).pipe(Effect.flatMap(tasks.detail)),
     get_linked_clickup_comments: (input) =>
-      linkedTask().pipe(Effect.flatMap((task) => interactions.comments({ ...input, ...task }))),
+      linkedTask(input.task).pipe(
+        Effect.flatMap((task) => interactions.comments({ ...task, cursor: input.cursor })),
+      ),
     get_linked_clickup_comment_replies: (input) =>
-      linkedTask().pipe(Effect.flatMap((task) => interactions.replies({ ...input, ...task }))),
+      linkedTask(input.task).pipe(
+        Effect.flatMap((task) =>
+          interactions.replies({ ...task, commentId: input.commentId, cursor: input.cursor }),
+        ),
+      ),
     complete_clickup_estimation: (input) =>
-      linkedTask().pipe(
-        Effect.flatMap((task) => editing.completeEstimation({ ...task, ...input })),
+      linkedTask(input.task).pipe(
+        Effect.flatMap((task) =>
+          editing.completeEstimation({ ...task, estimateMinutes: input.estimateMinutes }),
+        ),
       ),
   });
 });

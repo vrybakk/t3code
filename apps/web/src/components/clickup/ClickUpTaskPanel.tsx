@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
+import type { ClickUpTaskDetails, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { ExternalLinkIcon, PaperclipIcon, RefreshCwIcon } from "lucide-react";
@@ -9,7 +9,6 @@ import { appAtomRegistry } from "../../rpc/atomRegistry";
 import ChatMarkdown from "../ChatMarkdown";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ScrollArea } from "../ui/scroll-area";
 import { ClickUpTaskActivity } from "./ClickUpTaskActivity";
 import { ClickUpCustomFields, ClickUpTaskFields } from "./ClickUpTaskFields";
 import { ClickUpTaskWork } from "./ClickUpTaskWork";
@@ -22,9 +21,11 @@ import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
 export function ClickUpTaskPanel({
   environmentId,
   input,
+  onStartTask,
 }: {
   environmentId: EnvironmentId;
   input: ClickUpTaskInput;
+  onStartTask?: (details: ClickUpTaskDetails) => void;
 }) {
   const [action, setAction] = useState<ClickUpTaskAction | null>(null);
   const query = serverEnvironment.clickUpTask({ environmentId, input });
@@ -32,35 +33,51 @@ export function ClickUpTaskPanel({
   const details = Option.getOrNull(AsyncResult.value(result));
   const linksQuery = serverEnvironment.clickUpThreads({ environmentId, input });
   return (
-    <section aria-label="Task details" className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <section
+      aria-label="Task details"
+      className="@container/task-panel flex min-h-0 min-w-0 flex-1 flex-col"
+    >
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-5 py-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-          <p className="min-w-0 truncate text-xs text-muted-foreground">
-            {details?.task.listName ?? "Task details"}
-          </p>
-          <a
-            href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        <div className="flex min-w-0 basis-full flex-wrap items-center justify-between gap-3 @[64rem]/task-panel:basis-auto @[64rem]/task-panel:flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="min-w-0 truncate text-xs text-muted-foreground">
+              {details?.task.listName ?? "Task details"}
+            </p>
+            <a
+              href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Open in ClickUp <ExternalLinkIcon className="size-3.5" />
+            </a>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={result.waiting}
+            onClick={() => {
+              appAtomRegistry.refresh(query);
+              appAtomRegistry.refresh(linksQuery);
+            }}
           >
-            Open in ClickUp <ExternalLinkIcon className="size-3.5" />
-          </a>
+            <RefreshCwIcon className="size-4" /> Refresh details
+          </Button>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={result.waiting}
-          onClick={() => {
-            appAtomRegistry.refresh(query);
-            appAtomRegistry.refresh(linksQuery);
-          }}
-        >
-          <RefreshCwIcon className="size-4" /> Refresh details
-        </Button>
         {details && (
           <div className="ml-auto flex min-w-0 max-w-full justify-end">
-            <ClickUpTaskActionButtons task={details.task} onSelect={setAction} />
+            <ClickUpTaskActionButtons
+              task={details.task}
+              onSelect={(nextAction) => {
+                if (nextAction === "implement" && onStartTask) {
+                  if (!details.task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent")) {
+                    onStartTask(details);
+                  }
+                } else {
+                  setAction(nextAction);
+                }
+              }}
+            />
           </div>
         )}
       </div>
@@ -76,15 +93,15 @@ export function ClickUpTaskPanel({
           </p>
         )
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-          <ScrollArea className="min-h-0 min-w-0 flex-1">
-            <div className="mx-auto max-w-4xl space-y-7 px-6 py-8 xl:px-10">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto @[64rem]/task-panel:flex-row @[64rem]/task-panel:overflow-hidden">
+          <div className="@container/task-content min-w-0 shrink-0 @[64rem]/task-panel:min-h-0 @[64rem]/task-panel:flex-1 @[64rem]/task-panel:overflow-y-auto">
+            <div className="mx-auto max-w-4xl space-y-7 px-4 py-6 @[40rem]/task-content:px-8 @[40rem]/task-content:py-8">
               <div className="space-y-3">
                 <Badge variant="outline">
                   <ClickUpTaskTypeIcon name={details.task.taskType?.name ?? "Task"} />
                   {details.task.taskType?.name ?? "Task"}
                 </Badge>
-                <h2 className="text-2xl font-semibold leading-snug tracking-tight">
+                <h2 className="break-words text-2xl font-semibold leading-snug tracking-tight">
                   {details.task.name}
                 </h2>
               </div>
@@ -149,7 +166,7 @@ export function ClickUpTaskPanel({
                 </section>
               )}
             </div>
-          </ScrollArea>
+          </div>
           <ClickUpTaskActivity details={details} environmentId={environmentId} input={input} />
         </div>
       )}

@@ -119,7 +119,7 @@ export const layer = Layer.effect(
     SELECT p.thread_id AS "threadId", t.project_id AS "projectId", p.host, p.repository, p.number, p.url
     FROM projection_thread_pull_requests p JOIN projection_threads t ON p.thread_id = t.thread_id
     JOIN projection_thread_clickup_tasks c ON c.thread_id = t.thread_id
-    WHERE c.is_primary = 1 AND c.workspace_id = ${task.workspaceId} AND c.task_id = ${task.taskId} AND t.deleted_at IS NULL
+    WHERE c.workspace_id = ${task.workspaceId} AND c.task_id = ${task.taskId} AND t.deleted_at IS NULL
   `.pipe(Effect.mapError(failed));
     return ClickUpWorkflowStore.of({ list, save, postOnce, registered });
   }),
