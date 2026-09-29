@@ -9889,11 +9889,12 @@ export default function ChatView(props: ChatViewProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="min-w-0 justify-start"
+              className="min-w-0 flex-1 shrink justify-start"
+              title={mainLinkedTask?.name}
               onClick={addTaskSurface}
             >
               <span className="shrink-0 text-muted-foreground">Task</span>
-              <span className="truncate">{mainLinkedTask?.name}</span>
+              <span className="min-w-0 truncate">{mainLinkedTask?.name}</span>
             </Button>
             {primaryLinkedTask && supportsTaskLinks ? (
               <Button variant="outline" size="sm" className="shrink-0" onClick={addHandoffSurface}>

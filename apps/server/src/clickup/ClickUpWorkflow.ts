@@ -18,7 +18,12 @@ import * as Semaphore from "effect/Semaphore";
 import { PullRequestService } from "../pullRequest/PullRequestService.ts";
 import { ClickUpTasks } from "./ClickUpTasks.ts";
 import { ClickUpTaskEditing } from "./ClickUpTaskEditing.ts";
-import { decodeWorkflowText, handoffSummary, matchingHandoff } from "./ClickUpWorkflowEvidence.ts";
+import {
+  currentHandoffs,
+  decodeWorkflowText,
+  handoffSummary,
+  matchingHandoff,
+} from "./ClickUpWorkflowEvidence.ts";
 import { ClickUpWorkflowStore } from "./ClickUpWorkflowStore.ts";
 import { taskScopeFingerprint } from "./ClickUpTaskScope.ts";
 import { refreshHandoffPullRequest } from "./ClickUpWorkflowPullRequests.ts";
@@ -89,7 +94,7 @@ export const layer = Layer.effect(
     });
     const read = Effect.fn("ClickUpWorkflow.read")(function* (task: ClickUpTaskInput) {
       yield* tasks.authorize(task);
-      return { handoffs: yield* store.list(task) };
+      return { handoffs: currentHandoffs(yield* store.list(task)) };
     });
     const start = Effect.fn("ClickUpWorkflow.start")(function* (task: ClickUpTaskInput) {
       const details = yield* current(task);
@@ -159,7 +164,8 @@ export const layer = Layer.effect(
         });
       }
       const existing = yield* store.list(task);
-      const same = matchingHandoff(existing, {
+      const latest = existing.find((handoff) => handoff.threadId === threadId);
+      const same = matchingHandoff(latest ? [latest] : [], {
         threadId,
         taskScopeFingerprint: scope,
         summary,
@@ -187,10 +193,16 @@ export const layer = Layer.effect(
       task: ClickUpSubmitWorkflowInput,
     ) {
       const taskDetails = yield* current(task);
-      const found = (yield* store.list(task)).find((item) => item.id === task.handoffId);
+      const handoffs = yield* store.list(task);
+      const foundIndex = handoffs.findIndex((item) => item.id === task.handoffId);
+      const found = handoffs[foundIndex];
       if (!found)
         return yield* failure(
           "This handoff does not belong to the current ClickUp account and task.",
+        );
+      if (handoffs.slice(0, foundIndex).some((item) => item.threadId === found.threadId))
+        return yield* failure(
+          "A newer handoff is ready for this thread. Review that handoff instead.",
         );
       if (
         found.status === "uncertain" ||

@@ -70,3 +70,14 @@ export function matchingHandoff(
       ),
   );
 }
+
+export function currentHandoffs(
+  handoffs: ReadonlyArray<ClickUpHandoff>,
+): ReadonlyArray<ClickUpHandoff> {
+  const seenThreads = new Set<ThreadId>();
+  return handoffs.filter((handoff) => {
+    const superseded = seenThreads.has(handoff.threadId);
+    seenThreads.add(handoff.threadId);
+    return !superseded;
+  });
+}

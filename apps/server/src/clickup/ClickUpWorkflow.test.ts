@@ -74,6 +74,58 @@ it.effect(
     }).pipe(Effect.provide(database)),
 );
 
+it.effect("shows the latest handoff and blocks an older pending submission", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const original = yield* service.prepare(task, threadId, input);
+    const revised = yield* service.prepare(task, threadId, {
+      ...input,
+      summary: "Updated review summary for the same pull request.",
+    });
+    assert.notEqual(revised.id, original.id);
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [revised.id],
+    );
+    assert.equal(
+      (yield* Effect.result(service.submit({ ...task, handoffId: original.id })))._tag,
+      "Failure",
+    );
+    assert.deepEqual(state.writes, []);
+    assert.deepEqual(state.comments, []);
+    assert.equal((yield* service.submit({ ...task, handoffId: revised.id })).status, "submitted");
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [revised.id],
+    );
+  }).pipe(Effect.provide(database)),
+);
+
+it.effect("replaces a failed partial handoff with the latest reviewed handoff", () =>
+  Effect.gen(function* () {
+    const { service, state } = yield* harness();
+    const original = yield* service.prepare(task, threadId, input);
+    state.head = "changed-head";
+    const partial = yield* service.submit({ ...task, handoffId: original.id });
+    assert.equal(partial.status, "partial");
+    assert.include(partial.error, "changed after review");
+    state.head = "abc";
+    const revised = yield* service.prepare(task, threadId, {
+      ...input,
+      summary: "Updated review summary for the same pull request.",
+    });
+    assert.deepEqual(
+      (yield* service.read(task)).handoffs.map((handoff) => handoff.id),
+      [revised.id],
+    );
+    assert.equal(
+      (yield* Effect.result(service.submit({ ...task, handoffId: original.id })))._tag,
+      "Failure",
+    );
+    assert.deepEqual(state.writes, []);
+  }).pipe(Effect.provide(database)),
+);
+
 it.effect("rejects changed or unlinked PR heads before any submit write", () =>
   Effect.gen(function* () {
     const { service, state, sql } = yield* harness();
