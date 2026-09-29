@@ -19,7 +19,7 @@ const threadId = ThreadId.make("thread");
 const projectId = ProjectId.make("project");
 const url = "https://github.com/acme/app/pull/42";
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => state.navigate }));
-vi.mock("../../state/entities", () => ({
+vi.mock("../state/entities", () => ({
   useProjects: () =>
     [EnvironmentId.make("other"), environmentId].map((id) => ({
       id: id === environmentId ? projectId : ProjectId.make("other-project"),
@@ -43,27 +43,27 @@ vi.mock("../../state/entities", () => ({
       ],
     ]),
 }));
-vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => "other" }));
-vi.mock("../../rightPanelStore", () => ({
+vi.mock("../state/environments", () => ({ usePrimaryEnvironmentId: () => "other" }));
+vi.mock("../rightPanelStore", () => ({
   useRightPanelStore: { getState: () => ({ openPullRequest: state.openPanel }) },
 }));
-vi.mock("../../browser/useOpenLink", () => ({ useOpenLink: () => state.openLink }));
-vi.mock("../../browser/browserLinkTarget", () => ({
+vi.mock("../browser/useOpenLink", () => ({ useOpenLink: () => state.openLink }));
+vi.mock("../browser/browserLinkTarget", () => ({
   canOpenLinksInApp: (hasThread: boolean) => hasThread,
 }));
-vi.mock("../../browser/openFileInPreview", () => ({ openUrlInPreview: state.openPreview }));
-vi.mock("../../browserHistoryStore", () => ({ recordVisitForThread: state.recordVisit }));
-vi.mock("../../hooks/useCopyToClipboard", () => ({ writeTextToClipboard: state.copy }));
-vi.mock("../../localApi", () => ({
+vi.mock("../browser/openFileInPreview", () => ({ openUrlInPreview: state.openPreview }));
+vi.mock("../browserHistoryStore", () => ({ recordVisitForThread: state.recordVisit }));
+vi.mock("../hooks/useCopyToClipboard", () => ({ writeTextToClipboard: state.copy }));
+vi.mock("../localApi", () => ({
   readLocalApi: () => ({
     contextMenu: { show: state.showMenu },
     shell: { openExternal: state.openExternal },
   }),
 }));
-vi.mock("../../state/preview", () => ({ previewEnvironment: { open: "preview" } }));
-vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.openPreview }));
-vi.mock("../ui/toast", () => ({ toastManager: { add: state.toast } }));
-import { HandoffPullRequestLink } from "./HandoffPullRequestLink";
+vi.mock("../state/preview", () => ({ previewEnvironment: { open: "preview" } }));
+vi.mock("../state/use-atom-command", () => ({ useAtomCommand: () => state.openPreview }));
+vi.mock("./ui/toast", () => ({ toastManager: { add: state.toast } }));
+import { ExternalLink } from "./ExternalLink";
 
 let renderer: ReactTestRenderer;
 beforeEach(() => {
@@ -79,9 +79,13 @@ afterEach(async () => {
 async function mount(selectedThread: ThreadId | undefined = threadId, href = url) {
   await act(async () => {
     renderer = create(
-      <HandoffPullRequestLink environmentId={environmentId} threadId={selectedThread} url={href}>
+      <ExternalLink
+        environmentId={environmentId}
+        threadRef={selectedThread ? { environmentId, threadId: selectedThread } : undefined}
+        url={href}
+      >
         acme/app #42
-      </HandoffPullRequestLink>,
+      </ExternalLink>,
     );
   });
 }
@@ -116,9 +120,9 @@ it("opens the native PR beside the current thread in its own environment", async
 it("opens a standalone handoff in the native PR page using its environment", async () => {
   await act(async () => {
     renderer = create(
-      <HandoffPullRequestLink environmentId={environmentId} threadId={undefined} url={url}>
+      <ExternalLink environmentId={environmentId} url={url}>
         PR
-      </HandoffPullRequestLink>,
+      </ExternalLink>,
     );
   });
   await act(async () => renderer.root.findByType("a").props.onClick(event()));

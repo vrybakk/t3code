@@ -1,5 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { ClickUpTaskDetails, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
+import type {
+  ClickUpTaskDetails,
+  ClickUpTaskInput,
+  EnvironmentId,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import {
@@ -16,6 +21,7 @@ import { serverEnvironment } from "../../state/server";
 import { formatEnvironmentQueryError } from "../../state/query";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import ChatMarkdown from "../ChatMarkdown";
+import { ExternalLink } from "../ExternalLink";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { showAnchoredCopyErrorToast, showAnchoredCopySuccessToast } from "../ui/anchoredCopyToast";
@@ -30,10 +36,13 @@ import { ClickUpTaskTypeIcon } from "./ClickUpTaskTypeIcon";
 
 export function ClickUpTaskPanel({
   environmentId,
+  threadRef,
   input,
   onStartTask,
 }: {
   environmentId: EnvironmentId;
+  /** Thread the task is open beside, so its links can open in that thread's integrated browser. */
+  threadRef?: ScopedThreadRef | undefined;
   input: ClickUpTaskInput;
   onStartTask?: (details: ClickUpTaskDetails) => void;
 }) {
@@ -66,14 +75,15 @@ export function ClickUpTaskPanel({
             <p className="min-w-0 truncate text-xs text-muted-foreground">
               {details?.task.listName ?? "Task details"}
             </p>
-            <a
-              href={taskUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            <ExternalLink
+              url={taskUrl}
+              environmentId={environmentId}
+              threadRef={threadRef}
+              favicon={false}
+              className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:no-underline"
             >
               Open in ClickUp <ExternalLinkIcon className="size-3.5" />
-            </a>
+            </ExternalLink>
           </div>
           <Button
             size="sm"
@@ -162,10 +172,16 @@ export function ClickUpTaskPanel({
                   text={details.task.description || "No description provided."}
                   cwd={undefined}
                   environmentId={environmentId}
+                  threadRef={threadRef}
                 />
               </section>
               <ClickUpCustomFields details={details} />
-              <ClickUpTaskWork environmentId={environmentId} input={input} details={details} />
+              <ClickUpTaskWork
+                environmentId={environmentId}
+                threadRef={threadRef}
+                input={input}
+                details={details}
+              />
               <section className="space-y-3 border-t border-border pt-6" aria-label="Attachments">
                 <h3 className="flex items-center gap-2 text-sm font-medium">
                   <PaperclipIcon className="size-4" /> Attachments{" "}
@@ -174,7 +190,11 @@ export function ClickUpTaskPanel({
                 {!details.attachments.length && (
                   <p className="text-sm text-muted-foreground">No attachments.</p>
                 )}
-                <ClickUpAttachments attachments={details.attachments} />
+                <ClickUpAttachments
+                  attachments={details.attachments}
+                  environmentId={environmentId}
+                  threadRef={threadRef}
+                />
               </section>
               <ClickUpTaskChecklist
                 environmentId={environmentId}
@@ -186,16 +206,17 @@ export function ClickUpTaskPanel({
                 <section className="space-y-3 border-t border-border pt-6">
                   <h3 className="text-sm font-medium">Subtasks</h3>
                   {details.metadata?.subtasks.map((task) => (
-                    <a
-                      key={task.id}
-                      href={`https://app.clickup.com/t/${encodeURIComponent(task.id)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between gap-3 text-sm text-primary hover:underline"
-                    >
-                      {task.name}
-                      <span className="text-xs text-muted-foreground">{task.status}</span>
-                    </a>
+                    <div key={task.id} className="flex items-center justify-between gap-3 text-sm">
+                      <ExternalLink
+                        url={`https://app.clickup.com/t/${encodeURIComponent(task.id)}`}
+                        environmentId={environmentId}
+                        threadRef={threadRef}
+                        className="min-w-0"
+                      >
+                        {task.name}
+                      </ExternalLink>
+                      <span className="shrink-0 text-xs text-muted-foreground">{task.status}</span>
+                    </div>
                   ))}
                 </section>
               )}
@@ -203,21 +224,26 @@ export function ClickUpTaskPanel({
                 <section className="space-y-3 border-t border-border pt-6">
                   <h3 className="text-sm font-medium">Related tasks</h3>
                   {details.metadata?.relatedTasks.map((task) => (
-                    <a
-                      key={`${task.id}:${task.label}`}
-                      href={`https://app.clickup.com/t/${encodeURIComponent(task.id)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block text-sm text-primary hover:underline"
-                    >
-                      {task.label} · {task.id}
-                    </a>
+                    <p key={`${task.id}:${task.label}`} className="text-sm">
+                      <ExternalLink
+                        url={`https://app.clickup.com/t/${encodeURIComponent(task.id)}`}
+                        environmentId={environmentId}
+                        threadRef={threadRef}
+                      >
+                        {task.label} · {task.id}
+                      </ExternalLink>
+                    </p>
                   ))}
                 </section>
               )}
             </div>
           </div>
-          <ClickUpTaskActivity details={details} environmentId={environmentId} input={input} />
+          <ClickUpTaskActivity
+            details={details}
+            environmentId={environmentId}
+            threadRef={threadRef}
+            input={input}
+          />
         </div>
       )}
       {action && details && (

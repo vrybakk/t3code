@@ -56,6 +56,7 @@ vi.mock("../../hooks/useSettings", () => ({
 vi.mock("../../lib/utils", () => ({ newProjectId: () => "cloned" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/input", () => ({ Input: "input" }));
+vi.mock("../ExternalLink", () => ({ ExternalLink: "a" }));
 import { ClickUpRepositoryClone } from "./ClickUpRepositoryClone";
 const task: ClickUpTask = {
   workspaceId: "42",

@@ -1836,6 +1836,14 @@ code {
   background-size: 4px 2px;
 }
 
+.chat-markdown mark {
+  border-radius: 0.125rem;
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  font-weight: 500;
+  padding-inline: 0.125rem;
+}
+
 .chat-markdown blockquote {
   border-left: 2px solid var(--contrast-border);
   padding-left: 0.8rem;

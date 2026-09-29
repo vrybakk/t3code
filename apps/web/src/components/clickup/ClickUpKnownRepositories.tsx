@@ -1,5 +1,6 @@
 import type { ClickUpRepositoryLink } from "@t3tools/contracts";
 import { useId, useState } from "react";
+import { ExternalLink } from "../ExternalLink";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { githubRepositoryName, repositoryKey } from "./projectMappings";
@@ -52,7 +53,9 @@ export function ClickUpKnownRepositories({
           key={repositoryKey(link.remoteUrl)}
           className="flex items-center justify-between gap-2 text-xs"
         >
-          <span className="min-w-0 break-all">{link.remoteUrl}</span>
+          <span className="min-w-0 break-all">
+            <KnownRepositoryLink remoteUrl={link.remoteUrl} />
+          </span>
           <Button
             variant="ghost"
             size="sm"
@@ -77,4 +80,9 @@ export function ClickUpKnownRepositories({
       )}
     </div>
   );
+}
+
+function KnownRepositoryLink({ remoteUrl }: { remoteUrl: string }) {
+  const name = githubRepositoryName(remoteUrl);
+  return name ? <ExternalLink url={`https://github.com/${name}`}>{name}</ExternalLink> : remoteUrl;
 }

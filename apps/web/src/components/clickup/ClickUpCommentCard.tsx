@@ -1,27 +1,46 @@
-import type { ClickUpComment } from "@t3tools/contracts";
-import type { ReactNode } from "react";
+import type { ClickUpComment, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
+import { useMemo, type ReactNode } from "react";
 import { CheckIcon } from "lucide-react";
+import type { Options as ReactMarkdownOptions } from "react-markdown";
 import { cn } from "../../lib/utils";
+import ChatMarkdown from "../ChatMarkdown";
 import { Button } from "../ui/button";
 import { ClickUpAttachments } from "./ClickUpAttachments";
 import { taskDate } from "./taskFormatting";
-import { splitSelfMentions } from "./commentMentions";
+import { commentLinkedMedia } from "./commentMedia";
+import { remarkSelfMentions } from "./commentMentions";
 
 export function ClickUpCommentCard({
   comment,
   userId,
   username,
+  environmentId,
+  threadRef,
   resolution,
   children,
 }: {
   comment: ClickUpComment;
   userId: number;
   username: string | undefined;
+  environmentId: EnvironmentId;
+  /** Thread the task is open beside, so comment links can open in its integrated browser. */
+  threadRef: ScopedThreadRef | undefined;
   resolution?: { busy: boolean; refreshing: boolean; error: string | null; toggle: () => void };
   children?: ReactNode;
 }) {
   const assignedToMe = comment.assignee?.id === userId;
   const mentionsMe = comment.mentionedUserIds?.includes(userId) === true;
+  const mentionPlugins = useMemo<NonNullable<ReactMarkdownOptions["remarkPlugins"]>>(
+    () => [[remarkSelfMentions, { username }]],
+    [username],
+  );
+  const attachments = useMemo(
+    () => [
+      ...(comment.attachments ?? []),
+      ...commentLinkedMedia(comment.text, comment.attachments),
+    ],
+    [comment.attachments, comment.text],
+  );
   return (
     <article
       className={cn(
@@ -49,21 +68,22 @@ export function ClickUpCommentCard({
           {assignedToMe ? "Assigned to you" : "Mentions you"}
         </p>
       )}
-      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-        {splitSelfMentions(comment.text, username).map((part) =>
-          part.isMention ? (
-            <mark
-              key={part.offset}
-              className="rounded-sm bg-primary/15 px-0.5 font-medium text-primary"
-            >
-              {part.text}
-            </mark>
-          ) : (
-            part.text
-          ),
-        )}
-      </p>
-      {!!comment.attachments?.length && <ClickUpAttachments attachments={comment.attachments} />}
+      <ChatMarkdown
+        text={comment.text}
+        cwd={undefined}
+        environmentId={environmentId}
+        threadRef={threadRef}
+        lineBreaks
+        parseRawHtml={false}
+        extraRemarkPlugins={mentionPlugins}
+      />
+      {!!attachments.length && (
+        <ClickUpAttachments
+          attachments={attachments}
+          environmentId={environmentId}
+          threadRef={threadRef}
+        />
+      )}
       {comment.assignee && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           <p className="min-w-0 text-xs text-muted-foreground">

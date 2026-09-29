@@ -1,4 +1,4 @@
-import type { ClickUpTask, EnvironmentId } from "@t3tools/contracts";
+import type { ClickUpTask, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { FolderGit2Icon } from "lucide-react";
 import { ClickUpRepositoryClone } from "./ClickUpRepositoryClone";
 import { ClickUpRepositoryMappings } from "./ClickUpRepositoryMappings";
@@ -7,9 +7,11 @@ import { useClickUpRepositories } from "./useClickUpRepositories";
 export function ClickUpLinkedRepositories({
   task,
   environmentId,
+  threadRef,
 }: {
   task: ClickUpTask;
   environmentId: EnvironmentId;
+  threadRef: ScopedThreadRef | undefined;
 }) {
   const { mapping, mappedProjects, missing, unavailableLocalIds } = useClickUpRepositories(
     task,
@@ -49,6 +51,7 @@ export function ClickUpLinkedRepositories({
               repository={repository}
               task={task}
               environmentId={environmentId}
+              threadRef={threadRef}
             />
           ))}
         </div>
