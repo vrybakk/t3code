@@ -315,6 +315,43 @@ it.effect("does not fetch sprint tasks outside the configured folder", () => {
   }).pipe(Effect.provide(test.layer));
 });
 
+it.effect("loads task details when a rich comment contains an image URL", () => {
+  const test = setup((path) =>
+    path.endsWith("/comment")
+      ? {
+          comments: [
+            {
+              id: "image-comment",
+              user: { id: 17, username: "Developer" },
+              comment_text: "Verified on desktop.",
+              comment: [
+                {
+                  type: "image",
+                  image: "https://example.test/screenshot.png",
+                  attributes: { alt: "Desktop" },
+                },
+              ],
+            },
+          ],
+        }
+      : task,
+  );
+  return Effect.gen(function* () {
+    const tasks = yield* ClickUpTasks;
+    const details = yield* tasks.detail({ workspaceId: "42", taskId: "abc", userId: 17 });
+    assert.equal(details.task.name, task.name);
+    assert.deepEqual(details.comments[0]?.attachments, [
+      {
+        name: "Desktop",
+        url: "https://example.test/screenshot.png",
+        mimeType: "image/*",
+        extension: null,
+        thumbnailUrl: null,
+      },
+    ]);
+  }).pipe(Effect.provide(test.layer));
+});
+
 it.effect("loads bounded comment context and rejects tasks from another workspace", () => {
   const test = setup((path) =>
     path.endsWith("/comment")

@@ -18,7 +18,13 @@ export const normalizeComment = (comment: typeof ApiComment.Type) => ({
   ],
   resolved: comment.resolved ?? false,
   attachments: (comment.comment ?? []).flatMap((block) =>
-    [block.attachment, block.image, block.video]
+    [
+      block.attachment,
+      typeof block.image === "string"
+        ? { url: block.image, title: block.attributes?.alt ?? "Image", mimetype: "image/*" }
+        : block.image,
+      block.video,
+    ]
       .filter((attachment) => attachment != null)
       .map(normalizeAttachment),
   ),
