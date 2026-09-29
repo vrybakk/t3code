@@ -453,6 +453,9 @@ export const resolveServerConfig = (
       desktopBootstrapToken,
       desktopTelemetryFd,
       desktopTelemetryControlFd,
+      ...(bootstrap?.desktopAppUpdateEnabled === undefined
+        ? {}
+        : { desktopAppUpdateEnabled: bootstrap.desktopAppUpdateEnabled }),
       resourceMonitorPath,
       autoBootstrapProjectFromCwd,
       logWebSocketEvents,

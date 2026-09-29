@@ -230,7 +230,7 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
     }),
   );
 
-  it.effect("advertises desktopAppUpdate only with desktop mode and the control fd", () =>
+  it.effect("advertises desktopAppUpdate only with an enabled updater and desktop control fd", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const baseDir = yield* fileSystem.makeTempDirectoryScoped({
@@ -252,19 +252,37 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
           ),
         );
 
-      const withFd = yield* describeWith({ mode: "desktop", desktopTelemetryControlFd: 5 });
+      const withFd = yield* describeWith({
+        mode: "desktop",
+        desktopTelemetryControlFd: 5,
+        desktopAppUpdateEnabled: true,
+      });
       expect(withFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
       expect(withFd.capabilities.desktopAppUpdate).toBe(true);
       expect(withFd.capabilities.serverSelfUpdateProgress).toBe(true);
       expect(withFd.capabilities.serverUpdateThreadContinuation).toBe(true);
 
-      const withoutFd = yield* describeWith({ mode: "desktop" });
+      for (const desktopAppUpdateEnabled of [false, undefined]) {
+        const disabled = yield* describeWith({
+          mode: "desktop",
+          desktopTelemetryControlFd: 5,
+          desktopAppUpdateEnabled,
+        });
+        expect(disabled.capabilities.desktopAppUpdate).toBeUndefined();
+        expect(disabled.capabilities.serverSelfUpdateProgress).toBeUndefined();
+        expect(disabled.capabilities.serverUpdateThreadContinuation).toBeUndefined();
+      }
+      const withoutFd = yield* describeWith({ mode: "desktop", desktopAppUpdateEnabled: true });
       expect(withoutFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
       expect(withoutFd.capabilities.desktopAppUpdate).toBeUndefined();
       expect(withoutFd.capabilities.serverSelfUpdateProgress).toBeUndefined();
       expect(withoutFd.capabilities.serverUpdateThreadContinuation).toBeUndefined();
 
-      const web = yield* describeWith({ mode: "web", desktopTelemetryControlFd: 5 });
+      const web = yield* describeWith({
+        mode: "web",
+        desktopTelemetryControlFd: 5,
+        desktopAppUpdateEnabled: true,
+      });
       expect(web.capabilities.desktopAppUpdate).toBeUndefined();
     }),
   );

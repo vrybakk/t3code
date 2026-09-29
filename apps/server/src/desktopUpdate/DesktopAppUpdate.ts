@@ -43,8 +43,8 @@ function desktopUpdateProgressStage(
 export class DesktopAppUpdate extends Context.Service<
   DesktopAppUpdate,
   {
-    /** True when this server was spawned by a desktop app that can be
-        driven over the telemetry control channel. */
+    /** True when the desktop updater is enabled and reachable over the
+        telemetry control channel. */
     readonly available: boolean;
     /** Checks and downloads through the desktop app, then returns a token
         while this server is still connected. `commit` starts installation. */
@@ -68,7 +68,9 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
   const receiver = yield* DesktopTelemetryReceiver.DesktopTelemetryReceiver;
   const inFlight = yield* Ref.make(false);
 
-  const available = config.mode === "desktop" && config.desktopTelemetryControlFd !== undefined;
+  const desktopManaged =
+    config.mode === "desktop" && config.desktopTelemetryControlFd !== undefined;
+  const available = desktopManaged && config.desktopAppUpdateEnabled === true;
   const failWith = (reason: string, cause?: unknown) =>
     cause === undefined
       ? new ServerSelfUpdateError({ reason })
@@ -147,7 +149,9 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
     function* (reportProgress) {
       if (!available) {
         return yield* failWith(
-          "This server was not started by the T3 Code desktop app, so it cannot drive a desktop update.",
+          desktopManaged
+            ? "Automatic updates are unavailable for this desktop build. Install an updated desktop app manually."
+            : "This server was not started by the T3 Code desktop app, so it cannot drive a desktop update.",
         );
       }
       if (yield* Ref.getAndSet(inFlight, true)) {
