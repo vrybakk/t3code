@@ -126,9 +126,7 @@ interface RightPanelTabsProps {
   onAddGitButler: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
-  onAddTask?: (() => void) | undefined;
   onAddTasks?: (() => void) | undefined;
-  onAddHandoff?: (() => void) | undefined;
   onAddAgents: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
@@ -138,9 +136,7 @@ interface RightPanelTabsProps {
   gitButlerAvailable: boolean;
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
-  taskAvailable?: boolean | undefined;
   tasksAvailable?: boolean | undefined;
-  handoffAvailable?: boolean | undefined;
   agentsAvailable: boolean;
   deviceAvailable: boolean;
   pullRequestStatusSeeds?: Readonly<Record<string, PullRequestTabStatusSeed>>;
@@ -339,9 +335,7 @@ function RightPanelEmptyState(props: {
   onAddGitButler: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
-  onAddTask?: (() => void) | undefined;
   onAddTasks?: (() => void) | undefined;
-  onAddHandoff?: (() => void) | undefined;
   onAddAgents: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
@@ -351,9 +345,7 @@ function RightPanelEmptyState(props: {
   gitButlerAvailable: boolean;
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
-  taskAvailable?: boolean | undefined;
   tasksAvailable?: boolean | undefined;
-  handoffAvailable?: boolean | undefined;
   agentsAvailable: boolean;
   deviceAvailable: boolean;
   liveAgentCount: number;
@@ -415,24 +407,6 @@ function RightPanelEmptyState(props: {
       available: props.pullRequestAvailable,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequest,
       onClick: props.onAddPullRequest,
-      badgeCount: 0,
-    },
-    {
-      label: "Task",
-      icon: ClipboardList,
-      shortcut: "K",
-      available: props.taskAvailable === true,
-      disabledReason: "No task is linked to this thread.",
-      onClick: () => props.onAddTask?.(),
-      badgeCount: 0,
-    },
-    {
-      label: "Handoff",
-      icon: ClipboardCheck,
-      shortcut: "H",
-      available: props.handoffAvailable === true,
-      disabledReason: "No primary workflow task is linked.",
-      onClick: () => props.onAddHandoff?.(),
       badgeCount: 0,
     },
     {
@@ -993,24 +967,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddPullRequest,
     },
     {
-      label: "Task",
-      icon: ClipboardList,
-      shortcut: "K",
-      available: props.taskAvailable === true,
-      disabledReason: "No task is linked to this thread.",
-      onClick: () => props.onAddTask?.(),
-      badgeCount: 0,
-    },
-    {
-      label: "Handoff",
-      icon: ClipboardCheck,
-      shortcut: "H",
-      available: props.handoffAvailable === true,
-      disabledReason: "No primary workflow task is linked.",
-      onClick: () => props.onAddHandoff?.(),
-      badgeCount: 0,
-    },
-    {
       label: "Linked tasks",
       icon: ListTodo,
       shortcut: "J",
@@ -1525,11 +1481,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddGitButler={props.onAddGitButler}
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
-            onAddTask={props.onAddTask}
             onAddTasks={props.onAddTasks}
-            onAddHandoff={props.onAddHandoff}
-            handoffAvailable={props.handoffAvailable}
-            taskAvailable={props.taskAvailable}
             tasksAvailable={props.tasksAvailable}
             onAddAgents={props.onAddAgents}
             onAddDevice={props.onAddDevice}

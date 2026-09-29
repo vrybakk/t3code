@@ -1005,3 +1005,33 @@ it("keeps task tabs distinct by workspace and scoped to a thread", () => {
   expect(selectThreadRightPanelState(state.byThreadKey, refB).surfaces).toEqual([]);
   expect(migratePersistedRightPanelState(state).byThreadKey).toEqual(state.byThreadKey);
 });
+
+it("consolidates legacy handoff tabs into linked tasks without losing task details", () => {
+  const state = migratePersistedRightPanelState({
+    byThreadKey: {
+      legacy: {
+        isOpen: true,
+        activeSurfaceId: "handoff",
+        surfaces: [
+          { id: "handoff", kind: "handoff" },
+          { id: "tasks", kind: "tasks" },
+          {
+            id: "task:42:abc",
+            kind: "task",
+            task: { workspaceId: "42", taskId: "abc", name: "Task" },
+          },
+        ],
+      },
+    },
+  }).byThreadKey.legacy;
+  expect(state?.activeSurfaceId).toBe("tasks");
+  expect(state?.surfaces.map((surface) => surface.id)).toEqual(["tasks", "task:42:abc"]);
+  expect(state?.isOpen).toBe(true);
+});
+
+it("routes legacy handoff opens to the linked tasks view", () => {
+  useRightPanelStore.getState().open(refA, "handoff");
+  expect(
+    selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).activeSurfaceId,
+  ).toBe("tasks");
+});

@@ -50,17 +50,20 @@ export function ClickUpTaskFields({
       : []),
   ];
   return (
-    <>
-      <dl className="grid gap-x-8 gap-y-4 text-sm xl:grid-cols-2">
+    <div className="@container/task-fields">
+      <dl className="grid gap-x-8 gap-y-4 text-sm @[40rem]/task-fields:grid-cols-2">
         {fields.map(([label, value]) => (
-          <div key={label} className="grid min-w-0 grid-cols-[7rem_1fr] gap-3">
+          <div
+            key={label}
+            className="grid min-w-0 gap-1 @[20rem]/task-fields:grid-cols-[7rem_minmax(0,1fr)] @[20rem]/task-fields:gap-3"
+          >
             <dt className="text-muted-foreground">{label}</dt>
             <dd className="min-w-0 break-words">{value}</dd>
           </div>
         ))}
-        <div className="grid grid-cols-[7rem_1fr] gap-3 xl:col-span-2">
+        <div className="grid min-w-0 gap-1 @[20rem]/task-fields:grid-cols-[7rem_minmax(0,1fr)] @[20rem]/task-fields:gap-3 @[40rem]/task-fields:col-span-2">
           <dt className="text-muted-foreground">Tags</dt>
-          <dd className="flex flex-wrap gap-1.5">
+          <dd className="flex min-w-0 flex-wrap gap-1.5">
             <ClickUpTagsPicker
               environmentId={environmentId}
               input={input}
@@ -70,7 +73,7 @@ export function ClickUpTaskFields({
           </dd>
         </div>
       </dl>
-    </>
+    </div>
   );
 }
 
@@ -87,8 +90,11 @@ export function ClickUpCustomFields({ details }: { details: ClickUpTaskDetails }
   return (
     <>
       {metadata && (
-        <section className="space-y-3 border-t border-border pt-6" aria-label="Custom fields">
-          <div className="flex items-center justify-between gap-3">
+        <section
+          className="@container/custom-fields space-y-3 border-t border-border pt-6"
+          aria-label="Custom fields"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-medium">
               Custom fields{" "}
               <span className="ml-1 text-muted-foreground">{metadata.customFields.length}</span>
@@ -109,12 +115,12 @@ export function ClickUpCustomFields({ details }: { details: ClickUpTaskDetails }
               {fields.map((field) => (
                 <div
                   key={field.id}
-                  className="grid grid-cols-[minmax(7rem,1fr)_2fr] gap-4 py-3 text-sm"
+                  className="grid min-w-0 gap-1 py-3 text-sm @[20rem]/custom-fields:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] @[20rem]/custom-fields:gap-4"
                 >
                   <dt className="break-words text-muted-foreground">
                     {customFieldLabels[field.name] ?? field.name}
                   </dt>
-                  <dd className="whitespace-pre-wrap break-words">
+                  <dd className="min-w-0 whitespace-pre-wrap break-words">
                     {field.valueText ?? <span className="text-muted-foreground">Empty</span>}
                   </dd>
                 </div>

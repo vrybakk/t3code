@@ -223,6 +223,7 @@ export const make = Effect.gen(function* () {
       inlineMessageContext: true,
       clickUpTasks: true,
       threadTaskLinks: true,
+      clickUpWorkflowTaskSelection: true,
       clickUpMergedHandoffs: true,
       composerTaskMentions: true,
       clickUpTimeSync: true,
