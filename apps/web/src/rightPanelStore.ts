@@ -102,7 +102,7 @@ const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 // v11 stops persisting the pull-request list's shared panel, so a restart opens the page fresh.
 // v12 adds the device surface.
 // v14 adds the GitButler workspace surface.
-const RIGHT_PANEL_STORAGE_VERSION = 16;
+const RIGHT_PANEL_STORAGE_VERSION = 17;
 
 /** A fixed workspace-level ref: each PR surface carries its own real environment. */
 export const PULL_REQUESTS_PANEL_REF = scopeThreadRef(
@@ -203,7 +203,7 @@ const singletonSurface = (
     case "tasks":
       return { id: "tasks", kind };
     case "handoff":
-      return { id: "handoff", kind };
+      return { id: "tasks", kind: "tasks" };
     case "agents":
       return { id: "agents", kind };
     case "device":
@@ -379,11 +379,12 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
             .map(([threadKey, threadState]) => {
               const validThreadState =
                 threadState && typeof threadState === "object" ? threadState : null;
-              const surfaces = Array.isArray(validThreadState?.surfaces)
+              const parsedSurfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
                     // Dropped surface kind: plans now render inline in the
                     // transcript (v9).
                     if ((surface as { kind?: string }).kind === "plan") return [];
+                    if (surface.kind === "handoff") return [{ id: "tasks", kind: "tasks" }];
                     if (surface.kind === "file") {
                       const revealLine =
                         typeof surface.revealLine === "number" &&
@@ -467,7 +468,13 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                     ];
                   })
                 : [];
-              const rawActiveSurfaceId = validThreadState?.activeSurfaceId;
+              const surfaces = [
+                ...new Map(parsedSurfaces.map((surface) => [surface.id, surface])).values(),
+              ];
+              const rawActiveSurfaceId =
+                validThreadState?.activeSurfaceId === "handoff"
+                  ? "tasks"
+                  : validThreadState?.activeSurfaceId;
               const persistedActiveSurfaceId = surfaces.some(
                 (surface) => surface.id === rawActiveSurfaceId,
               )

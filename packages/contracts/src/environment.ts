@@ -108,6 +108,7 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   inlineMessageContext: Schema.optionalKey(Schema.Boolean),
   clickUpTasks: Schema.optionalKey(Schema.Boolean),
   threadTaskLinks: Schema.optionalKey(Schema.Boolean),
+  clickUpWorkflowTaskSelection: Schema.optionalKey(Schema.Boolean),
   clickUpMergedHandoffs: Schema.optionalKey(Schema.Boolean),
   clickUpCommentReconciliation: Schema.optionalKey(Schema.Boolean),
   composerTaskMentions: Schema.optionalKey(Schema.Boolean),

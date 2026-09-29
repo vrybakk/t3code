@@ -8,6 +8,7 @@ import {
   ClickUpFindingsInput,
   ClickUpPrepareHandoffInput,
   ClickUpTaskDetails,
+  ClickUpTaskInput,
   ClickUpCompleteEstimationInput,
   ClickUpCompleteEstimationResult,
   ClickUpCommentsInput,
@@ -37,10 +38,22 @@ const dependencies = [
   ClickUpInteractions,
 ];
 const failure = Schema.Union([ClickUpError, McpCapabilityUnavailableError]);
+const linkedTaskFields = {
+  task: Schema.optional(
+    Schema.Struct({
+      workspaceId: ClickUpTaskInput.fields.workspaceId,
+      taskId: ClickUpTaskInput.fields.taskId,
+    }),
+  ),
+};
+const linkedTaskDescription =
+  " Omit task to use this thread's primary task, or its only linked task if no primary exists. Multiple links without a primary require an explicit selection. To select another task already linked to this thread, pass task with both workspaceId and taskId on every call. Nerd verifies that link and supplies credentials. This does not change the primary task.";
 
 const GetLinkedTask = Tool.make("get_linked_clickup_task", {
   description:
-    "Read current ClickUp context for the task linked to this coding thread, including tags and time estimate. Use before estimating or checking changed requirements. Returns an error if this thread has no linked task. Task identity and credentials are supplied by Nerd, never by the agent.",
+    "Read current ClickUp context for the task linked to this coding thread, including tags and time estimate. Use before estimating or checking changed requirements. Returns an error if this thread has no linked task." +
+    linkedTaskDescription,
+  parameters: Schema.Struct(linkedTaskFields),
   success: ClickUpTaskDetails,
   failure,
   dependencies,
@@ -51,8 +64,9 @@ const GetLinkedTask = Tool.make("get_linked_clickup_task", {
 
 const GetLinkedComments = Tool.make("get_linked_clickup_comments", {
   description:
-    "Read comments on this thread's linked ClickUp task, newest first. Omit cursor for the first page; pass the returned nextCursor to read older pages while hasMore is true. Keep the cursor used to load each page when reading replies to its comments. Task identity and credentials are supplied by Nerd.",
-  parameters: Schema.Struct({ cursor: ClickUpCommentsInput.fields.cursor }),
+    "Read comments on this thread's linked ClickUp task, newest first. Omit cursor for the first page; pass the returned nextCursor to read older pages while hasMore is true. Keep the cursor used to load each page when reading replies to its comments." +
+    linkedTaskDescription,
+  parameters: Schema.Struct({ ...linkedTaskFields, cursor: ClickUpCommentsInput.fields.cursor }),
   success: ClickUpCommentsPage,
   failure,
   dependencies,
@@ -63,8 +77,10 @@ const GetLinkedComments = Tool.make("get_linked_clickup_comments", {
 
 const GetLinkedCommentReplies = Tool.make("get_linked_clickup_comment_replies", {
   description:
-    "Read replies to a comment on this thread's linked ClickUp task. Pass commentId and the cursor used to load the parent comment's page, not that page's nextCursor; omit cursor for a parent on the first page. Nerd verifies the parent belongs to that task page before reading replies.",
+    "Read replies to a comment on this thread's linked ClickUp task. Pass commentId and the cursor used to load the parent comment's page, not that page's nextCursor; omit cursor for a parent on the first page. Nerd verifies the parent belongs to that task page before reading replies." +
+    linkedTaskDescription,
   parameters: Schema.Struct({
+    ...linkedTaskFields,
     commentId: ClickUpCommentRepliesInput.fields.commentId,
     cursor: ClickUpCommentRepliesInput.fields.cursor,
   }),
@@ -78,8 +94,10 @@ const GetLinkedCommentReplies = Tool.make("get_linked_clickup_comment_replies", 
 
 const CompleteEstimation = Tool.make("complete_clickup_estimation", {
   description:
-    "Save an AI-assisted estimate in minutes for this thread's linked task, without overwriting any existing estimate, then remove its estimation needed tag if present only after verifying the saved value. A missing estimate can be saved without that tag. First read the task and research the code. Estimate work to a review-ready result with AI, including tests and likely fixes, not equivalent unaided human hours or time waiting for CTO review/deploy. Explain assumptions to the developer. Do not call in plan-only work. If tagRemoved is false, the estimate saved but tag cleanup failed: report partial success and reread before retrying. Never claim success on an error.",
+    "Save an AI-assisted estimate in minutes for this thread's linked task, without overwriting any existing estimate, then remove its estimation needed tag if present only after verifying the saved value. A missing estimate can be saved without that tag. First read the task and research the code. Estimate work to a review-ready result with AI, including tests and likely fixes, not equivalent unaided human hours or time waiting for CTO review/deploy. Explain assumptions to the developer. Do not call in plan-only work. If tagRemoved is false, the estimate saved but tag cleanup failed: report partial success and reread before retrying. Never claim success on an error." +
+    linkedTaskDescription,
   parameters: Schema.Struct({
+    ...linkedTaskFields,
     estimateMinutes: ClickUpCompleteEstimationInput.fields.estimateMinutes,
   }),
   success: ClickUpCompleteEstimationResult,
@@ -92,8 +110,12 @@ const CompleteEstimation = Tool.make("complete_clickup_estimation", {
 
 const StudioWorkflow = Tool.make("get_studio_task_workflow", {
   description:
-    "Read the app-shipped studio workflow for this linked task. Read at every run or resume; follow the returned mode instructions, current model preferences and repository candidates.",
-  parameters: Schema.Struct({ mode: Schema.Literals(["requirements", "estimate", "implement"]) }),
+    "Read the app-shipped studio workflow for this linked task. Read at every run or resume; follow the returned mode instructions, current model preferences and repository candidates." +
+    linkedTaskDescription,
+  parameters: Schema.Struct({
+    ...linkedTaskFields,
+    mode: Schema.Literals(["requirements", "estimate", "implement"]),
+  }),
   success: Schema.Struct({
     version: Schema.String,
     mode: Schema.String,
@@ -113,7 +135,9 @@ const StudioWorkflow = Tool.make("get_studio_task_workflow", {
 
 const StartImplementation = Tool.make("start_linked_clickup_implementation", {
   description:
-    "Start authorized implementation of this thread's linked task. Checks the current no agent tag and changes status to In Progress. Never call for requirements or estimation only.",
+    "Start authorized implementation of this thread's linked task. Checks the current no agent tag and changes status to In Progress. Never call for requirements or estimation only." +
+    linkedTaskDescription,
+  parameters: Schema.Struct(linkedTaskFields),
   success: Schema.Void,
   failure,
   dependencies,
@@ -123,8 +147,9 @@ const StartImplementation = Tool.make("start_linked_clickup_implementation", {
 
 const PostFindings = Tool.make("post_linked_clickup_findings", {
   description:
-    "Post actionable requirements findings only. Use plain English, first person singular, at most four lines, no we/us/our or long dashes. Do not post success, status, or estimation comments. Identical findings are deduplicated. Never retry an uncertain delivery or rephrase it to bypass deduplication.",
-  parameters: ClickUpFindingsInput,
+    "Post actionable requirements findings only. Use plain English, first person singular, at most four lines, no we/us/our or long dashes. Do not post success, status, or estimation comments. Identical findings are deduplicated. Never retry an uncertain delivery or rephrase it to bypass deduplication." +
+    linkedTaskDescription,
+  parameters: Schema.Struct({ ...ClickUpFindingsInput.fields, ...linkedTaskFields }),
   success: Schema.Void,
   failure,
   dependencies,
@@ -134,8 +159,9 @@ const PostFindings = Tool.make("post_linked_clickup_findings", {
 
 const PrepareHandoff = Tool.make("prepare_linked_clickup_handoff", {
   description:
-    "Prepare a durable developer review handoff for the linked task after independent review and verification. Pass reviewedTaskScope from the scopeFingerprint returned by get_linked_clickup_task for the requirements you reviewed. Include evidence (or the developer's explicit waiver) and every relevant registered PR URL with the exact headSha that was reviewed, across repositories. Supply a brief waiverSummary if evidence contains any explicit developer waiver. Summary is a final plain English comment, at most four lines without we/us/our or long dashes. Does not submit, request reviewers or move to Code Review. The developer must review and press Submit in the app.",
-  parameters: ClickUpPrepareHandoffInput,
+    "Prepare a durable developer review handoff for the linked task after independent review and verification. Pass reviewedTaskScope from the scopeFingerprint returned by get_linked_clickup_task for the requirements you reviewed. Include evidence (or the developer's explicit waiver) and every relevant registered PR URL with the exact headSha that was reviewed, across repositories. Supply a brief waiverSummary if evidence contains any explicit developer waiver. Summary is a final plain English comment, at most four lines without we/us/our or long dashes. Does not submit, request reviewers or move to Code Review. The developer must review and press Submit in the app." +
+    linkedTaskDescription,
+  parameters: Schema.Struct({ ...ClickUpPrepareHandoffInput.fields, ...linkedTaskFields }),
   success: ClickUpHandoff,
   failure,
   dependencies,

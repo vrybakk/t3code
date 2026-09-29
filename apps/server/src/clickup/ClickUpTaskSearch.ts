@@ -35,7 +35,7 @@ export const makeTaskSearch = Effect.fn("ClickUpTaskSearch.make")(function* (
     requestGate.withPermit,
     Effect.retry({ while: (error) => error.retryAfterMs !== undefined }),
   );
-  // Keep successful pages across cancellation or errors; expose matches only after the last page.
+  // Keep successful pages across cancellation or errors, shared by queries for the same account.
   const snapshots = yield* Cache.makeWith(
     ({ workspaceId, token }: Workspace) =>
       Effect.gen(function* () {
@@ -44,13 +44,18 @@ export const makeTaskSearch = Effect.fn("ClickUpTaskSearch.make")(function* (
         let page = 0;
         let complete = false;
         let expiresAt = 0;
-        return Effect.fnUntraced(function* () {
+        return Effect.fnUntraced(function* (query: string, searchPage?: number) {
+          const terms = query.toLocaleLowerCase().trim().split(/\s+/);
+          const matches = (task: ReturnType<typeof normalizeTask>) =>
+            terms.every((term) => `${task.name} ${task.taskId}`.toLocaleLowerCase().includes(term));
           if ((yield* Clock.currentTimeMillis) >= expiresAt) {
             tasks.clear();
             page = 0;
             complete = false;
           }
+          let matching = [...tasks.values()].filter(matches);
           while (!complete) {
+            if (searchPage !== undefined && (page > searchPage || matching.length > 50)) break;
             const query = new URLSearchParams({
               page: String(page),
               subtasks: "true",
@@ -79,8 +84,16 @@ export const makeTaskSearch = Effect.fn("ClickUpTaskSearch.make")(function* (
               response.last_page === true ||
               (response.last_page === undefined && response.tasks.length < 100);
             expiresAt = (yield* Clock.currentTimeMillis) + 5 * 60_000;
+            if (searchPage !== undefined) break;
           }
-          return [...tasks.values()];
+          matching = [...tasks.values()].filter(matches);
+          return {
+            tasks: matching.slice(0, 50),
+            hasMore: matching.length > 50,
+            ...(searchPage !== undefined && !complete && matching.length <= 50
+              ? { nextSearchPage: page }
+              : {}),
+          };
         }, gate.withPermit);
       }),
     { capacity: 8, timeToLive: () => Duration.infinity },
@@ -89,12 +102,9 @@ export const makeTaskSearch = Effect.fn("ClickUpTaskSearch.make")(function* (
     workspaceId: string,
     token: string,
     query: string,
+    searchPage?: number,
   ) {
-    const terms = query.toLocaleLowerCase().trim().split(/\s+/);
     const snapshot = yield* Cache.get(snapshots, new Workspace({ workspaceId, token }));
-    const tasks = (yield* snapshot()).filter((task) =>
-      terms.every((term) => `${task.name} ${task.taskId}`.toLocaleLowerCase().includes(term)),
-    );
-    return { tasks: tasks.slice(0, 50), hasMore: tasks.length > 50 };
+    return yield* snapshot(query, searchPage);
   });
 });

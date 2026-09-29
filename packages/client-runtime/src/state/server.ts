@@ -1150,6 +1150,7 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:clickup:clickUpTaskOptions",
       tag: WS_METHODS.clickUpTaskOptions,
       staleTimeMs: 30_000,
+      retainSnapshot: true,
       refreshTrigger: ({ environmentId }) => clickUpRevisionAtom(environmentId),
     }),
     clickUpSetStatus: createEnvironmentRpcCommand(runtime, {

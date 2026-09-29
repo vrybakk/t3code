@@ -64,6 +64,7 @@ function makeEnvironmentLayer(
     readonly otlpTracesUrl?: string;
     readonly otlpMetricsUrl?: string;
     readonly otlpLogsUrl?: string;
+    readonly disableAutoUpdate?: boolean;
   },
 ) {
   return DesktopEnvironment.layer({
@@ -77,21 +78,20 @@ function makeEnvironmentLayer(
     resourcesPath: options?.resourcesPath ?? "/missing/resources",
     runningUnderArm64Translation: false,
   }).pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        NodeServices.layer,
-        DesktopConfig.layerTest({
-          T3CODE_HOME: baseDir,
-          T3CODE_PORT: "9999",
-          T3CODE_MODE: "desktop",
-          T3CODE_DESKTOP_LAN_HOST: "192.168.1.50",
-          VITE_DEV_SERVER_URL: options?.devServerUrl,
-          T3CODE_OTLP_TRACES_URL: options?.otlpTracesUrl,
-          T3CODE_OTLP_METRICS_URL: options?.otlpMetricsUrl,
-          T3CODE_OTLP_LOGS_URL: options?.otlpLogsUrl,
-        }),
-      ),
+    Layer.provideMerge(
+      DesktopConfig.layerTest({
+        T3CODE_HOME: baseDir,
+        T3CODE_DISABLE_AUTO_UPDATE: options?.disableAutoUpdate ? "1" : undefined,
+        T3CODE_PORT: "9999",
+        T3CODE_MODE: "desktop",
+        T3CODE_DESKTOP_LAN_HOST: "192.168.1.50",
+        VITE_DEV_SERVER_URL: options?.devServerUrl,
+        T3CODE_OTLP_TRACES_URL: options?.otlpTracesUrl,
+        T3CODE_OTLP_METRICS_URL: options?.otlpMetricsUrl,
+        T3CODE_OTLP_LOGS_URL: options?.otlpLogsUrl,
+      }),
     ),
+    Layer.provide(NodeServices.layer),
   );
 }
 
@@ -1578,3 +1578,58 @@ describe("DesktopBackendConfiguration", () => {
     }
   });
 });
+
+it.effect.each([
+  { name: "feedless local build", feed: undefined, enabled: false },
+  {
+    name: "configured packaged build",
+    feed: "provider: github\nowner: t3\nrepo: t3code",
+    enabled: true,
+  },
+  { name: "invalid feed", feed: "not a feed", enabled: false },
+  { name: "disabled updater", feed: "provider: github", disableAutoUpdate: true, enabled: false },
+  {
+    name: "development build",
+    feed: "provider: github",
+    devServerUrl: "http://localhost:5733",
+    enabled: false,
+  },
+  { name: "unpackaged build", feed: "provider: github", isPackaged: false, enabled: false },
+])("bootstraps actual update availability for $name without removing control traffic", (scenario) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-desktop-update-capability-" });
+    const environmentLayer = makeEnvironmentLayer(baseDir, {
+      resourcesPath: baseDir,
+      appPath: baseDir,
+      dirname: `${baseDir}/apps/desktop/src`,
+      ...scenario,
+    });
+    const environment = yield* DesktopEnvironment.DesktopEnvironment.pipe(
+      Effect.provide(environmentLayer),
+    );
+    if (scenario.feed !== undefined) {
+      yield* fs.makeDirectory(environment.path.dirname(environment.appUpdateYmlPath), {
+        recursive: true,
+      });
+      yield* fs.writeFileString(environment.appUpdateYmlPath, scenario.feed);
+    }
+    const config = yield* Effect.gen(function* () {
+      const configuration = yield* DesktopBackendConfiguration.DesktopBackendConfiguration;
+      return yield* configuration.resolvePrimary;
+    }).pipe(
+      Effect.provide(
+        DesktopBackendConfiguration.layer.pipe(
+          Layer.provideMerge(serverExposureLayer),
+          Layer.provideMerge(DesktopAppSettings.layerTest()),
+          Layer.provideMerge(DesktopWslServerTree.layerTest()),
+          Layer.provideMerge(DesktopWslEnvironment.layerTest()),
+          Layer.provideMerge(environmentLayer),
+        ),
+      ),
+    );
+    assert.equal(config.bootstrap.desktopAppUpdateEnabled, scenario.enabled);
+    assert.equal(config.bootstrap.desktopTelemetryControlFd, 5);
+    assert.equal(config.bootstrap.desktopTelemetryFd, 4);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);

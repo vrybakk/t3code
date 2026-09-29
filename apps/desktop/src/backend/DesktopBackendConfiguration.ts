@@ -15,6 +15,12 @@ import * as SynchronizedRef from "effect/SynchronizedRef";
 import serverPackageJson from "../../../server/package.json" with { type: "json" };
 
 import * as DesktopBackendManager from "./DesktopBackendManager.ts";
+import * as DesktopConfig from "../app/DesktopConfig.ts";
+import {
+  getAutoUpdateDisabledReason,
+  readAppUpdateYml,
+  readIsDebPackage,
+} from "../updates/updateAvailability.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopServerExposure from "./DesktopServerExposure.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
@@ -539,6 +545,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
   function* (
     input: SharedBootstrapInput & {
       readonly resourceMonitorPath: Option.Option<string>;
+      readonly desktopAppUpdateEnabled: boolean;
     },
   ): Effect.fn.Return<
     DesktopBackendManager.DesktopBackendStartConfig,
@@ -560,6 +567,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       tailscaleServePort: backendExposure.tailscaleServePort,
       desktopTelemetryFd: 4,
       desktopTelemetryControlFd: 5,
+      desktopAppUpdateEnabled: input.desktopAppUpdateEnabled,
       ...Option.match(input.resourceMonitorPath, {
         onNone: () => ({}),
         onSome: (resourceMonitorPath) => ({ resourceMonitorPath }),
@@ -821,6 +829,7 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
+  const desktopConfig = yield* DesktopConfig.DesktopConfig;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
   const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
@@ -892,7 +901,27 @@ export const make = Effect.gen(function* () {
       Effect.provideService(FileSystem.FileSystem, fileSystem),
       Effect.provideService(DesktopEnvironment.DesktopEnvironment, environment),
     );
-    return yield* resolvePrimaryStartConfig({ ...shared, resourceMonitorPath }).pipe(
+    const appUpdateYmlConfig = yield* readAppUpdateYml(environment.appUpdateYmlPath).pipe(
+      Effect.provideService(FileSystem.FileSystem, fileSystem),
+    );
+    const isDebPackage = yield* readIsDebPackage(environment).pipe(
+      Effect.provideService(FileSystem.FileSystem, fileSystem),
+    );
+    const desktopAppUpdateEnabled =
+      getAutoUpdateDisabledReason({
+        isDevelopment: environment.isDevelopment,
+        isPackaged: environment.isPackaged,
+        platform: environment.platform,
+        appImage: Option.getOrUndefined(desktopConfig.appImagePath),
+        isDebPackage,
+        disabledByEnv: desktopConfig.disableAutoUpdate,
+        hasUpdateFeedConfig: Option.isSome(appUpdateYmlConfig) || desktopConfig.mockUpdates,
+      }) === null;
+    return yield* resolvePrimaryStartConfig({
+      ...shared,
+      resourceMonitorPath,
+      desktopAppUpdateEnabled,
+    }).pipe(
       Effect.provideService(DesktopEnvironment.DesktopEnvironment, environment),
       Effect.provideService(DesktopServerExposure.DesktopServerExposure, serverExposure),
     );

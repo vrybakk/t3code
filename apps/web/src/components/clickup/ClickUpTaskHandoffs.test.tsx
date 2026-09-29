@@ -168,3 +168,48 @@ it("keeps time sync available when the current handoff is pending", async () => 
       .some((button) => button.children.includes("Sync ClickUp time")),
   ).toBe(true);
 });
+
+it.each(["pending", "partial"] as const)(
+  "requires fresh confirmation when an approved %s handoff becomes uncertain",
+  async (status) => {
+    state.result = AsyncResult.success({
+      handoffs: [{ ...handoff, status }],
+      submittedThreadIds: [],
+    });
+    await mount();
+    await act(async () => renderer.root.findByType("input").props.onCheckedChange(true));
+    expect(renderer.root.findByType("input").props.checked).toBe(true);
+
+    state.result = AsyncResult.success({
+      handoffs: [{ ...handoff, status: "uncertain" }],
+      submittedThreadIds: [],
+    });
+    await act(async () => {
+      renderer.update(
+        <ClickUpTaskHandoffs
+          environmentId={environmentId}
+          input={input}
+          refreshKey="2026-09-29T12:00:00Z"
+        />,
+      );
+    });
+    const posted = renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Summary is posted"))!;
+    const missing = renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Summary is missing"))!;
+    expect(posted.props.disabled).toBe(true);
+    expect(missing.props.disabled).toBe(true);
+    await act(async () => posted.props.onClick());
+    await act(async () => missing.props.onClick());
+    expect(state.submit).not.toHaveBeenCalled();
+
+    await act(async () => renderer.root.findByType("input").props.onCheckedChange(true));
+    await act(async () => posted.props.onClick());
+    expect(state.submit).toHaveBeenCalledWith({
+      environmentId,
+      input: { ...input, handoffId: handoff.id, commentDelivery: "posted" },
+    });
+  },
+);
