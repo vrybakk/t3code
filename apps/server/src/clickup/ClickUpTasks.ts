@@ -31,10 +31,12 @@ const decodeThreadLinks = Schema.decodeUnknownEffect(Schema.Array(ClickUpThreadL
 export class ClickUpTasks extends Context.Service<
   ClickUpTasks,
   {
-    readonly list: (
-      input: ClickUpTasksInput,
-    ) => Effect.Effect<
-      { tasks: ReadonlyArray<ReturnType<typeof normalizeTask>>; hasMore: boolean },
+    readonly list: (input: ClickUpTasksInput) => Effect.Effect<
+      {
+        tasks: ReadonlyArray<ReturnType<typeof normalizeTask>>;
+        hasMore: boolean;
+        nextSearchPage?: number;
+      },
       ClickUpError
     >;
     readonly detail: (input: ClickUpTaskInput) => Effect.Effect<ClickUpTaskDetails, ClickUpError>;
@@ -64,7 +66,8 @@ export const layer = Layer.effect(
           message: "Select a workspace authorized by your ClickUp account.",
         });
       }
-      if (input.query) return yield* search(input.workspaceId, token, input.query);
+      if (input.query)
+        return yield* search(input.workspaceId, token, input.query, input.searchPage);
       const query = new URLSearchParams({
         page: String(input.listId ? 0 : input.page),
         subtasks: "true",

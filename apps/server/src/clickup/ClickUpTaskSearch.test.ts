@@ -14,6 +14,171 @@ const task = (id: string) => ({
   list: { name: "Tasks" },
 });
 
+it.effect("returns incremental matches before reaching the last workspace page", () =>
+  Effect.gen(function* () {
+    const pages: number[] = [];
+    const search = yield* makeTaskSearch({
+      request: (path) => {
+        const page = Number(new URL(path, "https://fixture.test").searchParams.get("page"));
+        pages.push(page);
+        return page === 0
+          ? Effect.succeed({ tasks: [task("match")], last_page: false })
+          : Effect.fail(new ClickUpError({ message: "The remaining workspace is unavailable." }));
+      },
+    });
+    const pending = yield* Effect.forkChild(Effect.result(search("42", "token", "match", 0)));
+    yield* TestClock.adjust("1 second");
+    const result = yield* Fiber.join(pending);
+    assert.equal(result._tag, "Success");
+    if (result._tag !== "Success") return;
+    assert.deepEqual(
+      result.success.tasks.map(({ taskId }) => taskId),
+      ["match"],
+    );
+    assert.equal(result.success.nextSearchPage, 1);
+    assert.isFalse(result.success.hasMore);
+    assert.deepEqual(pages, [0]);
+  }),
+);
+
+it.effect(
+  "continues one page at a time and reuses collected tasks for other queries and retries",
+  () =>
+    Effect.gen(function* () {
+      const pages: number[] = [];
+      const search = yield* makeTaskSearch({
+        request: (path) =>
+          Effect.sync(() => {
+            const page = Number(new URL(path, "https://fixture.test").searchParams.get("page"));
+            pages.push(page);
+            return {
+              tasks: page === 1 ? [task("0"), task("1")] : [task(String(page))],
+              last_page: page === 2,
+            };
+          }),
+      });
+      const first = yield* search("42", "token", "Task", 0);
+      assert.equal(first.nextSearchPage, 1);
+      assert.deepEqual(
+        (yield* search("42", "token", "0", 0)).tasks.map(({ taskId }) => taskId),
+        ["0"],
+      );
+      const pending = yield* Effect.forkChild(search("42", "token", "Task", 1));
+      yield* TestClock.adjust("1 second");
+      const second = yield* Fiber.join(pending);
+      assert.deepEqual(
+        second.tasks.map(({ taskId }) => taskId),
+        ["0", "1"],
+      );
+      assert.equal(second.nextSearchPage, 2);
+      assert.deepEqual(yield* search("42", "token", "Task", 1), second);
+      const cached = yield* search("42", "token", "1", 0);
+      assert.deepEqual(
+        cached.tasks.map(({ taskId }) => taskId),
+        ["1"],
+      );
+      assert.equal(cached.nextSearchPage, 2);
+      assert.deepEqual(pages, [0, 1]);
+      const finalPending = yield* Effect.forkChild(search("42", "token", "Task", 2));
+      yield* TestClock.adjust("1 second");
+      const final = yield* Fiber.join(finalPending);
+      assert.deepEqual(
+        final.tasks.map(({ taskId }) => taskId),
+        ["0", "1", "2"],
+      );
+      assert.isFalse(final.hasMore);
+      assert.isUndefined(final.nextSearchPage);
+      assert.deepEqual(yield* search("42", "token", "Task", 2), final);
+      assert.deepEqual(pages, [0, 1, 2]);
+    }),
+);
+
+it.effect("shares a page request between concurrent calls with the same cursor", () =>
+  Effect.gen(function* () {
+    const pages: number[] = [];
+    const search = yield* makeTaskSearch({
+      request: (path) =>
+        Effect.sync(() => {
+          const page = Number(new URL(path, "https://fixture.test").searchParams.get("page"));
+          pages.push(page);
+          return { tasks: [task(String(page))], last_page: false };
+        }),
+    });
+    const results = yield* Effect.all(
+      [search("42", "token", "Task", 0), search("42", "token", "0", 0)],
+      { concurrency: "unbounded" },
+    );
+    assert.deepEqual(pages, [0]);
+    assert.deepEqual(
+      results.map(({ nextSearchPage }) => nextSearchPage),
+      [1, 1],
+    );
+  }),
+);
+
+it.effect("caps broad matches and resumes scanning when a narrower query needs more evidence", () =>
+  Effect.gen(function* () {
+    const pages: number[] = [];
+    const search = yield* makeTaskSearch({
+      request: (path) =>
+        Effect.sync(() => {
+          const page = Number(new URL(path, "https://fixture.test").searchParams.get("page"));
+          pages.push(page);
+          return {
+            tasks:
+              page === 0
+                ? Array.from({ length: 51 }, (_, index) => task(String(index)))
+                : [task("needle")],
+            last_page: page === 1,
+          };
+        }),
+    });
+    const broad = yield* search("42", "token", "Task", 0);
+    assert.equal(broad.tasks.length, 50);
+    assert.isTrue(broad.hasMore);
+    assert.isUndefined(broad.nextSearchPage);
+    assert.deepEqual(yield* search("42", "token", "Task", 1), broad);
+    const narrow = yield* search("42", "token", "needle", 0);
+    assert.equal(narrow.tasks.length, 0);
+    assert.equal(narrow.nextSearchPage, 1);
+    const pending = yield* Effect.forkChild(search("42", "token", "needle", 1));
+    yield* TestClock.adjust("1 second");
+    const result = yield* Fiber.join(pending);
+    assert.deepEqual(
+      result.tasks.map(({ taskId }) => taskId),
+      ["needle"],
+    );
+    assert.isFalse(result.hasMore);
+    assert.deepEqual(pages, [0, 1]);
+  }),
+);
+
+it.effect("returns a reset cursor after expiration without jumping to the requested page", () =>
+  Effect.gen(function* () {
+    const pages: number[] = [];
+    const search = yield* makeTaskSearch({
+      request: (path) =>
+        Effect.sync(() => {
+          const page = Number(new URL(path, "https://fixture.test").searchParams.get("page"));
+          pages.push(page);
+          return { tasks: [task(String(page))], last_page: false };
+        }),
+    });
+    yield* search("42", "token", "Task", 0);
+    const pending = yield* Effect.forkChild(search("42", "token", "Task", 1));
+    yield* TestClock.adjust("1 second");
+    assert.equal((yield* Fiber.join(pending)).nextSearchPage, 2);
+    yield* TestClock.adjust("5 minutes");
+    const refreshed = yield* search("42", "token", "Task", 2);
+    assert.equal(refreshed.nextSearchPage, 1);
+    assert.deepEqual(
+      refreshed.tasks.map(({ taskId }) => taskId),
+      ["0"],
+    );
+    assert.deepEqual(pages, [0, 1, 0]);
+  }),
+);
+
 it.effect(
   "paces a large workspace and resumes its rate-limited page before returning matches",
   () =>
