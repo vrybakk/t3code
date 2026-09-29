@@ -26,19 +26,24 @@ export function ClickUpTaskHandoffs({
   environmentId,
   input,
   threadId,
+  refreshKey,
 }: {
   environmentId: EnvironmentId;
   input: ClickUpTaskInput;
   threadId?: ThreadId;
+  refreshKey?: string | null;
 }) {
   const query = serverEnvironment.clickUpWorkflow({ environmentId, input });
   const result = useAtomValue(query);
   const data = Option.getOrNull(AsyncResult.value(result));
   const handoffs =
     data?.handoffs.filter((handoff) => !threadId || handoff.threadId === threadId) ?? [];
+  const lastRefresh = useRef<{ query: typeof query; key: typeof refreshKey } | null>(null);
   useEffect(() => {
+    if (lastRefresh.current?.query === query && lastRefresh.current.key === refreshKey) return;
+    lastRefresh.current = { query, key: refreshKey };
     appAtomRegistry.refresh(query);
-  }, [query]);
+  }, [query, refreshKey]);
   return (
     <section className="space-y-3" aria-label="Developer handoff">
       <div className="flex items-center justify-between gap-2">
@@ -67,7 +72,7 @@ export function ClickUpTaskHandoffs({
       ) : (
         handoffs.map((handoff) => (
           <HandoffCard
-            key={handoff.id}
+            key={`${handoff.id}:${handoff.status}:${handoff.destination ?? "code-review"}:${handoff.taskScopeFingerprint ?? ""}`}
             handoff={handoff}
             environmentId={environmentId}
             input={input}

@@ -9724,7 +9724,7 @@ export default function ChatView(props: ChatViewProps) {
       activeThreadRef &&
       supportsTaskLinks ? (
       <ThreadTasksPanel
-        key={`${activeThreadRef.environmentId}:${activeThreadRef.threadId}:${activeThread.latestTurn?.completedAt ?? "active"}`}
+        key={`${activeThreadRef.environmentId}:${activeThreadRef.threadId}`}
         threadRef={activeThreadRef}
       />
     ) : renderedRightPanelSurface?.kind === "task" && supportsTaskLinks ? (

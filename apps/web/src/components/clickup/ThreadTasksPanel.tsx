@@ -157,6 +157,7 @@ export function ThreadTasksPanel({ threadRef }: { threadRef: ScopedThreadRef }) 
                   userId: account.data.user.id,
                 }}
                 threadId={threadRef.threadId}
+                refreshKey={thread?.latestTurn?.completedAt ?? null}
               />
             )}
           </div>
