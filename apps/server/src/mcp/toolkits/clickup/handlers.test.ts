@@ -48,6 +48,8 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
     settings?: ServerSettings;
     projects?: ReadonlyArray<OrchestrationProjectShell>;
     linked?: boolean;
+    contextLinked?: boolean;
+    extraContext?: boolean;
     deleted?: boolean;
     userId?: number | null;
     failEstimate?: boolean;
@@ -59,7 +61,10 @@ const makeHarness = Effect.fn("makeClickUpToolkitHarness")(function* (
   yield* sql`CREATE TABLE projection_thread_clickup_tasks (thread_id TEXT, workspace_id TEXT, task_id TEXT, is_primary INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (thread_id, workspace_id, task_id))`;
   yield* sql`INSERT INTO projection_threads (thread_id, deleted_at) VALUES ('own-thread', ${options.deleted ? "2026-09-24T12:00:00.000Z" : null}), ('other-thread', NULL)`;
   yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id) VALUES ('other-thread', 'other-workspace', 'other-task')`;
-  yield* sql`INSERT INTO projection_thread_clickup_tasks VALUES ('own-thread', '42', 'context-task', 0)`;
+  if (options.contextLinked !== false)
+    yield* sql`INSERT INTO projection_thread_clickup_tasks VALUES ('own-thread', '42', 'context-task', 0)`;
+  if (options.extraContext)
+    yield* sql`INSERT INTO projection_thread_clickup_tasks VALUES ('own-thread', '43', 'second-context', 0)`;
   if (options.linked !== false)
     yield* sql`INSERT INTO projection_thread_clickup_tasks (thread_id, workspace_id, task_id) VALUES ('own-thread', '42', 'own-task')`;
   const calls = {
@@ -245,7 +250,7 @@ it.effect("rejects missing ClickUp capability before account reads or mutations"
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );
 
-for (const options of [{ linked: false }, { deleted: true }]) {
+for (const options of [{ linked: false, contextLinked: false }, { deleted: true }]) {
   it.effect(
     `rejects a ${options.linked === false ? "missing link" : "deleted thread"} without using another thread's task`,
     () =>
@@ -267,6 +272,72 @@ it.effect("reads only the invocation thread's durable task using the current acc
     const details = yield* harness.call("get_linked_clickup_task", {});
     assert.equal(details.task.taskId, "own-task");
     assert.deepEqual(harness.calls.reads, [{ workspaceId: "42", taskId: "own-task", userId: 91 }]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("uses a sole context task across the workflow without requiring a primary link", () =>
+  Effect.gen(function* () {
+    const harness = yield* makeHarness({ linked: false });
+    const expected = { workspaceId: "42", taskId: "context-task", userId: 73 };
+    const details = yield* harness.call("get_linked_clickup_task", {});
+    assert.equal(details.task.taskId, expected.taskId);
+    yield* harness.call("get_studio_task_workflow", { mode: "implement" });
+    yield* harness.call("start_linked_clickup_implementation", {});
+    const comments = yield* harness.call("get_linked_clickup_comments", {});
+    yield* harness.call("get_linked_clickup_comment_replies", {
+      commentId: "older-comment",
+      cursor: comments.nextCursor!,
+    });
+    yield* harness.call("post_linked_clickup_findings", {
+      text: "Missing acceptance criteria.",
+      actionable: true,
+    });
+    yield* harness.call("complete_clickup_estimation", { estimateMinutes: 30 });
+    yield* harness.call("prepare_linked_clickup_handoff", handoffInput);
+    assert.deepEqual(harness.calls.reads, [expected, expected]);
+    assert.deepEqual(harness.calls.starts, [expected]);
+    assert.deepEqual(harness.calls.findings, [expected]);
+    assert.deepEqual(harness.calls.estimates, [{ ...expected, estimateMinutes: 30 }]);
+    assert.deepEqual(harness.calls.handoffs, [{ task: expected, threadId: "own-thread" }]);
+    const sql = yield* SqlClient.SqlClient;
+    const links = yield* sql<{
+      is_primary: number;
+    }>`SELECT is_primary FROM projection_thread_clickup_tasks WHERE thread_id = 'own-thread'`;
+    assert.deepEqual(
+      links.map((link) => link.is_primary),
+      [0],
+    );
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("asks for an explicit task when several context tasks have no primary", () =>
+  Effect.gen(function* () {
+    const harness = yield* makeHarness({ linked: false, extraContext: true });
+    const operations = [
+      harness.call("get_linked_clickup_task", {}),
+      harness.call("get_studio_task_workflow", { mode: "implement" }),
+      harness.call("start_linked_clickup_implementation", {}),
+      harness.call("get_linked_clickup_comments", {}),
+      harness.call("get_linked_clickup_comment_replies", { commentId: "older-comment" }),
+      harness.call("post_linked_clickup_findings", { text: "Missing criteria.", actionable: true }),
+      harness.call("complete_clickup_estimation", { estimateMinutes: 30 }),
+      harness.call("prepare_linked_clickup_handoff", handoffInput),
+    ];
+    for (const operation of operations) {
+      const error = yield* operation.pipe(Effect.flip);
+      assert.equal(error._tag, "ClickUpError");
+      assert.include(error.message, "Multiple ClickUp tasks are linked");
+      assert.include(error.message, '"workspaceId":"42","taskId":"context-task"');
+      assert.include(error.message, '"workspaceId":"43","taskId":"second-context"');
+      assert.notInclude(error.message, "other-task");
+    }
+    assert.equal(harness.calls.accountReads, 0);
+    assert.deepEqual(harness.calls.starts, []);
+    assert.deepEqual(harness.calls.estimates, []);
+    const selected = yield* harness.call("get_linked_clickup_task", {
+      task: { workspaceId: "43", taskId: "second-context" },
+    });
+    assert.equal(selected.task.taskId, "second-context");
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );
 
@@ -496,7 +567,7 @@ it.effect("rejects a foreign parent comment before reading its replies", () =>
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );
 
-for (const options of [{ linked: false }, { deleted: true }]) {
+for (const options of [{ linked: false, contextLinked: false }, { deleted: true }]) {
   it.effect(
     `rejects comment reads for ${options.linked === false ? "unlinked" : "deleted"} threads`,
     () =>
@@ -657,7 +728,7 @@ it.effect(
       ),
     ),
 );
-for (const options of [{ linked: false }, { deleted: true }]) {
+for (const options of [{ linked: false, contextLinked: false }, { deleted: true }]) {
   it.effect("does not reveal workflow setup without an active linked thread", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness(options);

@@ -47,7 +47,7 @@ const linkedTaskFields = {
   ),
 };
 const linkedTaskDescription =
-  " Omit task to use this thread's primary task. To select another task already linked to this thread, pass task with both workspaceId and taskId on every call. Nerd verifies that link and supplies credentials. This does not change the primary task.";
+  " Omit task to use this thread's primary task, or its only linked task if no primary exists. Multiple links without a primary require an explicit selection. To select another task already linked to this thread, pass task with both workspaceId and taskId on every call. Nerd verifies that link and supplies credentials. This does not change the primary task.";
 
 const GetLinkedTask = Tool.make("get_linked_clickup_task", {
   description:

@@ -13,6 +13,11 @@ import { getStudioTaskWorkflow } from "../../../studio/StudioTaskWorkflow.ts";
 import { ClickUpToolkit } from "./tools.ts";
 
 const decodeTaskInput = Schema.decodeUnknownEffect(ClickUpTaskInput);
+const encodeTaskSelectors = Schema.encodeSync(
+  Schema.fromJsonString(
+    Schema.Array(Schema.Struct({ workspaceId: Schema.String, taskId: Schema.String })),
+  ),
+);
 
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -25,22 +30,28 @@ const make = Effect.gen(function* () {
     target?: Pick<ClickUpTaskInput, "workspaceId" | "taskId">,
   ) {
     const scope = yield* requireMcpCapability("clickup");
-    const rows = yield* sql<{ workspaceId: string; taskId: string }>`
-      SELECT tasks.workspace_id AS "workspaceId", tasks.task_id AS "taskId"
+    const rows = yield* sql<{ workspaceId: string; taskId: string; isPrimary: number }>`
+      SELECT tasks.workspace_id AS "workspaceId", tasks.task_id AS "taskId", tasks.is_primary AS "isPrimary"
       FROM projection_thread_clickup_tasks AS tasks
       JOIN projection_threads AS threads ON threads.thread_id = tasks.thread_id
       WHERE tasks.thread_id = ${scope.threadId} AND threads.deleted_at IS NULL
         AND ${
           target
             ? sql`tasks.workspace_id = ${target.workspaceId} AND tasks.task_id = ${target.taskId}`
-            : sql`tasks.is_primary = 1`
+            : sql`1 = 1`
         }
     `.pipe(
       Effect.mapError(
         () => new ClickUpError({ message: "Could not read this thread's linked ClickUp task." }),
       ),
     );
-    const link = rows[0];
+    const link = target
+      ? rows[0]
+      : (rows.find((row) => row.isPrimary === 1) ?? (rows.length === 1 ? rows[0] : undefined));
+    if (!target && !link && rows.length > 1)
+      return yield* new ClickUpError({
+        message: `Multiple ClickUp tasks are linked and no primary task is set. Select the intended task and pass task: { workspaceId, taskId } on every workflow call. Linked tasks: ${encodeTaskSelectors(rows.map(({ workspaceId, taskId }) => ({ workspaceId, taskId })))}`,
+      });
     if (!link)
       return yield* new ClickUpError({
         message: target
@@ -53,7 +64,8 @@ const make = Effect.gen(function* () {
         message: "Connect your ClickUp account in Settings first.",
       });
     return yield* decodeTaskInput({
-      ...link,
+      workspaceId: link.workspaceId,
+      taskId: link.taskId,
       userId: account.user.id,
     }).pipe(
       Effect.mapError(
