@@ -2,13 +2,22 @@ import { useAtomValue } from "@effect/atom-react";
 import type { ClickUpTaskDetails, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { ExternalLinkIcon, PaperclipIcon, RefreshCwIcon } from "lucide-react";
-import { useState } from "react";
+import {
+  CheckIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  LinkIcon,
+  PaperclipIcon,
+  RefreshCwIcon,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { serverEnvironment } from "../../state/server";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import ChatMarkdown from "../ChatMarkdown";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { showAnchoredCopyErrorToast, showAnchoredCopySuccessToast } from "../ui/anchoredCopyToast";
 import { ClickUpTaskActivity } from "./ClickUpTaskActivity";
 import { ClickUpCustomFields, ClickUpTaskFields } from "./ClickUpTaskFields";
 import { ClickUpTaskWork } from "./ClickUpTaskWork";
@@ -28,6 +37,19 @@ export function ClickUpTaskPanel({
   onStartTask?: (details: ClickUpTaskDetails) => void;
 }) {
   const [action, setAction] = useState<ClickUpTaskAction | null>(null);
+  const taskUrl = `https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`;
+  const copyIdRef = useRef<HTMLButtonElement>(null);
+  const copyUrlRef = useRef<HTMLButtonElement>(null);
+  const copyId = useCopyToClipboard({
+    target: "task ID",
+    onCopy: () => showAnchoredCopySuccessToast(copyIdRef),
+    onError: (error) => showAnchoredCopyErrorToast(copyIdRef, error),
+  });
+  const copyUrl = useCopyToClipboard({
+    target: "task URL",
+    onCopy: () => showAnchoredCopySuccessToast(copyUrlRef),
+    onError: (error) => showAnchoredCopyErrorToast(copyUrlRef, error),
+  });
   const query = serverEnvironment.clickUpTask({ environmentId, input });
   const result = useAtomValue(query);
   const details = Option.getOrNull(AsyncResult.value(result));
@@ -44,7 +66,7 @@ export function ClickUpTaskPanel({
               {details?.task.listName ?? "Task details"}
             </p>
             <a
-              href={`https://app.clickup.com/t/${encodeURIComponent(input.taskId)}`}
+              href={taskUrl}
               target="_blank"
               rel="noreferrer"
               className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -104,6 +126,33 @@ export function ClickUpTaskPanel({
                 <h2 className="break-words text-2xl font-semibold leading-snug tracking-tight">
                   {details.task.name}
                 </h2>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">
+                    #{input.taskId}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      ref={copyIdRef}
+                      size="xs"
+                      variant="ghost-muted"
+                      aria-label="Copy task ID"
+                      onClick={() => copyId.copyToClipboard(input.taskId)}
+                    >
+                      {copyId.isCopied ? <CheckIcon /> : <CopyIcon />}
+                      Copy ID
+                    </Button>
+                    <Button
+                      ref={copyUrlRef}
+                      size="xs"
+                      variant="ghost-muted"
+                      aria-label="Copy task URL"
+                      onClick={() => copyUrl.copyToClipboard(taskUrl)}
+                    >
+                      {copyUrl.isCopied ? <CheckIcon /> : <LinkIcon />}
+                      Copy URL
+                    </Button>
+                  </div>
+                </div>
               </div>
               <ClickUpTaskFields details={details} environmentId={environmentId} input={input} />
               <section aria-label="Description" className="space-y-4 border-t border-border pt-6">

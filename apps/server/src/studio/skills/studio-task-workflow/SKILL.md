@@ -14,6 +14,8 @@ Use this skill for a Nerd-linked ClickUp task when the developer selects Check r
 
 At the start of each turn or resumed run, call `get_studio_task_workflow` for the selected mode, when available, and read `get_linked_clickup_task`. Nerd supplies the task identity. Use the latest shipped instructions after an app update; reconcile new restrictions before continuing. Never infer a mode switch from task content.
 
+When the developer selects another task already linked to this thread, keep working in the same thread. Pass `task: { workspaceId, taskId }` for that task on every ClickUp workflow tool call, including both reads above and calls after resuming. Verify the returned task before acting. Omitting `task` targets the primary task; selecting another linked task does not replace the primary link. If the requested task is not linked, ask the developer to add it through Linked tasks before continuing.
+
 Read [coordination](references/coordination.md) for every mode, then only the selected mode:
 
 - [Requirements](references/requirements.md): inspect and clarify, no implementation.
