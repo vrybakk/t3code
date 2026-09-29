@@ -1,4 +1,8 @@
-import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
+import {
+  TaskAnalysis,
+  TaskEstimationResponse,
+  TaskEstimationFinalResponse,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -196,9 +200,15 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
         )?.slug ??
         requestedModel;
       const launchArgs = resolveCodexLaunchArgs(codexConfig.launchArgs, resolvedEnvironment);
-      const reasoningEffort =
+      const selectedReasoningEffort =
         getModelSelectionStringOptionValue(modelSelection, "reasoningEffort") ??
         DEFAULT_TEXT_GENERATION_REASONING_EFFORT;
+      // Estimation requires following code across files; the metadata default is too shallow.
+      const reasoningEffort =
+        operation === "researchTaskEstimate" &&
+        ["none", "minimal", "low", "medium"].includes(selectedReasoningEffort)
+          ? "high"
+          : selectedReasoningEffort;
       const serviceTier = getCodexServiceTierOptionValue(modelSelection);
       const spawnCommand = yield* resolveSpawnCommand(
         codexConfig.binaryPath || "codex",
@@ -434,7 +444,8 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       operation: "researchTaskEstimate",
       cwd: input.cwd,
       prompt: input.prompt,
-      outputSchemaJson: TaskEstimationResponse,
+      outputSchemaJson:
+        input.phase === "final" ? TaskEstimationFinalResponse : TaskEstimationResponse,
       modelSelection: input.modelSelection,
       imagePaths: input.imagePaths ?? [],
     });

@@ -32,6 +32,7 @@ interface FakeCodexInput {
   stderr?: string;
   requireImage?: boolean;
   requireTaskAnalysisSchema?: boolean;
+  requireFinalEstimationSchema?: boolean;
   requireServiceTier?: string;
   requireReasoningEffort?: string;
   forbidReasoningEffort?: boolean;
@@ -49,6 +50,7 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
   const check = JSON.stringify({
     requireImage: input.requireImage ?? false,
     requireTaskAnalysisSchema: input.requireTaskAnalysisSchema ?? false,
+    requireFinalEstimationSchema: input.requireFinalEstimationSchema ?? false,
     requireServiceTier: input.requireServiceTier ?? null,
     requireReasoningEffort: input.requireReasoningEffort ?? null,
     forbidReasoningEffort: input.forbidReasoningEffort ?? false,
@@ -97,6 +99,11 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
         '  assert.deepEqual(schema.required.toSorted(), ["estimateMinutes", "findings", "summary"]);',
         "  assert.equal(schema.additionalProperties, false);",
         '  assert.deepEqual(schema.properties.findings.anyOf, [{ type: "string", minLength: 1, maxLength: 2000 }, { type: "null" }]);',
+        "}",
+        "if (check.requireFinalEstimationSchema) {",
+        '  const schema = JSON.parse(NodeFS.readFileSync(schemaPath, "utf8"));',
+        "  assert.equal(schema.properties.files.maxItems, 0);",
+        "  assert.equal(schema.properties.searches.maxItems, 0);",
         "}",
         "const chunks = [];",
         "for await (const chunk of process.stdin) chunks.push(chunk);",
@@ -177,12 +184,14 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
       {
         output: '{"summary":"Inspect checkout","searches":[],"files":[],"estimate":null}',
         requireImage: true,
+        requireReasoningEffort: "high",
         requireArg:
           '--ignore-user-config --ignore-rules --config mcp_servers={} --config web_search="disabled" --config agents.max_concurrent_threads_per_session=1 --disable shell_tool --disable unified_exec --disable apps --disable plugins --disable remote_plugin --disable multi_agent --disable multi_agent_v2 --disable skill_search --disable skill_mcp_dependency_install --disable code_mode_host --disable view_image --disable browser_use --disable computer_use --disable hooks --disable goals --disable sleep_tool',
       },
       (generation) =>
         Effect.gen(function* () {
           const result = yield* generation.researchTaskEstimate({
+            phase: "research",
             cwd: process.cwd(),
             prompt: "Inspect supplied evidence only",
             imagePaths: ["/tmp/evidence.png"],
@@ -193,11 +202,35 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
     ),
   );
 
+  for (const effort of ["low", "medium", "high", "xhigh"]) {
+    it.effect(
+      `uses sufficient estimation reasoning and enforces a final schema for ${effort}`,
+      () =>
+        withFakeCodexEnv(
+          {
+            output: '{"summary":"Bounded change","searches":[],"files":[],"estimate":null}',
+            requireFinalEstimationSchema: true,
+            requireReasoningEffort: effort === "xhigh" ? "xhigh" : "high",
+          },
+          (generation) =>
+            generation.researchTaskEstimate({
+              phase: "final",
+              cwd: process.cwd(),
+              prompt: "Estimate inspected work",
+              modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-6-luna", [
+                { id: "reasoningEffort", value: effort },
+              ]),
+            }),
+        ),
+    );
+  }
+
   it.effect("generates structured task analysis with the selected model", () =>
     withFakeCodexEnv(
       {
         output: '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}',
         requireTaskAnalysisSchema: true,
+        requireReasoningEffort: "low",
       },
       (generation) =>
         Effect.gen(function* () {

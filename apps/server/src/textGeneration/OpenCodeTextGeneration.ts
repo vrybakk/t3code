@@ -1,4 +1,8 @@
-import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
+import {
+  TaskAnalysis,
+  TaskEstimationResponse,
+  TaskEstimationFinalResponse,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -440,7 +444,8 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       operation: "researchTaskEstimate",
       cwd: input.cwd,
       prompt: input.prompt,
-      outputSchemaJson: TaskEstimationResponse,
+      outputSchemaJson:
+        input.phase === "final" ? TaskEstimationFinalResponse : TaskEstimationResponse,
       modelSelection: input.modelSelection,
     });
 

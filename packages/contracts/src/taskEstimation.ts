@@ -20,6 +20,11 @@ export const TaskEstimationResponse = Schema.Struct({
   ),
 });
 export type TaskEstimationResponse = typeof TaskEstimationResponse.Type;
+export const TaskEstimationFinalResponse = Schema.Struct({
+  ...TaskEstimationResponse.fields,
+  searches: Schema.Array(RepositoryRequest).check(Schema.isMaxLength(0)),
+  files: Schema.Array(RepositoryRequest).check(Schema.isMaxLength(0)),
+});
 export const TaskEstimationEvidence = Schema.Struct({
   implementationMinutes: NonNegativeInt,
   verificationMinutes: NonNegativeInt,

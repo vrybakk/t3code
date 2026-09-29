@@ -1,4 +1,8 @@
-import { TaskAnalysis, TaskEstimationResponse } from "@t3tools/contracts";
+import {
+  TaskAnalysis,
+  TaskEstimationResponse,
+  TaskEstimationFinalResponse,
+} from "@t3tools/contracts";
 import {
   type ModelSelection,
   type ProviderSetupError,
@@ -395,7 +399,7 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
       operation: "researchTaskEstimate",
 
       prompt: input.prompt,
-      outputSchema: TaskEstimationResponse,
+      outputSchema: input.phase === "final" ? TaskEstimationFinalResponse : TaskEstimationResponse,
       modelSelection: input.modelSelection,
     });
 
