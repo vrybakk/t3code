@@ -48,12 +48,16 @@ export const ClickUpHandoff = Schema.Struct({
   commentPosted: Schema.Boolean,
 });
 export type ClickUpHandoff = typeof ClickUpHandoff.Type;
-export const ClickUpWorkflow = Schema.Struct({ handoffs: Schema.Array(ClickUpHandoff) });
+export const ClickUpWorkflow = Schema.Struct({
+  handoffs: Schema.Array(ClickUpHandoff),
+  submittedThreadIds: Schema.optionalKey(Schema.Array(ThreadId)),
+});
 export type ClickUpWorkflow = typeof ClickUpWorkflow.Type;
 export const ClickUpWorkflowInput = ClickUpTaskInput;
 export const ClickUpSubmitWorkflowInput = Schema.Struct({
   ...ClickUpTaskInput.fields,
   handoffId: TrimmedNonEmptyString,
+  commentDelivery: Schema.optionalKey(Schema.Literals(["posted", "not-posted"])),
 });
 export type ClickUpSubmitWorkflowInput = typeof ClickUpSubmitWorkflowInput.Type;
 export const ClickUpFindingsInput = Schema.Struct({

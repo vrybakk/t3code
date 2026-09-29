@@ -63,3 +63,21 @@ export const resolveTaskRepositories = Effect.fn("resolveTaskRepositories")(
     () => new ClickUpError({ message: "Could not resolve the task's linked repositories." }),
   ),
 );
+
+export const estimationRepositories = Effect.fn("estimationRepositories")(function* (
+  task: ClickUpTask,
+) {
+  const { resolved, checkouts, unavailableLocalIds } = yield* resolveTaskRepositories(task);
+  if (resolved.missing.length || unavailableLocalIds.length || !resolved.projects.length)
+    return yield* new ClickUpError({
+      message:
+        "Set up the task's linked repositories before estimating so the actual code can be inspected.",
+    });
+  const repos = resolved.projects.flatMap((project) => {
+    const nested = checkouts.filter((c) => c.projectId === project.id);
+    return nested.length
+      ? nested.map((c) => ({ cwd: c.cwd, title: project.title }))
+      : [{ cwd: project.workspaceRoot, title: project.title }];
+  });
+  return [...new Map(repos.map((r) => [r.cwd, r])).values()];
+});

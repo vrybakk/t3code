@@ -32,6 +32,11 @@ export class ClickUpWorkflowStore extends Context.Service<
       key: string,
       text: string,
     ) => Effect.Effect<void, ClickUpError>;
+    readonly reconcileComment: (
+      task: ClickUpTaskInput,
+      key: string,
+      posted: boolean,
+    ) => Effect.Effect<void, ClickUpError>;
     readonly registered: (task: ClickUpTaskInput) => Effect.Effect<
       ReadonlyArray<{
         threadId: ThreadId;
@@ -72,12 +77,13 @@ export const layer = Layer.effect(
         Effect.mapError(failed),
       );
     });
+    const operationKey = (key: string) => NodeCrypto.createHash("sha256").update(key).digest("hex");
     const postOnce = Effect.fn("ClickUpWorkflowStore.postOnce")(function* (
       task: ClickUpTaskInput,
       key: string,
       text: string,
     ) {
-      const operation = NodeCrypto.createHash("sha256").update(key).digest("hex");
+      const operation = operationKey(key);
       const existing = yield* sql<{ state: string }>`SELECT state FROM clickup_workflow_comments
       WHERE workspace_id = ${task.workspaceId} AND task_id = ${task.taskId} AND user_id = ${task.userId} AND operation_key = ${operation}`.pipe(
         Effect.mapError(failed),
@@ -107,6 +113,35 @@ export const layer = Layer.effect(
         Effect.mapError(failed),
       );
     });
+    const reconcileComment = Effect.fn("ClickUpWorkflowStore.reconcileComment")(function* (
+      task: ClickUpTaskInput,
+      key: string,
+      posted: boolean,
+    ) {
+      const operation = operationKey(key);
+      if (!posted) {
+        const existing = yield* sql<{ state: string }>`SELECT state FROM clickup_workflow_comments
+          WHERE workspace_id = ${task.workspaceId} AND task_id = ${task.taskId} AND user_id = ${task.userId} AND operation_key = ${operation}`.pipe(
+          Effect.mapError(failed),
+        );
+        if (existing[0]?.state === "posted")
+          return yield* new ClickUpError({
+            message:
+              "This handoff comment was already recorded as posted. Refresh and confirm it in ClickUp.",
+          });
+      }
+      if (posted)
+        yield* sql`INSERT INTO clickup_workflow_comments(workspace_id, task_id, user_id, operation_key, state)
+          VALUES (${task.workspaceId}, ${task.taskId}, ${task.userId}, ${operation}, 'posted')
+          ON CONFLICT(workspace_id, task_id, user_id, operation_key) DO UPDATE SET state = 'posted'`.pipe(
+          Effect.mapError(failed),
+        );
+      else
+        yield* sql`DELETE FROM clickup_workflow_comments WHERE workspace_id = ${task.workspaceId}
+          AND task_id = ${task.taskId} AND user_id = ${task.userId} AND operation_key = ${operation}`.pipe(
+          Effect.mapError(failed),
+        );
+    });
     const registered = (task: ClickUpTaskInput) =>
       sql<{
         threadId: ThreadId;
@@ -121,6 +156,6 @@ export const layer = Layer.effect(
     JOIN projection_thread_clickup_tasks c ON c.thread_id = t.thread_id
     WHERE c.workspace_id = ${task.workspaceId} AND c.task_id = ${task.taskId} AND t.deleted_at IS NULL
   `.pipe(Effect.mapError(failed));
-    return ClickUpWorkflowStore.of({ list, save, postOnce, registered });
+    return ClickUpWorkflowStore.of({ list, save, postOnce, reconcileComment, registered });
   }),
 );
