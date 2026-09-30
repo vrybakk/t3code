@@ -143,7 +143,10 @@ it.effect(
       (path) =>
         path === "list/sprint-1"
           ? { folder: { id: "90122725830" } }
-          : { tasks: [{ ...task, team_id: "2179724" }], last_page: true },
+          : {
+              tasks: path.includes("page=0") ? [{ ...task, team_id: "2179724" }] : [],
+              last_page: true,
+            },
       "2179724",
     );
     return Effect.gen(function* () {
@@ -175,16 +178,18 @@ it.effect("defaults sprint task pages to the connected user's assignments", () =
       path === "list/sprint-1"
         ? { folder: { id: "90122725830" } }
         : {
-            tasks: [
-              {
-                ...task,
-                team_id: "2179724",
-                status: { status: "review", color: "#abc" },
-                priority: { priority: "high" },
-                due_date: "1790222400000",
-                tags: [{ name: "estimation needed" }],
-              },
-            ],
+            tasks: path.includes("page=0")
+              ? [
+                  {
+                    ...task,
+                    team_id: "2179724",
+                    status: { status: "review", color: "#abc" },
+                    priority: { priority: "high" },
+                    due_date: "1790222400000",
+                    tags: [{ name: "estimation needed" }],
+                  },
+                ]
+              : [],
             last_page: true,
           },
     "2179724",
@@ -218,10 +223,13 @@ it.effect("collects every sprint page and deduplicates tasks before returning su
     return page === "0"
       ? { tasks: firstPage, last_page: false }
       : {
-          tasks: [
-            { ...firstPage[0], priority: { priority: "urgent" } },
-            { ...task, id: "100", team_id: "2179724", priority: null },
-          ],
+          tasks:
+            page === "1"
+              ? [
+                  { ...firstPage[0], priority: { priority: "urgent" } },
+                  { ...task, id: "100", team_id: "2179724", priority: null },
+                ]
+              : [],
           last_page: true,
         };
   }, "2179724");
@@ -243,7 +251,7 @@ it.effect("collects every sprint page and deduplicates tasks before returning su
       .map((path) => new URL(`https://example.test/${path}`).searchParams);
     assert.deepEqual(
       queries.map((query) => query.get("page")),
-      ["0", "1"],
+      ["0", "1", "2"],
     );
     assert.isTrue(
       queries.every(
@@ -451,10 +459,12 @@ it.effect(
                   ],
                 },
               ]
-            : [
-                { ...task, team_id: "2179724", id: "story", custom_item_id: 94 },
-                { ...task, team_id: "2179724", id: "unknown", custom_item_id: 500 },
-              ],
+            : page === "1"
+              ? [
+                  { ...task, team_id: "2179724", id: "story", custom_item_id: 94 },
+                  { ...task, team_id: "2179724", id: "unknown", custom_item_id: 500 },
+                ]
+              : [],
         last_page: page === "1",
       };
     }, "2179724");
@@ -603,4 +613,59 @@ it.effect("resumes a failed page without exposing a partial workspace", () =>
     assert.equal(result.tasks.length, 1);
     assert.equal(calls, previousCalls + 1);
   }),
+);
+
+it.effect(
+  "keeps estimated multi-list tasks when short sprint pages incorrectly report last_page",
+  () => {
+    const firstPage = Array.from({ length: 79 }, (_, index) => ({
+      ...task,
+      id: `task-${index}`,
+      team_id: "2179724",
+    }));
+    const estimated = Array.from({ length: 4 }, (_, index) => ({
+      ...task,
+      id: `estimated-${index}`,
+      team_id: "2179724",
+      list: { id: "backlog", name: "Project backlog" },
+      time_estimate: 900000,
+      tags: [{ name: "critical" }],
+      due_date: "1790733600000",
+    }));
+    const test = setup((path) => {
+      if (path === "list/sprint-1") return { folder: { id: "90122725830" } };
+      const page = new URL(`https://example.test/${path}`).searchParams.get("page");
+      return {
+        tasks: page === "0" ? firstPage : page === "1" ? [firstPage[0], ...estimated] : [],
+        last_page: true,
+      };
+    }, "2179724");
+    return Effect.gen(function* () {
+      const tasks = yield* ClickUpTasks;
+      const result = yield* tasks.list({
+        workspaceId: "2179724",
+        listId: "sprint-1",
+        page: 0,
+        userId: 17,
+      });
+      assert.equal(result.tasks.length, 83);
+      assert.equal(result.hasMore, false);
+      assert.deepEqual(
+        result.tasks
+          .filter((task) => task.taskId.startsWith("estimated-"))
+          .map((task) => ({ id: task.taskId, estimate: task.timeEstimate, tags: task.tags })),
+        estimated.map((task) => ({
+          id: task.id,
+          estimate: task.time_estimate,
+          tags: ["critical"],
+        })),
+      );
+      assert.deepEqual(
+        test.paths
+          .slice(1)
+          .map((path) => new URL(`https://example.test/${path}`).searchParams.get("page")),
+        ["0", "1", "2"],
+      );
+    }).pipe(Effect.provide(test.layer));
+  },
 );
