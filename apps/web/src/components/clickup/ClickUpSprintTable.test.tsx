@@ -17,6 +17,9 @@ vi.mock("@effect/atom-react", () => ({
 vi.mock("../../state/entities", () => ({ useThreadShells: () => state.threads }));
 vi.mock("../../state/server", () => ({ serverEnvironment: { clickUpThreads: state.query } }));
 vi.mock("../../rpc/atomRegistry", () => ({ appAtomRegistry: { refresh: state.refresh } }));
+vi.mock("./useClickUpBackgroundAction", () => ({
+  useClickUpBackgroundAction: () => ({ state: undefined, run: vi.fn() }),
+}));
 vi.mock("./ClickUpBackgroundAction", () => ({ ClickUpBackgroundAction: () => null }));
 vi.mock("./ClickUpTaskLauncher", () => ({ ClickUpTaskLauncher: () => null }));
 vi.mock("./ClickUpTaskEditors", () => ({ ClickUpStatusIconPicker: () => null }));
@@ -158,7 +161,14 @@ it("refreshes cached associations when running identities change, but not on str
 it("leaves the task detail implementation action available while its thread runs", async () => {
   state.threads = [thread()];
   await act(async () => {
-    renderer = create(<ClickUpTaskActionButtons task={task} onSelect={vi.fn()} />);
+    renderer = create(
+      <ClickUpTaskActionButtons
+        environmentId={environmentId}
+        input={{ workspaceId: task.workspaceId, userId: 7, taskId: task.taskId }}
+        task={task}
+        onSelect={vi.fn()}
+      />,
+    );
   });
   expect(startButtons()).toHaveLength(1);
   expect(seeLinks()).toHaveLength(0);

@@ -147,6 +147,8 @@ export function ClickUpSprintTable({
                           />
                         ) : (
                           <ClickUpTaskActionButtons
+                            environmentId={environmentId}
+                            input={{ workspaceId, userId, taskId: task.taskId }}
                             compact
                             task={task}
                             onSelect={(action) => setSelection({ task, action })}

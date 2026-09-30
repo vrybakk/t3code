@@ -90,6 +90,8 @@ export function ClickUpTaskPanel({
         {details && (
           <div className="ml-auto flex min-w-0 max-w-full justify-end">
             <ClickUpTaskActionButtons
+              environmentId={environmentId}
+              input={input}
               task={details.task}
               onSelect={(nextAction) => {
                 if (nextAction === "implement" && onStartTask) {
