@@ -113,7 +113,8 @@ export const layer = Layer.effect(
           response.last_page === undefined ? response.tasks.length === 100 : !response.last_page;
         if (!input.listId) return { tasks, hasMore };
         for (const task of tasks) collected.set(task.taskId, task);
-        if (!hasMore) return { tasks: [...collected.values()], hasMore: false };
+        // Filtered multi-list pages can report last_page=true while later pages still contain tasks.
+        if (response.tasks.length === 0) return { tasks: [...collected.values()], hasMore: false };
         query.set("page", String(++page));
       }
     });

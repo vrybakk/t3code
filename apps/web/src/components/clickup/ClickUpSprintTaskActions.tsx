@@ -46,6 +46,8 @@ export function ClickUpSprintTaskActions({
   const thread = links.find((link) => runningThreadIds.has(link.threadId));
   return (
     <ClickUpTaskActionButtons
+      environmentId={environmentId}
+      input={{ workspaceId, userId, taskId: task.taskId }}
       compact
       task={task}
       runningThread={thread ? { environmentId, threadId: thread.threadId } : undefined}

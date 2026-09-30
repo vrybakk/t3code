@@ -11,6 +11,8 @@ import { AsyncResult } from "effect/unstable/reactivity";
 import { CalculatorIcon, EyeIcon, ListChecksIcon, PlayIcon } from "lucide-react";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
+import { Spinner } from "../ui/spinner";
+import { useClickUpBackgroundAction } from "./useClickUpBackgroundAction";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -50,16 +52,26 @@ const actions = {
 >;
 
 export function ClickUpTaskActionButtons({
+  environmentId,
+  input,
   task,
   compact = false,
   runningThread,
   onSelect,
 }: {
+  environmentId: EnvironmentId;
+  input: ClickUpTaskInput;
   task: Pick<ClickUpTask, "name" | "timeEstimate" | "tags">;
   compact?: boolean;
   runningThread?: ScopedThreadRef | undefined;
   onSelect: (action: ClickUpTaskAction) => void;
 }) {
+  const estimate = useClickUpBackgroundAction({
+    environmentId,
+    input: { ...input, action: "estimate" },
+    taskName: task.name,
+  });
+  const estimating = estimate.state === null;
   return (
     <div
       className={
@@ -70,7 +82,7 @@ export function ClickUpTaskActionButtons({
       aria-label={`Actions for ${task.name}`}
     >
       {(Object.keys(actions) as ClickUpTaskAction[]).map((action) => {
-        if (action === "estimate" && task.timeEstimate != null) return null;
+        if (action === "estimate" && task.timeEstimate != null && !estimating) return null;
         if (action === "implement" && runningThread) {
           return (
             <Tooltip key={action}>
@@ -95,6 +107,8 @@ export function ClickUpTaskActionButtons({
           action === "implement" &&
           task.tags?.some((tag) => tag.trim().toLowerCase() === "no agent");
         const { label, icon: Icon } = actions[action];
+        const pending = action === "estimate" && estimating;
+        const actionLabel = pending ? "Show estimation progress" : label;
         return (
           <Tooltip key={action}>
             <TooltipTrigger
@@ -110,19 +124,28 @@ export function ClickUpTaskActionButtons({
                         ? "default"
                         : "outline"
                   }
-                  aria-label={`${label}: ${task.name}`}
+                  aria-label={`${actionLabel}: ${task.name}`}
                   aria-disabled={blocked || undefined}
                   onClick={() => {
-                    if (!blocked) onSelect(action);
+                    if (blocked) return;
+                    if (action === "estimate" && estimate.state === undefined) {
+                      void estimate.run();
+                    } else {
+                      onSelect(action);
+                    }
                   }}
                 />
               }
             >
-              <Icon className="size-3.5" />
-              {!compact && label}
+              {pending ? (
+                <Spinner aria-hidden role="presentation" />
+              ) : (
+                <Icon className="size-3.5" />
+              )}
+              {!compact && !pending && label}
             </TooltipTrigger>
             <TooltipPopup>
-              {blocked ? "Remove the no agent tag to allow implementation." : label}
+              {blocked ? "Remove the no agent tag to allow implementation." : actionLabel}
             </TooltipPopup>
           </Tooltip>
         );

@@ -1,7 +1,7 @@
 import { EnvironmentId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { act, StrictMode } from "react";
+import { act, StrictMode, useState, type ReactElement, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
@@ -25,9 +25,17 @@ vi.mock("../ui/dialog", () => ({
 }));
 vi.mock("../ui/spinner", () => ({ Spinner: "svg" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
-vi.mock("../ui/tooltip", () => ({ Tooltip: "div", TooltipPopup: "div", TooltipTrigger: "div" }));
+vi.mock("../ui/tooltip", async () => {
+  const { cloneElement } = await import("react");
+  return {
+    Tooltip: ({ children }: { children: ReactNode }) => children,
+    TooltipTrigger: ({ render, children }: { render: ReactElement; children: ReactNode }) =>
+      cloneElement(render, {}, children),
+    TooltipPopup: () => null,
+  };
+});
 import { subscribeTaskAnalysisNotifications } from "./taskAnalysisFeedback";
-import { ClickUpTaskActionDialog } from "./ClickUpTaskActions";
+import { ClickUpTaskActionButtons, ClickUpTaskActionDialog } from "./ClickUpTaskActions";
 
 let renderer: ReactTestRenderer;
 let taskNumber = 0;
@@ -161,4 +169,117 @@ it("reuses the running action and saved result after closing and reopening", asy
       .props.onClick(),
   );
   expect(mocks.analyze).toHaveBeenCalledTimes(2);
+});
+
+function taskActions() {
+  return <TaskActions />;
+}
+function TaskActions() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ClickUpTaskActionButtons
+        environmentId={EnvironmentId.make("test")}
+        input={input}
+        compact
+        task={{ name: "Checkout" }}
+        onSelect={() => setOpen(true)}
+      />
+      {open && (
+        <ClickUpTaskActionDialog
+          environmentId={EnvironmentId.make("test")}
+          input={input}
+          action="estimate"
+          taskName="Checkout"
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+const actionButton = (label: string) =>
+  renderer.root.findByProps({ "aria-label": `${label}: Checkout` });
+it("starts estimation silently and opens progress only when the spinner is clicked", async () => {
+  let finish!: (value: ReturnType<typeof AsyncResult.success<typeof success>>) => void;
+  mocks.analyze.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  await act(async () => {
+    renderer = create(taskActions());
+  });
+  expect(mocks.analyze).not.toHaveBeenCalled();
+  await act(async () => actionButton("Estimate task").props.onClick());
+  expect(mocks.analyze).toHaveBeenCalledTimes(1);
+  expect(renderer.root.findAllByType("dialog")).toHaveLength(0);
+  expect(actionButton("Show estimation progress").findAllByType("svg")).toHaveLength(1);
+  await act(async () => actionButton("Show estimation progress").props.onClick());
+  expect(renderer.root.findAllByType("dialog")).toHaveLength(1);
+  expect(mocks.analyze).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Continue working"))!
+      .props.onClick();
+  });
+  expect(renderer.root.findAllByType("dialog")).toHaveLength(0);
+  await act(async () => finish(AsyncResult.success(success)));
+  expect(mocks.toast).toHaveBeenCalledTimes(1);
+  expect(actionButton("Estimate task")).toBeDefined();
+  await act(async () => actionButton("Estimate task").props.onClick());
+  expect(renderer.root.findByProps({ role: "status" }).findAllByType("p")[0]?.children).toContain(
+    success.summary,
+  );
+  expect(mocks.analyze).toHaveBeenCalledTimes(1);
+});
+
+it("keeps shared estimate progress after navigating between action surfaces", async () => {
+  let finish!: (value: ReturnType<typeof AsyncResult.success<typeof success>>) => void;
+  mocks.analyze.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  await act(async () => {
+    renderer = create(taskActions());
+  });
+  await act(async () => actionButton("Estimate task").props.onClick());
+  await act(async () => renderer.unmount());
+  await act(async () => {
+    renderer = create(taskActions());
+  });
+  expect(actionButton("Show estimation progress")).toBeDefined();
+  await act(async () => actionButton("Show estimation progress").props.onClick());
+  expect(mocks.analyze).toHaveBeenCalledTimes(1);
+  await act(async () => finish(AsyncResult.success(success)));
+  expect(actionButton("Estimate task")).toBeDefined();
+});
+
+it("shows estimation errors on demand and restores the spinner during explicit retry", async () => {
+  mocks.analyze.mockResolvedValue(
+    AsyncResult.failure(Cause.fail(new Error("Provider is unavailable"))),
+  );
+  await act(async () => {
+    renderer = create(taskActions());
+  });
+  await act(async () => actionButton("Estimate task").props.onClick());
+  expect(renderer.root.findAllByType("dialog")).toHaveLength(0);
+  await act(async () => actionButton("Estimate task").props.onClick());
+  expect(renderer.root.findByType("pre").children).toContain("Provider is unavailable");
+  let finish!: (value: ReturnType<typeof AsyncResult.success<typeof success>>) => void;
+  mocks.analyze.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  await act(async () => {
+    renderer.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Retry"))!
+      .props.onClick();
+  });
+  expect(actionButton("Show estimation progress")).toBeDefined();
+  expect(mocks.analyze).toHaveBeenCalledTimes(2);
+  await act(async () => finish(AsyncResult.success(success)));
 });
