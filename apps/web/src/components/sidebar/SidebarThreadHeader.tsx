@@ -145,7 +145,7 @@ export function SidebarThreadHeader({
             >
               {viewMode === "threads" ? <ListTreeIcon /> : <ListIcon />}
             </SidebarHeaderIconButton>
-            <SidebarHeaderIconButton label="New project" onClick={onNewProject}>
+            <SidebarHeaderIconButton label="Add project" onClick={onNewProject}>
               <FolderPlusIcon />
             </SidebarHeaderIconButton>
           </>
