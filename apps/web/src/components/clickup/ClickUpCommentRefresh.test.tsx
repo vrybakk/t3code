@@ -44,7 +44,15 @@ vi.mock("../ui/tooltip", async () => {
     TooltipPopup: () => null,
   };
 });
-vi.mock("../ChatMarkdown", () => ({ default: () => null }));
+vi.mock("../ChatMarkdown", async () => {
+  const { default: ReactMarkdown } = await import("react-markdown");
+  return {
+    default: ({ text, extraRemarkPlugins }: { text: string; extraRemarkPlugins?: [] }) => (
+      <ReactMarkdown remarkPlugins={extraRemarkPlugins}>{text}</ReactMarkdown>
+    ),
+  };
+});
+vi.mock("../ExternalLink", () => ({ ExternalLink: "a" }));
 vi.mock("./ClickUpTaskFields", () => ({
   ClickUpTaskFields: () => null,
   ClickUpCustomFields: () => null,
@@ -99,6 +107,7 @@ it("highlights the connected user's mentions in both comments and expanded repli
     renderer = create(
       <ClickUpTaskActivity
         environmentId={EnvironmentId.make("test")}
+        threadRef={undefined}
         input={input}
         details={{
           ...details,
@@ -127,6 +136,7 @@ it("highlights the connected user's mentions in both comments and expanded repli
     renderer.update(
       <ClickUpTaskActivity
         environmentId={EnvironmentId.make("test")}
+        threadRef={undefined}
         input={input}
         details={details}
       />,
@@ -157,6 +167,7 @@ it("uses the detail comment page until pagination and preserves the first-page c
     renderer = create(
       <ClickUpTaskActivity
         environmentId={EnvironmentId.make("test")}
+        threadRef={undefined}
         input={input}
         details={{ ...details, commentsMayHaveMore: true }}
       />,
@@ -199,6 +210,7 @@ it.each(["post", "reply", "resolve"] as const)(
       renderer = create(
         <ClickUpTaskActivity
           environmentId={EnvironmentId.make("test")}
+          threadRef={undefined}
           input={input}
           details={details}
         />,

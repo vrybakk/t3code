@@ -1,15 +1,27 @@
 import { describe, expect, it } from "vite-plus/test";
-import { splitSelfMentions } from "./commentMentions";
+import type { MarkdownNode } from "~/vendor/mdast-find-and-replace";
+import { remarkSelfMentions } from "./commentMentions";
 
-describe("splitSelfMentions", () => {
-  it("finds repeated self mentions without changing surrounding text or other mentions", () => {
+function highlight(children: MarkdownNode[], username: string | undefined) {
+  const tree: MarkdownNode = { type: "root", children: [{ type: "paragraph", children }] };
+  remarkSelfMentions({ username })(tree);
+  return tree.children![0]!.children!;
+}
+
+function plainText(nodes: ReadonlyArray<MarkdownNode>): string {
+  return nodes.map((node) => node.value ?? plainText(node.children ?? [])).join("");
+}
+
+const marks = (nodes: ReadonlyArray<MarkdownNode>) =>
+  nodes.filter((node) => node.type === "selfMention").map((node) => plainText([node]));
+
+describe("remarkSelfMentions", () => {
+  it("marks repeated self mentions without changing surrounding text or other mentions", () => {
     const text = "@Vladyslav Rybak, ask @Other User.\nThanks (@vladyslav rybak)!";
-    const parts = splitSelfMentions(text, "Vladyslav Rybak");
-    expect(parts.filter((part) => part.isMention).map((part) => part.text)).toEqual([
-      "@Vladyslav Rybak",
-      "@vladyslav rybak",
-    ]);
-    expect(parts.map((part) => part.text).join("")).toBe(text);
+    const nodes = highlight([{ type: "text", value: text }], "Vladyslav Rybak");
+    expect(marks(nodes)).toEqual(["@Vladyslav Rybak", "@vladyslav rybak"]);
+    expect(nodes.find((node) => node.type === "selfMention")?.data).toEqual({ hName: "mark" });
+    expect(plainText(nodes)).toBe(text);
   });
 
   it.each([
@@ -18,22 +30,31 @@ describe("splitSelfMentions", () => {
     "email@Vladyslav Rybak",
     "@@Vladyslav Rybak",
     "Vladyslav Rybak",
-  ])("does not highlight a partial name or non-mention: %s", (text) => {
-    expect(splitSelfMentions(text, "Vladyslav Rybak")).toEqual([
-      { text, isMention: false, offset: 0 },
-    ]);
+  ])("does not mark a partial name or non-mention: %s", (text) => {
+    expect(marks(highlight([{ type: "text", value: text }], "Vladyslav Rybak"))).toEqual([]);
   });
 
   it("matches literal punctuation in usernames", () => {
-    const text = "Ask @A. User (QA).";
-    expect(splitSelfMentions(text, "A. User (QA)").filter((part) => part.isMention)).toEqual([
-      { text: "@A. User (QA)", isMention: true, offset: 4 },
-    ]);
+    const nodes = highlight([{ type: "text", value: "Ask @A. User (QA)." }], "A. User (QA)");
+    expect(marks(nodes)).toEqual(["@A. User (QA)"]);
   });
 
-  it("does not highlight without the connected user's name", () => {
-    expect(splitSelfMentions("@Vladyslav Rybak", undefined)).toEqual([
-      { text: "@Vladyslav Rybak", isMention: false, offset: 0 },
-    ]);
+  it("leaves links and code alone", () => {
+    const nodes = highlight(
+      [
+        { type: "inlineCode", value: "@Vladyslav Rybak" },
+        {
+          type: "link",
+          url: "https://x.test",
+          children: [{ type: "text", value: "@Vladyslav Rybak" }],
+        },
+      ],
+      "Vladyslav Rybak",
+    );
+    expect(marks(nodes)).toEqual([]);
+  });
+
+  it("does nothing without the connected user's name", () => {
+    expect(marks(highlight([{ type: "text", value: "@Vladyslav Rybak" }], undefined))).toEqual([]);
   });
 });

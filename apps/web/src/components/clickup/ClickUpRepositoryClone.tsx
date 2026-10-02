@@ -4,6 +4,7 @@ import type {
   ClickUpTask,
   EnvironmentId,
   ProjectId,
+  ScopedThreadRef,
 } from "@t3tools/contracts";
 import { useId, useRef, useState } from "react";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
@@ -14,6 +15,7 @@ import { sourceControlEnvironment } from "../../state/sourceControl";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
+import { ExternalLink } from "../ExternalLink";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -26,10 +28,12 @@ import {
 export function ClickUpRepositoryClone({
   task,
   environmentId,
+  threadRef,
   repository,
 }: {
   task: ClickUpTask;
   environmentId: EnvironmentId;
+  threadRef?: ScopedThreadRef | undefined;
   repository: ClickUpRepositoryLink;
 }) {
   const destinationInputId = useId();
@@ -166,7 +170,19 @@ export function ClickUpRepositoryClone({
   }
   return (
     <div className="space-y-2 rounded-md border border-border p-3 text-sm">
-      <p className="break-all font-medium">{name ?? repository.remoteUrl}</p>
+      <p className="break-all font-medium">
+        {name ? (
+          <ExternalLink
+            url={`https://github.com/${name}`}
+            environmentId={environmentId}
+            threadRef={threadRef}
+          >
+            {name}
+          </ExternalLink>
+        ) : (
+          repository.remoteUrl
+        )}
+      </p>
       {clone?.phase === "running" ? (
         <p role="status" className="text-muted-foreground">
           Downloading… {clone.percent == null ? "" : `${clone.percent}%`} · {clone.destinationPath}

@@ -9741,6 +9741,7 @@ export default function ChatView(props: ChatViewProps) {
       ) ? (
         <ThreadTaskDetails
           environmentId={environmentId}
+          threadRef={activeThreadRef ?? undefined}
           task={renderedRightPanelSurface.task}
           onStartTask={startLinkedTask}
           onBack={addTasksSurface}

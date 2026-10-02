@@ -1,5 +1,5 @@
 import { ClickUpTimeSync } from "./ClickUpTimeSync";
-import { HandoffPullRequestLink } from "./HandoffPullRequestLink";
+import { ExternalLink } from "../ExternalLink";
 import { useAtomValue } from "@effect/atom-react";
 import type { ClickUpHandoff, ClickUpTaskInput, EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
@@ -195,13 +195,13 @@ function HandoffCard({
         {handoff.pullRequests.map((pr) => (
           <li key={pr.url}>
             {safeClickUpAttachmentUrl(pr.url) && (
-              <HandoffPullRequestLink
+              <ExternalLink
                 url={pr.url}
                 environmentId={environmentId}
-                threadId={threadId}
+                threadRef={threadId ? { environmentId, threadId } : undefined}
               >
                 {pr.repository} #{pr.number}
-              </HandoffPullRequestLink>
+              </ExternalLink>
             )}
             <span className="ml-2 text-xs text-muted-foreground">
               {pr.merged ? "Merged" : pr.ready ? "Ready" : "Awaiting submission"}

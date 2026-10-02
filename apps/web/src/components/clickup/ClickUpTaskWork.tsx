@@ -1,14 +1,19 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import type { ClickUpTaskDetails, ClickUpTaskInput, EnvironmentId } from "@t3tools/contracts";
+import type {
+  ClickUpTaskDetails,
+  ClickUpTaskInput,
+  EnvironmentId,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { MessageSquareIcon } from "lucide-react";
-import { useOpenChangeRequestLink } from "../../lib/openPullRequestLink";
 import { useThreadShells } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
+import { ExternalLink } from "../ExternalLink";
 import { Badge } from "../ui/badge";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { safeClickUpAttachmentUrl } from "./taskPrompt";
@@ -17,10 +22,12 @@ import { ClickUpLinkedRepositories } from "./ClickUpLinkedRepositories";
 
 export function ClickUpTaskWork({
   environmentId,
+  threadRef,
   input,
   details,
 }: {
   environmentId: EnvironmentId;
+  threadRef: ScopedThreadRef | undefined;
   input: ClickUpTaskInput;
   details: ClickUpTaskDetails;
 }) {
@@ -44,7 +51,6 @@ export function ClickUpTaskWork({
     previousLinks.current = { atom: linksAtom, revision: taskLinkRevision };
     if (previous?.atom !== linksAtom || previous.revision !== taskLinkRevision) refreshLinks();
   }, [taskLinkRevision, linksAtom, refreshLinks]);
-  const openPr = useOpenChangeRequestLink();
   const pullRequests = [
     ...new Map(
       links
@@ -69,7 +75,11 @@ export function ClickUpTaskWork({
       <h3 className="flex items-center gap-2 text-sm font-medium">
         Linked work <Badge variant="secondary">Nerd</Badge>
       </h3>
-      <ClickUpLinkedRepositories task={details.task} environmentId={environmentId} />
+      <ClickUpLinkedRepositories
+        task={details.task}
+        environmentId={environmentId}
+        threadRef={threadRef}
+      />
       {AsyncResult.isFailure(linksResult) ? (
         <p role="alert" className="text-sm text-destructive">
           Could not load linked work. Refresh the task to retry.
@@ -109,16 +119,15 @@ export function ClickUpTaskWork({
               {pullRequests.length ? (
                 pullRequests.map((pr) =>
                   safeClickUpAttachmentUrl(pr.url) ? (
-                    <a
-                      key={pr.url}
-                      href={pr.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(event) => openPr(event, pr.url, undefined, environmentId)}
-                      className="block truncate text-primary hover:underline"
-                    >
-                      {pr.repository} #{pr.number}
-                    </a>
+                    <p key={pr.url} className="truncate">
+                      <ExternalLink
+                        url={pr.url}
+                        environmentId={environmentId}
+                        threadRef={threadRef}
+                      >
+                        {pr.repository} #{pr.number}
+                      </ExternalLink>
+                    </p>
                   ) : null,
                 )
               ) : (

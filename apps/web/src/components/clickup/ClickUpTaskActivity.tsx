@@ -5,6 +5,7 @@ import type {
   ClickUpTaskDetails,
   ClickUpTaskInput,
   EnvironmentId,
+  ScopedThreadRef,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -30,10 +31,12 @@ const inactiveComments = Atom.make(AsyncResult.initial<ClickUpCommentsPage>());
 export function ClickUpTaskActivity({
   details,
   environmentId,
+  threadRef,
   input,
 }: {
   details: ClickUpTaskDetails;
   environmentId: EnvironmentId;
+  threadRef: ScopedThreadRef | undefined;
   input: ClickUpTaskInput;
 }) {
   const [activityOpen, setActivityOpen] = useLocalStorage(
@@ -165,6 +168,7 @@ export function ClickUpTaskActivity({
                     comment={comment}
                     username={username}
                     environmentId={environmentId}
+                    threadRef={threadRef}
                     input={input}
                     cursor={cursor}
                     refreshing={result.waiting}

@@ -1,16 +1,28 @@
-export function splitSelfMentions(text: string, username: string | undefined) {
+import { findAndReplaceText, type MarkdownNode } from "~/vendor/mdast-find-and-replace";
+
+function selfMentionPattern(username: string | undefined): RegExp | null {
   const name = username?.trim();
-  if (!name) return [{ text, isMention: false, offset: 0 }];
+  if (!name) return null;
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`(?<![\\p{L}\\p{N}_@])@${escapedName}(?![\\p{L}\\p{N}_'’-])`, "giu");
-  const parts: Array<{ text: string; isMention: boolean; offset: number }> = [];
-  let end = 0;
-  for (const match of text.matchAll(pattern)) {
-    if (match.index > end)
-      parts.push({ text: text.slice(end, match.index), isMention: false, offset: end });
-    parts.push({ text: match[0], isMention: true, offset: match.index });
-    end = match.index + match[0].length;
-  }
-  if (end < text.length) parts.push({ text: text.slice(end), isMention: false, offset: end });
-  return parts;
+  return new RegExp(`(?<![\\p{L}\\p{N}_@])@${escapedName}(?![\\p{L}\\p{N}_'’-])`, "giu");
+}
+
+const MENTION_IGNORED_TYPES = new Set(["link", "linkReference", "inlineCode", "code"]);
+
+/** Wraps the reader's own `@name` in a `mark` when a comment is rendered as markdown. */
+export function remarkSelfMentions(options: { readonly username: string | undefined }) {
+  const pattern = selfMentionPattern(options.username);
+  return (tree: MarkdownNode) => {
+    if (!pattern) return;
+    findAndReplaceText(
+      tree,
+      pattern,
+      (matched) => ({
+        type: "selfMention",
+        data: { hName: "mark" },
+        children: [{ type: "text", value: matched }],
+      }),
+      MENTION_IGNORED_TYPES,
+    );
+  };
 }

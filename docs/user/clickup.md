@@ -31,7 +31,8 @@ Write a comment in the activity panel and select **Post comment**. Select **Repl
 comment to read its conversation and send a reply without leaving the task. Drafts remain
 if sending fails; refresh before retrying an unconfirmed send to avoid duplicates.
 
-Open image and video attachments from the task or its comments in the media viewer.
+Open image and video attachments from the task or its comments in the media viewer. Image
+and video links pasted into a comment show as previews too.
 Assigned comments show their owner and can be resolved or reopened. Checklist items show
 their assignee and can be checked off or reopened here too. These actions update ClickUp;
 Nerd refreshes the item after saving. Other files open through their original attachment link.
