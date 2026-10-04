@@ -52,13 +52,18 @@ to override its environment defaults. Worktree directories keep their original n
 If generation fails, or a custom name is invalid or already taken, the temporary
 branch name remains.
 
-## Scheduled tasks on mobile
+## Scheduled tasks
 
-Open **Settings → Scheduled tasks** to create recurring tasks or manage existing
-ones across your connected environments. Use the settings filter to narrow the
-list by environment or project. Each task runs on the environment you choose,
-using its project, model, and workspace settings. Fixed-time schedules use that
-environment's time zone, which may differ from your phone's.
+Open **Settings → Scheduled tasks → New task** (the **+** on mobile) to create
+recurring work. Choose an environment, project, model, workspace, and prompt,
+then set a time with weekdays or a repeating interval. Tasks created here start
+a new chat for each run. To return to an existing chat, ask its agent to schedule
+the work, for example: “Schedule this chat to check the open PR every weekday at 09:00.”
+
+The host server must remain running and awake. Fixed-time schedules use its
+time zone, which may differ from your device's. A fixed-time run missed by more
+than ten minutes is skipped until the next occurrence. These schedules repeat;
+one-time dates are not supported.
 
 You can edit, pause, resume, run immediately, or delete a task from the list.
 Leaving an edited form asks before discarding unsaved changes.
