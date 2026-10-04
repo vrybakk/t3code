@@ -171,15 +171,15 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
       expect(second.capabilities.repositoryIdentity).toBe(true);
       expect(second.capabilities.connectionProbe).toBe(true);
       expect(second.capabilities.attachmentUploads).toBe(true);
-      expect(second.capabilities.fileAttachments).toEqual({ maxUploadBytes: 250 * 1024 * 1024 });
+      expect(second.capabilities.fileAttachments).toEqual({ maxUploadBytes: 50 * 1024 * 1024 });
       expect(second.capabilities.pullRequests).toBe(true);
-      expect(second.capabilities.clickUpRepositorySetup).toBe(true);
       expect(second.capabilities.requiredWorktreeBootstrap).toBe(true);
       expect(second.capabilities.usagePriceOverrides).toBe(true);
       expect(second.capabilities.threadActiveReorder).toBe(true);
       expect(second.capabilities.threadTitleRegeneration).toBe(true);
       expect(second.capabilities.threadPullRequests).toBe(true);
       expect(second.capabilities.threadPullRequestLinking).toBe(true);
+      expect(second.capabilities.serverResolvedCommandContext).toBe(true);
       expect(second.capabilities.agentActivityPublishing).toBe(false);
     }),
   );
@@ -230,7 +230,7 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
     }),
   );
 
-  it.effect("advertises desktopAppUpdate only with an enabled updater and desktop control fd", () =>
+  it.effect("advertises desktopAppUpdate only with desktop mode and the control fd", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const baseDir = yield* fileSystem.makeTempDirectoryScoped({
@@ -252,37 +252,21 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
           ),
         );
 
-      const withFd = yield* describeWith({
-        mode: "desktop",
-        desktopTelemetryControlFd: 5,
-        desktopAppUpdateEnabled: true,
-      });
+      const withFd = yield* describeWith({ mode: "desktop", desktopTelemetryControlFd: 5 });
       expect(withFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
       expect(withFd.capabilities.desktopAppUpdate).toBe(true);
       expect(withFd.capabilities.serverSelfUpdateProgress).toBe(true);
-      expect(withFd.capabilities.serverUpdateThreadContinuation).toBe(true);
+      // v2 recovery terminalizes running runs on restart, so continuation
+      // stays unadvertised until the v2 runtime carries the markers.
+      expect(withFd.capabilities.serverUpdateThreadContinuation).toBeUndefined();
 
-      for (const desktopAppUpdateEnabled of [false, undefined]) {
-        const disabled = yield* describeWith({
-          mode: "desktop",
-          desktopTelemetryControlFd: 5,
-          desktopAppUpdateEnabled,
-        });
-        expect(disabled.capabilities.desktopAppUpdate).toBeUndefined();
-        expect(disabled.capabilities.serverSelfUpdateProgress).toBeUndefined();
-        expect(disabled.capabilities.serverUpdateThreadContinuation).toBeUndefined();
-      }
-      const withoutFd = yield* describeWith({ mode: "desktop", desktopAppUpdateEnabled: true });
+      const withoutFd = yield* describeWith({ mode: "desktop" });
       expect(withoutFd.capabilities.serverSelfUpdate).toBe("desktop-managed");
       expect(withoutFd.capabilities.desktopAppUpdate).toBeUndefined();
       expect(withoutFd.capabilities.serverSelfUpdateProgress).toBeUndefined();
       expect(withoutFd.capabilities.serverUpdateThreadContinuation).toBeUndefined();
 
-      const web = yield* describeWith({
-        mode: "web",
-        desktopTelemetryControlFd: 5,
-        desktopAppUpdateEnabled: true,
-      });
+      const web = yield* describeWith({ mode: "web", desktopTelemetryControlFd: 5 });
       expect(web.capabilities.desktopAppUpdate).toBeUndefined();
     }),
   );

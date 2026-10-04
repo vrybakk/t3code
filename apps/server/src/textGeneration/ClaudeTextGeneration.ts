@@ -1,8 +1,3 @@
-import {
-  TaskAnalysis,
-  TaskEstimationResponse,
-  TaskEstimationFinalResponse,
-} from "@t3tools/contracts";
 /**
  * ClaudeTextGeneration – Text generation layer using the Claude CLI.
  *
@@ -20,7 +15,7 @@ import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { type ClaudeSettings, type ModelSelection } from "@t3tools/contracts";
-import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
+import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@t3tools/shared/git";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
 
 import { TextGenerationError } from "@t3tools/contracts";
@@ -107,9 +102,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle"
-      | "researchTaskEstimate"
-      | "generateTaskAnalysis",
+      | "generateThreadTitle",
     value: unknown,
     detail: string,
   ): Effect.Effect<string, TextGenerationError> =>
@@ -139,9 +132,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle"
-      | "researchTaskEstimate"
-      | "generateTaskAnalysis";
+      | "generateThreadTitle";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -381,6 +372,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       const { prompt, outputSchema } = buildBranchNamePrompt({
         message: input.message,
         attachments: input.attachments,
+        naming: input.naming,
       });
 
       const generated = yield* runClaudeJson({
@@ -392,31 +384,8 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       });
 
       return {
-        branch: sanitizeBranchFragment(generated.branch),
+        branch: formatGeneratedBranchName(generated.branch, input.naming),
       };
-    });
-
-  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] = (
-    input,
-  ) =>
-    runClaudeJson({
-      operation: "researchTaskEstimate",
-      cwd: input.cwd,
-      prompt: input.prompt,
-      outputSchemaJson:
-        input.phase === "final" ? TaskEstimationFinalResponse : TaskEstimationResponse,
-      modelSelection: input.modelSelection,
-    });
-
-  const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
-    input,
-  ) =>
-    runClaudeJson({
-      operation: "generateTaskAnalysis",
-      cwd: input.cwd,
-      prompt: input.prompt,
-      outputSchemaJson: TaskAnalysis,
-      modelSelection: input.modelSelection,
     });
 
   const generateThreadTitle: TextGeneration.TextGeneration["Service"]["generateThreadTitle"] =
@@ -447,7 +416,5 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
-    generateTaskAnalysis,
-    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

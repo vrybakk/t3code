@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
-import { ChatFileAttachment } from "./orchestration.ts";
+import { ChatAttachment } from "./chatAttachment.ts";
 import { AttachmentCreateUploadUrlInput } from "./assets.ts";
 import { fileAttachmentMaxBytes, PROVIDER_SEND_TURN_MAX_VIDEO_BYTES } from "./video.ts";
 
 describe("video attachment limits", () => {
-  const decodeAttachment = Schema.decodeUnknownSync(ChatFileAttachment);
+  const decodeAttachment = Schema.decodeUnknownSync(ChatAttachment);
   const decodeUpload = Schema.decodeUnknownSync(AttachmentCreateUploadUrlInput);
   const video = {
     type: "file",

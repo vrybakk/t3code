@@ -5,6 +5,8 @@ import {
   ForwardCompatibleArray,
   NonNegativeInt,
   PositiveInt,
+  EnvironmentId,
+  ThreadId,
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
 
@@ -27,6 +29,7 @@ export const COMPOSER_CONTEXT_KINDS = [
   "mention",
   "skill",
   "task",
+  "thread",
 ] as const;
 export type KnownComposerContextKind = (typeof COMPOSER_CONTEXT_KINDS)[number];
 
@@ -224,6 +227,15 @@ export const TaskContextRecord = Schema.Struct({
 });
 export type TaskContextRecord = typeof TaskContextRecord.Type;
 
+export const ThreadContextRecord = Schema.Struct({
+  ...recordBase,
+  kind: Schema.Literal("thread"),
+  environmentId: EnvironmentId,
+  threadId: ThreadId,
+  title: TrimmedNonEmptyString.check(Schema.isMaxLength(1_024)),
+});
+export type ThreadContextRecord = typeof ThreadContextRecord.Type;
+
 /**
  * Catch-all for kinds this build does not know. Known discriminators are excluded so a
  * malformed known record fails its own schema instead of sliding through unchecked.
@@ -255,6 +267,7 @@ export const KnownComposerContextRecord = Schema.Union([
   MentionContextRecord,
   SkillContextRecord,
   TaskContextRecord,
+  ThreadContextRecord,
 ]);
 export type KnownComposerContextRecord = typeof KnownComposerContextRecord.Type;
 

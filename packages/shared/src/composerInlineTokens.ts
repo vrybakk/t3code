@@ -23,11 +23,21 @@ export interface CollectComposerInlineTokensOptions {
  * numeric expressions like "$20", "$20k", "$100M", and "$1e6" must stay prose:
  * the composer chips any matched `$name` token, known or not. Tokens beginning
  * with digits must not match numbers with currency/exponent suffixes, and must
- * contain at least one letter.
+ * contain at least one letter. Any currency symbol is accepted as the sigil.
  */
-const SKILL_TOKEN_REGEX =
-  /(^|\s)\p{Sc}(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s)/gu;
-const MENTION_TOKEN_REGEX = /(^|\s)([~@])(?:"((?:\\.|[^"\\])*)"|([^\s@"]+))(?=\s)/g;
+const SKILL_MENTION_SOURCE =
+  /(^|\s)\p{Sc}(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)/u
+    .source;
+// While typing, a token only becomes a chip once a delimiter follows it, so a
+// half-typed name at the end of the text stays plain.
+const SKILL_TOKEN_REGEX = new RegExp(`${SKILL_MENTION_SOURCE}(?=\\s)`, "gu");
+/**
+ * Skill mentions in a sent prompt, which may also end at the end of the text.
+ * Group 1 is the leading delimiter and group 2 the skill name. The pattern is
+ * global, so use it with `matchAll` or `replace`, not `test` or `exec`.
+ */
+export const SKILL_MENTION_PATTERN = new RegExp(`${SKILL_MENTION_SOURCE}(?=\\s|$)`, "gu");
+const MENTION_TOKEN_REGEX = /(^|\s)@(?:"((?:\\.|[^"\\])*)"|([^\s@"]+))(?=\s)/g;
 /**
  * The label body is bounded rather than `*`. Unbounded, every whitespace in
  * the composer is a candidate start: the engine scans the rest of the text for
@@ -45,6 +55,7 @@ const FILE_LINK_TOKEN_REGEX = new RegExp(
 );
 const URI_SCHEME_REGEX = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const WINDOWS_DRIVE_PATH_REGEX = /^[A-Za-z]:[\\/]/;
+// Autocomplete emits canonical file links, so ambiguous bare @scope/package text stays a package.
 const SCOPED_PACKAGE_REFERENCE_REGEX =
   /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*(?:\/[^\s@"]+)*$/;
 
@@ -82,17 +93,9 @@ function collectMentionTokens(text: string): ComposerInlineToken[] {
   for (const match of text.matchAll(MENTION_TOKEN_REGEX)) {
     const fullMatch = match[0];
     const prefix = match[1] ?? "";
-    const quotedPath = match[3];
-    const path = quotedPath !== undefined ? quotedPath.replace(/\\(.)/g, "$1") : (match[4] ?? "");
-    if (!path) {
-      continue;
-    }
-    // Historical file references still open, while bare task queries and packages stay text.
-    if (
-      match[2] === "@" &&
-      quotedPath === undefined &&
-      (!/[./\\]/.test(path) || SCOPED_PACKAGE_REFERENCE_REGEX.test(path))
-    ) {
+    const quotedPath = match[2];
+    const path = quotedPath !== undefined ? quotedPath.replace(/\\(.)/g, "$1") : (match[3] ?? "");
+    if (!path || (quotedPath === undefined && SCOPED_PACKAGE_REFERENCE_REGEX.test(path))) {
       continue;
     }
     const start = (match.index ?? 0) + prefix.length;

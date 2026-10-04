@@ -1,4 +1,3 @@
-import { getComposerSkills } from "@t3tools/client-runtime/providerSkills";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { ServerProviderSkill } from "@t3tools/contracts";
@@ -105,28 +104,3 @@ describe("searchProviderSkills", () => {
     ]);
   });
 });
-
-it("finds Studio Task Workflow before incidental description matches for $stud", () => {
-  const marketing = makeSkill({
-    name: "marketing:content-creation",
-    description: "Write blogs and case studies.",
-  });
-  const skills = getComposerSkills([marketing], true);
-  expect(searchProviderSkills(skills, "$stud").map((skill) => skill.name)).toEqual([
-    "studio-task-workflow",
-    "marketing:content-creation",
-  ]);
-  expect(searchProviderSkills(skills, "$studio-task-workflow")[0]?.name).toBe(
-    "studio-task-workflow",
-  );
-});
-
-it.each([{ enabled: false }, { userInvocable: false }])(
-  "preserves an invocable duplicate after an unavailable skill: %j",
-  (unavailable) => {
-    const disabled = makeSkill({ name: "review", ...unavailable });
-    const enabled = makeSkill({ name: "review", path: "/workspace/review/SKILL.md" });
-    const skills = getComposerSkills([disabled, enabled], true);
-    expect(searchProviderSkills(skills, "$review")).toEqual([enabled]);
-  },
-);

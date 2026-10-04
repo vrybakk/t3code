@@ -1,11 +1,13 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
 import { createModelSelection } from "@t3tools/shared/model";
 import { expect } from "vite-plus/test";
 
@@ -31,8 +33,6 @@ interface FakeCodexInput {
   exitCode?: number;
   stderr?: string;
   requireImage?: boolean;
-  requireTaskAnalysisSchema?: boolean;
-  requireFinalEstimationSchema?: boolean;
   requireServiceTier?: string;
   requireReasoningEffort?: string;
   forbidReasoningEffort?: boolean;
@@ -49,8 +49,6 @@ interface FakeCodexInput {
 function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
   const check = JSON.stringify({
     requireImage: input.requireImage ?? false,
-    requireTaskAnalysisSchema: input.requireTaskAnalysisSchema ?? false,
-    requireFinalEstimationSchema: input.requireFinalEstimationSchema ?? false,
     requireServiceTier: input.requireServiceTier ?? null,
     requireReasoningEffort: input.requireReasoningEffort ?? null,
     forbidReasoningEffort: input.forbidReasoningEffort ?? false,
@@ -69,12 +67,10 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
       name: "codex",
       source: [
         'import * as NodeFS from "node:fs";',
-        'import assert from "node:assert/strict";',
         `const check = ${check};`,
         "const args = process.argv.slice(2);",
         'const originalArgs = ` ${args.join(" ")} `;',
         "let outputPath = null;",
-        "let schemaPath = null;",
         "let seenImage = false;",
         'let seenServiceTier = "";',
         'let seenReasoningEffort = "";',
@@ -87,23 +83,10 @@ function makeFakeCodexBinary(dir: string, input: FakeCodexInput) {
         '    const value = args[index] ?? "";',
         '    if (value.startsWith("service_tier=")) seenServiceTier = value;',
         '    if (value.startsWith("model_reasoning_effort=")) seenReasoningEffort = value;',
-        '  } else if (args[index] === "--output-schema") {',
-        "    schemaPath = args[++index];",
         '  } else if (args[index] === "--output-last-message") {',
         "    index += 1;",
         "    outputPath = args[index] ?? null;",
         "  }",
-        "}",
-        "if (check.requireTaskAnalysisSchema) {",
-        '  const schema = JSON.parse(NodeFS.readFileSync(schemaPath, "utf8"));',
-        '  assert.deepEqual(schema.required.toSorted(), ["estimateMinutes", "findings", "summary"]);',
-        "  assert.equal(schema.additionalProperties, false);",
-        '  assert.deepEqual(schema.properties.findings.anyOf, [{ type: "string", minLength: 1, maxLength: 2000 }, { type: "null" }]);',
-        "}",
-        "if (check.requireFinalEstimationSchema) {",
-        '  const schema = JSON.parse(NodeFS.readFileSync(schemaPath, "utf8"));',
-        "  assert.equal(schema.properties.files.maxItems, 0);",
-        "  assert.equal(schema.properties.searches.maxItems, 0);",
         "}",
         "const chunks = [];",
         "for await (const chunk of process.stdin) chunks.push(chunk);",
@@ -165,7 +148,7 @@ function withFakeCodexEnv<A, E, R>(
     const config = decodeCodexSettings({ binaryPath: codexPath, launchArgs: input.launchArgs });
     const textGeneration = yield* makeCodexTextGeneration(
       config,
-      input.environment,
+      input.environment === undefined ? undefined : { ...process.env, ...input.environment },
       Effect.succeed(
         (input.models ?? []).map((slug) => ({
           slug,
@@ -187,129 +170,9 @@ function withFakeCodexEnv<A, E, R>(
 }
 
 it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
-  it.effect("isolates estimation research and forwards supplied images", () =>
-    withFakeCodexEnv(
-      {
-        output: '{"summary":"Inspect checkout","searches":[],"files":[],"estimate":null}',
-        requireImage: true,
-        requireReasoningEffort: "high",
-        requireArg:
-          '--ignore-user-config --ignore-rules --config mcp_servers={} --config web_search="disabled" --config agents.max_concurrent_threads_per_session=1 --disable shell_tool --disable unified_exec --disable apps --disable plugins --disable remote_plugin --disable multi_agent --disable multi_agent_v2 --disable skill_search --disable skill_mcp_dependency_install --disable code_mode_host --disable view_image --disable browser_use --disable computer_use --disable hooks --disable goals --disable sleep_tool',
-      },
-      (generation) =>
-        Effect.gen(function* () {
-          const result = yield* generation.researchTaskEstimate({
-            phase: "research",
-            cwd: process.cwd(),
-            prompt: "Inspect supplied evidence only",
-            imagePaths: ["/tmp/evidence.png"],
-            modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5"),
-          });
-          expect(result.estimate).toBeNull();
-        }),
-    ),
-  );
-
-  it.effect("keeps managed authentication while isolating estimation research", () =>
-    withFakeCodexEnv(
-      {
-        output: '{"summary":"Inspect supplied evidence","searches":[],"files":[],"estimate":null}',
-        managedRuntime: true,
-        launchArgs: `-c 'model_provider="openai_token_sharing"' -c 'model_providers.openai_token_sharing.env_key="ACCESS_TOKEN"'`,
-        requireReasoningEffort: "high",
-        requireArg:
-          '-c model_provider="openai_token_sharing" -c model_providers.openai_token_sharing.env_key="ACCESS_TOKEN" --ignore-user-config --ignore-rules --config mcp_servers={}',
-        forbidArg: 'service_tier="priority"',
-      },
-      (generation) =>
-        generation.researchTaskEstimate({
-          phase: "research",
-          cwd: process.cwd(),
-          prompt: "Inspect supplied evidence only",
-          modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5.4", [
-            { id: "reasoningEffort", value: "low" },
-            { id: "serviceTier", value: "priority" },
-          ]),
-        }),
-    ),
-  );
-
-  for (const effort of ["low", "medium", "high", "xhigh"]) {
-    it.effect(
-      `uses sufficient estimation reasoning and enforces a final schema for ${effort}`,
-      () =>
-        withFakeCodexEnv(
-          {
-            output: '{"summary":"Bounded change","searches":[],"files":[],"estimate":null}',
-            requireFinalEstimationSchema: true,
-            requireReasoningEffort: effort === "xhigh" ? "xhigh" : "high",
-          },
-          (generation) =>
-            generation.researchTaskEstimate({
-              phase: "final",
-              cwd: process.cwd(),
-              prompt: "Estimate inspected work",
-              modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-6-luna", [
-                { id: "reasoningEffort", value: effort },
-              ]),
-            }),
-        ),
-    );
-  }
-
-  it.effect("generates structured task analysis with the selected model", () =>
-    withFakeCodexEnv(
-      {
-        output: '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}',
-        requireTaskAnalysisSchema: true,
-        requireReasoningEffort: "low",
-      },
-      (generation) =>
-        Effect.gen(function* () {
-          const result = yield* generation.generateTaskAnalysis({
-            cwd: process.cwd(),
-            prompt: "Analyze the task context",
-            modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5"),
-          });
-          expect(result).toEqual({
-            summary: "Task context estimate",
-            estimateMinutes: 30,
-            findings: null,
-          });
-        }),
-    ),
-  );
-
-  it.effect("rejects findings that violate local validation after generation", () =>
-    withFakeCodexEnv(
-      {
-        output: JSON.stringify({
-          summary: "Missing details",
-          estimateMinutes: null,
-          findings: "We need the expected image.",
-        }),
-        requireTaskAnalysisSchema: true,
-      },
-      (generation) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.result(
-            generation.generateTaskAnalysis({
-              cwd: process.cwd(),
-              prompt: "Check the task requirements",
-              modelSelection: DEFAULT_TEST_MODEL_SELECTION,
-            }),
-          );
-          expect(Result.isFailure(result)).toBe(true);
-          if (Result.isFailure(result)) {
-            expect(result.failure).toBeInstanceOf(TextGenerationError);
-            expect(result.failure.detail).toBe("Codex returned invalid structured output.");
-          }
-        }),
-    ),
-  );
-
-  for (const selectedModel of ["gpt-5.6-luna", "openai.gpt-5.6-luna"]) {
-    it.effect(`dispatches the qualified live model for ${selectedModel}`, () =>
+  it.effect.each(["gpt-5.6-luna", "openai.gpt-5.6-luna"])(
+    "dispatches the qualified live model for %s",
+    (selectedModel) =>
       withFakeCodexEnv(
         {
           output: JSON.stringify({ title: "Bedrock title" }),
@@ -327,8 +190,7 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
             expect(result.title).toBe("Bedrock title");
           }),
       ),
-    );
-  }
+  );
   it.effect("generates and sanitizes commit messages without branch by default", () =>
     withFakeCodexEnv(
       {
@@ -540,6 +402,76 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
           });
 
           expect(generated.branch).toBe("feat/session");
+        }),
+    ),
+  );
+
+  it.effect.each([
+    {
+      mode: "static",
+      output: "Add Search",
+      expected: "team/add-search",
+      instruction: "without a prefix or namespace",
+    },
+    {
+      mode: "semantic",
+      output: "feat/add-search",
+      expected: "feat/add-search",
+      instruction: "semantic prefix",
+    },
+    {
+      mode: "custom",
+      output: "Julius/ABC-123.v2",
+      expected: "Julius/ABC-123.v2",
+      instruction: "Preserve the issue ID and capitalization.",
+    },
+  ] as const)("generates a branch using $mode naming", (example) =>
+    withFakeCodexEnv(
+      {
+        output: JSON.stringify({ branch: example.output }),
+        stdinMustContain: example.instruction,
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const generated = yield* textGeneration.generateBranchName({
+            cwd: process.cwd(),
+            message: "Add search",
+            modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+            naming: {
+              mode: example.mode,
+              prefix: "team/",
+              instructions: "Preserve the issue ID and capitalization.",
+            },
+          });
+          expect(generated.branch).toBe(example.expected);
+        }),
+    ),
+  );
+
+  it.effect("generates branch names even when the ambient scope is already closed", () =>
+    withFakeCodexEnv(
+      {
+        output: JSON.stringify({
+          branch: "feat/background-generation",
+        }),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          // Background fibers (e.g. the worktree branch rename fork) can run
+          // after their launching request's scope has closed; temp files must
+          // not be tied to that ambient scope or they are reaped on creation.
+          const closedScope = yield* Scope.make();
+          yield* Scope.close(closedScope, Exit.void);
+
+          const generated = yield* textGeneration
+            .generateBranchName({
+              cwd: process.cwd(),
+              message: "Please update session handling.",
+              modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+            })
+            .pipe(Effect.provideService(Scope.Scope, closedScope));
+
+          expect(generated.branch).toBe("feat/background-generation");
         }),
     ),
   );

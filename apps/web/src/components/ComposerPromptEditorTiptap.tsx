@@ -1,4 +1,3 @@
-import type { ComposerSkill } from "@t3tools/client-runtime/providerSkills";
 import { Extension, Node, wrappingInputRule, type JSONContent } from "@tiptap/core";
 import { TaskList } from "@tiptap/extension-task-list";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
@@ -7,7 +6,11 @@ import { type Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { splitBlockKeepMarks } from "@tiptap/pm/commands";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import type { AssistantCitation, ComposerContextClipboardFragment } from "@t3tools/contracts";
+import type {
+  AssistantCitation,
+  ComposerContextClipboardFragment,
+  ServerProviderSkill,
+} from "@t3tools/contracts";
 import {
   serializeAssistantCitation,
   withAssistantCitationComment,
@@ -121,7 +124,7 @@ export interface ComposerPromptEditorProps {
   importContextFragment?:
     | ((fragment: ComposerContextClipboardFragment) => ReadonlyMap<string, string>)
     | undefined;
-  skills: ReadonlyArray<ComposerSkill>;
+  skills: ReadonlyArray<ServerProviderSkill>;
   disabled: boolean;
   placeholder: string;
   ariaLabel?: string | undefined;
@@ -140,11 +143,7 @@ export interface ComposerPromptEditorProps {
     contextIds: string[],
   ) => void;
   onVisibleSelectionChange?: () => void;
-  onCommandKeyDown?: (
-    key: "ArrowDown" | "ArrowUp" | "Enter" | "Tab" | "Escape",
-    event: KeyboardEvent,
-    isTaskItem?: boolean,
-  ) => boolean;
+  onCommandKeyDown?: (key: string, event: KeyboardEvent, isTaskItem?: boolean) => boolean;
   onPageScrollKeyDown?: (key: "PageUp" | "PageDown") => void;
   onPageScrollKeyUp?: (key: string) => void;
   onPageScrollRelease?: () => void;
@@ -172,7 +171,7 @@ const ComposerCitationCommentContext = createContext<{
   onSubmitAndSend: () => void;
 }>({ openComment: null, onOpenChange: () => {}, onSubmitAndSend: () => {} });
 
-const RichComposerSkillsContext = createContext<ReadonlyArray<ComposerSkill>>([]);
+const RichComposerSkillsContext = createContext<ReadonlyArray<ServerProviderSkill>>([]);
 
 const SURROUND_CLOSE: Record<string, string> = {
   "(": ")",
@@ -285,7 +284,6 @@ function ComposerSkillNodeView({ node }: NodeViewProps) {
   const skillLabel = (node.attrs.skillLabel as string) || skillName;
   const skillDescription = (node.attrs.skillDescription as string | null) ?? null;
   const skill = skills.find((candidate) => candidate.name === skillName);
-  const skillPath = skill?.path;
   return (
     <NodeViewWrapper as="span" className={CHIP_NODE_SELECTION_CLASS_NAME}>
       <ContextChipPopover
@@ -298,12 +296,11 @@ function ComposerSkillNodeView({ node }: NodeViewProps) {
           <p className="font-medium">{skillLabel}</p>
           <p>
             {skill?.description ??
-              skill?.shortDescription ??
               skillDescription ??
               "No description is available for this skill."}
           </p>
-          {skillPath ? (
-            <Button variant="outline" size="sm" onClick={() => actions.openMention(skillPath)}>
+          {skill?.path ? (
+            <Button variant="outline" size="sm" onClick={() => actions.openMention(skill.path)}>
               View instructions
             </Button>
           ) : null}
@@ -1000,18 +997,7 @@ function ComposerPromptEditorTiptapInner(props: ComposerPromptEditorProps) {
             });
           }
           if (!handler) return false;
-          const key =
-            event.key === "Tab"
-              ? ("Tab" as const)
-              : event.key === "ArrowDown"
-                ? ("ArrowDown" as const)
-                : event.key === "ArrowUp"
-                  ? ("ArrowUp" as const)
-                  : event.key === "Escape"
-                    ? ("Escape" as const)
-                    : null;
-          if (!key) return false;
-          const handled = handler(key, event);
+          const handled = handler(event.key, event);
           if (handled) {
             event.preventDefault();
             event.stopPropagation();

@@ -19,9 +19,6 @@ const makeStubTextGeneration = (
   overrides: Partial<TextGeneration.TextGeneration["Service"]>,
 ): TextGeneration.TextGeneration["Service"] =>
   TextGeneration.TextGeneration.of({
-    researchTaskEstimate: () => Effect.die("Estimation research is not used by this test"),
-    generateTaskAnalysis: () =>
-      Effect.die("generateTaskAnalysis stub not configured for this test"),
     generateCommitMessage: () =>
       Effect.die("generateCommitMessage stub not configured for this test"),
     generatePrContent: () => Effect.die("generatePrContent stub not configured for this test"),
@@ -44,7 +41,7 @@ const makeStubInstance = (
     displayName: undefined,
     enabled: true,
     snapshot: {} as ProviderInstance["snapshot"],
-    adapter: {} as ProviderInstance["adapter"],
+    orchestrationAdapter: {} as ProviderInstance["orchestrationAdapter"],
     textGeneration,
   }) satisfies ProviderInstance;
 

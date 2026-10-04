@@ -54,19 +54,11 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   );
 }
 
-function TableCell({
-  className,
-  compact = false,
-  ...props
-}: React.ComponentProps<"td"> & { compact?: boolean }) {
+function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
     <td
       data-slot="table-cell"
-      className={cn(
-        "px-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
-        compact ? "py-1" : "py-2",
-        className,
-      )}
+      className={cn("p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0", className)}
       {...props}
     />
   );

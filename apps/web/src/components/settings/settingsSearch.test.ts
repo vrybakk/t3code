@@ -45,19 +45,6 @@ const ITEMS: ReadonlyArray<SettingsSearchItem> = [
 ];
 
 describe("searchSettings", () => {
-  it("finds environment-owned Work profile, tracking, and backup settings", () => {
-    expect(searchSettings("work profile")[0]).toMatchObject({
-      id: "work-profile",
-      to: "/settings/work",
-    });
-    expect(searchSettings("worktrees attribution").map((item) => item.id)).toContain(
-      "work-tracking",
-    );
-    expect(searchSettings("ledger JSON").map((item) => item.id)).toContain("work-backup");
-    for (const id of ["work-profile", "work-tracking", "work-backup"]) {
-      expect(getSettingsSearchTargetScope(id)?.scope).toBe("environment");
-    }
-  });
   it.each(["send shortcut", "multiline", "new line"])("finds Send shortcut for %s", (query) => {
     expect(searchSettings(query).map((item) => item.id)).toContain("send-shortcut");
   });
@@ -295,6 +282,10 @@ describe("searchSettings", () => {
     });
     expect(searchSettings("word wrap")[0]).toMatchObject({
       id: "word-wrap",
+      to: "/settings/appearance",
+    });
+    expect(searchSettings("composer context")[0]).toMatchObject({
+      id: "composer-context",
       to: "/settings/appearance",
     });
     expect(searchSettings("environment identification")[0]).toMatchObject({

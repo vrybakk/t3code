@@ -1,9 +1,13 @@
-import type { ComposerSkill } from "@t3tools/client-runtime/providerSkills";
 import {
   resolveProviderSkillSourceKind,
   type ProviderSkillSourceKind,
 } from "@t3tools/client-runtime/providerSkills";
-import type { PullRequestContextMetadata, ServerProviderSlashCommand } from "@t3tools/contracts";
+import type {
+  PullRequestContextMetadata,
+  ScopedThreadRef,
+  ServerProviderSkill,
+  ServerProviderSlashCommand,
+} from "@t3tools/contracts";
 import type { ComposerTriggerKind } from "@t3tools/shared/composerTrigger";
 import { memo } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
@@ -30,6 +34,13 @@ export type ComposerCommandItem =
     }
   | {
       readonly id: string;
+      readonly type: "thread";
+      readonly thread: ScopedThreadRef;
+      readonly label: string;
+      readonly description: string;
+    }
+  | {
+      readonly id: string;
       readonly type: "slash-command";
       readonly command: string;
       readonly label: string;
@@ -45,7 +56,7 @@ export type ComposerCommandItem =
   | {
       readonly id: string;
       readonly type: "skill";
-      readonly skill: ComposerSkill;
+      readonly skill: ServerProviderSkill;
       readonly label: string;
       readonly description: string;
     };
@@ -96,6 +107,8 @@ function itemIcon(item: ComposerCommandItem): AppSymbolName | null {
       return SKILL_SOURCE_SYMBOL_BY_KIND[resolveProviderSkillSourceKind(item.skill)];
     case "path":
       return null;
+    case "thread":
+      return "text.bubble";
   }
 }
 

@@ -235,30 +235,6 @@ const advanceIdleClock = Effect.gen(function* () {
 });
 
 it.layer(OpenCodeTextGenerationTestLayer)("OpenCodeTextGeneration", (it) => {
-  it.effect("generates structured task analysis", () =>
-    withOpenCodeTextGeneration(DEFAULT_OPENCODE_SETTINGS, (generation) =>
-      Effect.gen(function* () {
-        runtimeMock.state.promptResult = {
-          data: {
-            parts: [
-              {
-                type: "text",
-                text: '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}',
-              },
-            ],
-          },
-        };
-        expect(
-          yield* generation.generateTaskAnalysis({
-            cwd: process.cwd(),
-            prompt: "Analyze task",
-            modelSelection: DEFAULT_TEST_MODEL_SELECTION,
-          }),
-        ).toEqual({ summary: "Task context estimate", estimateMinutes: 30, findings: null });
-      }),
-    ),
-  );
-
   it.effect("excludes generic files from thread title generation", () =>
     withOpenCodeTextGeneration(DEFAULT_OPENCODE_SETTINGS, (textGeneration) =>
       Effect.gen(function* () {

@@ -1,5 +1,4 @@
 import {
-  type GitButlerDiscoveryItem,
   type SourceControlDiscoveryResult,
   type VcsDiscoveryItem,
   type VcsDriverKind,
@@ -9,8 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { ServerConfig } from "../config.ts";
-import * as GitButlerCli from "../gitButler/GitButlerCli.ts";
+import * as ServerConfig from "../config.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import { detailFromCause, firstNonEmptyLine } from "./SourceControlProviderDiscovery.ts";
 import * as SourceControlProviderRegistry from "./SourceControlProviderRegistry.ts";
@@ -59,37 +57,6 @@ const VCS_PROBES: ReadonlyArray<VcsProbe> = [
   },
 ];
 
-const GITBUTLER_MINIMUM_VERSION = GitButlerCli.MINIMUM_VERSION;
-const GITBUTLER_INSTALL_HINT =
-  "Install the GitButler CLI on this server from https://docs.gitbutler.com/cli-overview and ensure `but` is on PATH.";
-
-function gitButlerDiscovery(input: {
-  readonly status: GitButlerDiscoveryItem["status"];
-  readonly version?: string;
-  readonly detail?: string;
-}): GitButlerDiscoveryItem {
-  return {
-    label: "GitButler",
-    executable: "but",
-    status: input.status,
-    version: input.version === undefined ? Option.none() : Option.some(input.version),
-    minimumVersion: GITBUTLER_MINIMUM_VERSION,
-    installHint: GITBUTLER_INSTALL_HINT,
-    detail: input.detail === undefined ? Option.none() : Option.some(input.detail),
-  };
-}
-
-function gitButlerDiscoveryFromVersionOutput(output: string): GitButlerDiscoveryItem {
-  const compatibility = GitButlerCli.versionCompatibilityFromOutput(output);
-  return compatibility.status === "available"
-    ? gitButlerDiscovery(compatibility)
-    : gitButlerDiscovery({
-        status: compatibility.status,
-        ...(compatibility.version === null ? {} : { version: compatibility.version }),
-        detail: compatibility.detail,
-      });
-}
-
 export class SourceControlDiscovery extends Context.Service<
   SourceControlDiscovery,
   {
@@ -99,32 +66,9 @@ export class SourceControlDiscovery extends Context.Service<
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
-  const config = yield* ServerConfig;
+  const config = yield* ServerConfig.ServerConfig;
   const process = yield* VcsProcess.VcsProcess;
   const sourceControlProviders = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
-
-  const probeGitButler = Effect.fn("SourceControlDiscovery.probeGitButler")(function* () {
-    return yield* GitButlerCli.readVersionOutput(
-      process,
-      config.cwd,
-      "source-control.discovery.gitbutler",
-    ).pipe(
-      Effect.map(gitButlerDiscoveryFromVersionOutput),
-      Effect.catch((cause) =>
-        Effect.succeed(
-          cause._tag === "VcsProcessSpawnError"
-            ? gitButlerDiscovery({ status: "missing", detail: GITBUTLER_INSTALL_HINT })
-            : gitButlerDiscovery({
-                status: "error",
-                detail:
-                  cause._tag === "VcsProcessTimeoutError"
-                    ? "The GitButler version check timed out."
-                    : "The GitButler version check failed.",
-              }),
-        ),
-      ),
-    );
-  });
 
   const probe = <Kind extends VcsDriverKind>(
     input: DiscoveryProbe & { readonly kind: Kind },
@@ -186,17 +130,13 @@ export const make = Effect.gen(function* () {
   };
 
   return SourceControlDiscovery.of({
-    discover: Effect.all(
-      {
-        versionControlSystems: Effect.all(
-          VCS_PROBES.map((entry) => probe(entry)) as ReadonlyArray<Effect.Effect<VcsDiscoveryItem>>,
-          { concurrency: "unbounded" },
-        ),
-        sourceControlProviders: sourceControlProviders.discover,
-        gitButler: probeGitButler(),
-      },
-      { concurrency: "unbounded" },
-    ),
+    discover: Effect.all({
+      versionControlSystems: Effect.all(
+        VCS_PROBES.map((entry) => probe(entry)) as ReadonlyArray<Effect.Effect<VcsDiscoveryItem>>,
+        { concurrency: "unbounded" },
+      ),
+      sourceControlProviders: sourceControlProviders.discover,
+    }),
   });
 });
 

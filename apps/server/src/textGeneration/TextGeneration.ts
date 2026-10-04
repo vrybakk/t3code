@@ -2,11 +2,10 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type {
+  BranchNamingOptions,
   ChatAttachment,
   ModelSelection,
   ProviderInstanceId,
-  TaskAnalysis,
-  TaskEstimationResponse,
 } from "@t3tools/contracts";
 import { TextGenerationError } from "@t3tools/contracts";
 
@@ -54,6 +53,7 @@ export interface PrContentGenerationResult {
 }
 
 export interface BranchNameGenerationInput {
+  naming?: BranchNamingOptions | undefined;
   cwd: string;
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
@@ -74,17 +74,6 @@ export interface ThreadTitleGenerationInput {
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
-}
-
-export interface TaskAnalysisGenerationInput {
-  cwd: string;
-  prompt: string;
-  modelSelection: ModelSelection;
-  imagePaths?: ReadonlyArray<string> | undefined;
-}
-
-export interface TaskEstimationGenerationInput extends TaskAnalysisGenerationInput {
-  phase: "research" | "final";
 }
 
 export interface ThreadTitleGenerationResult {
@@ -119,14 +108,6 @@ export class TextGeneration extends Context.Service<
       input: BranchNameGenerationInput,
     ) => Effect.Effect<BranchNameGenerationResult, TextGenerationError>;
 
-    readonly researchTaskEstimate: (
-      input: TaskEstimationGenerationInput,
-    ) => Effect.Effect<TaskEstimationResponse, TextGenerationError>;
-
-    readonly generateTaskAnalysis: (
-      input: TaskAnalysisGenerationInput,
-    ) => Effect.Effect<TaskAnalysis, TextGenerationError>;
-
     /** Generate a concise thread title from a first message or thread history. */
     readonly generateThreadTitle: (
       input: ThreadTitleGenerationInput,
@@ -138,9 +119,7 @@ type TextGenerationOp =
   | "generateCommitMessage"
   | "generatePrContent"
   | "generateBranchName"
-  | "generateThreadTitle"
-  | "generateTaskAnalysis"
-  | "researchTaskEstimate";
+  | "generateThreadTitle";
 
 const resolveInstance = (
   registry: ProviderInstanceRegistry.ProviderInstanceRegistry["Service"],
@@ -165,14 +144,6 @@ export const make = Effect.gen(function* () {
   const registry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
   const sourceControl = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   return TextGeneration.of({
-    researchTaskEstimate: (input) =>
-      resolveInstance(registry, "researchTaskEstimate", input.modelSelection.instanceId).pipe(
-        Effect.flatMap((generation) => generation.researchTaskEstimate(input)),
-      ),
-    generateTaskAnalysis: (input) =>
-      resolveInstance(registry, "generateTaskAnalysis", input.modelSelection.instanceId).pipe(
-        Effect.flatMap((textGeneration) => textGeneration.generateTaskAnalysis(input)),
-      ),
     generateCommitMessage: (input) =>
       resolveInstance(registry, "generateCommitMessage", input.modelSelection.instanceId).pipe(
         Effect.flatMap((textGeneration) => textGeneration.generateCommitMessage(input)),

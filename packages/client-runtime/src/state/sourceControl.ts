@@ -8,12 +8,12 @@ import {
   createEnvironmentRpcSubscriptionAtomFamily,
 } from "./runtime.ts";
 import type { EnvironmentRegistry } from "../connection/registry.ts";
-import { EnvironmentCacheStore } from "../platform/persistence.ts";
+import * as Persistence from "../platform/persistence.ts";
 import { vcsCommandConcurrency, vcsCommandScheduler } from "./vcsCommandScheduler.ts";
-import { invalidateCachedVcsRefs, vcsRefsCacheStateAtom } from "./vcsRefInvalidation.ts";
+import { invalidateCachedVcsRefs } from "./vcsRefInvalidation.ts";
 
 export function createSourceControlEnvironmentAtoms<R, E>(
-  runtime: Atom.AtomRuntime<EnvironmentRegistry | EnvironmentCacheStore | R, E>,
+  runtime: Atom.AtomRuntime<EnvironmentRegistry | Persistence.EnvironmentCacheStore | R, E>,
 ) {
   const commandScheduler = createAtomCommandScheduler();
   return {
@@ -24,11 +24,6 @@ export function createSourceControlEnvironmentAtoms<R, E>(
     repository: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:source-control:repository",
       tag: WS_METHODS.sourceControlLookupRepository,
-    }),
-    gitButlerWorkspace: createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:gitbutler:workspace",
-      tag: WS_METHODS.gitButlerWorkspaceStatus,
-      refreshTrigger: ({ environmentId }) => vcsRefsCacheStateAtom({ environmentId }),
     }),
     cloneRepository: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:source-control:clone-repository",

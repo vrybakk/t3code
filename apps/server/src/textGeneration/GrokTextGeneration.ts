@@ -1,4 +1,3 @@
-import { TaskAnalysis } from "@t3tools/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -8,7 +7,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import type * as EffectAcpErrors from "effect-acp/errors";
 
 import { type GrokSettings, type ModelSelection } from "@t3tools/contracts";
-import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
+import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@t3tools/shared/git";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { extractJsonObject } from "@t3tools/shared/schemaJson";
 
@@ -55,16 +54,13 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle"
-      | "researchTaskEstimate"
-      | "generateTaskAnalysis";
+      | "generateThreadTitle";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
     modelSelection: ModelSelection;
   }): Effect.Effect<S["Type"], TextGenerationError, S["DecodingServices"]> =>
     Effect.gen(function* () {
-      const resolvedModel = resolveGrokAcpBaseModelId(modelSelection.model);
       const outputRef = yield* Ref.make("");
       const runtime = yield* makeGrokAcpRuntime({
         grokSettings,
@@ -87,6 +83,7 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       });
 
       const promptResult = yield* Effect.gen(function* () {
+        const resolvedModel = resolveGrokAcpBaseModelId(modelSelection.model);
         const started = yield* runtime.start();
         const requestedReasoningEffort = getModelSelectionStringOptionValue(
           modelSelection,
@@ -107,7 +104,6 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
               cause,
             }),
         });
-
         return yield* runtime.prompt({
           prompt: [{ type: "text", text: prompt }],
         });
@@ -228,6 +224,7 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       const { prompt, outputSchema } = buildBranchNamePrompt({
         message: input.message,
         attachments: input.attachments,
+        naming: input.naming,
       });
 
       const generated = yield* runGrokJson({
@@ -239,29 +236,8 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       });
 
       return {
-        branch: sanitizeBranchFragment(generated.branch),
+        branch: formatGeneratedBranchName(generated.branch, input.naming),
       };
-    });
-
-  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] =
-    () =>
-      Effect.fail(
-        new TextGenerationError({
-          operation: "researchTaskEstimate",
-          detail:
-            "Research-backed estimation is not available with Grok yet. Choose Codex, Claude, OpenCode or Antigravity as the default text-generation provider.",
-        }),
-      );
-
-  const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
-    input,
-  ) =>
-    runGrokJson({
-      operation: "generateTaskAnalysis",
-      cwd: input.cwd,
-      prompt: input.prompt,
-      outputSchemaJson: TaskAnalysis,
-      modelSelection: input.modelSelection,
     });
 
   const generateThreadTitle: TextGeneration.TextGeneration["Service"]["generateThreadTitle"] =
@@ -292,7 +268,5 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
-    generateTaskAnalysis,
-    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
 });
