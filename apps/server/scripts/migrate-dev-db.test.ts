@@ -204,12 +204,8 @@ it.layer(NodeServices.layer)("migrate-dev-db", (it) => {
       );
       assert.deepEqual(history, [
         { migration_id: 54, name: "ProjectionThreadsAutoSettleDisabledAt" },
-        { migration_id: 55, name: "WorkTrackingReportSnapshots" },
-        { migration_id: 56, name: "ClickUpThreadTasks" },
-        { migration_id: 57, name: "ClickUpWorkflow" },
-        { migration_id: 58, name: "ProjectionThreadsAutoSettleDisabledAt" },
-        { migration_id: 59, name: "ThreadTaskLinks" },
-        { migration_id: 60, name: "ClickUpTimeExports" },
+        { migration_id: 55, name: "OrchestrationV2" },
+        { migration_id: 56, name: "RemoveRedundantProjectionIndexes" },
       ]);
     }),
   );
