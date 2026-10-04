@@ -245,21 +245,33 @@ const reconcileLegacyForkMigrationHistory = Effect.fn("reconcileLegacyForkMigrat
       return;
     }
 
-    yield* sql.withTransaction(
-      Effect.gen(function* () {
-        yield* sql`UPDATE effect_sql_migrations SET migration_id = migration_id + 100 WHERE migration_id BETWEEN 54 AND 60`;
-        yield* Migration0054;
-        yield* Migration0055;
-        yield* Migration0056;
-        yield* sql`INSERT INTO effect_sql_migrations (migration_id, name) VALUES (54, 'ProjectionThreadsAutoSettleDisabledAt'), (55, 'OrchestrationV2'), (56, 'RemoveRedundantProjectionIndexes')`;
-        yield* sql`UPDATE effect_sql_migrations SET migration_id = 57 WHERE migration_id = 154`;
-        yield* sql`UPDATE effect_sql_migrations SET migration_id = 58 WHERE migration_id = 155`;
-        yield* sql`UPDATE effect_sql_migrations SET migration_id = 59 WHERE migration_id = 156`;
-        yield* sql`UPDATE effect_sql_migrations SET migration_id = 60 WHERE migration_id = 157`;
-        yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 158`;
-        yield* sql`UPDATE effect_sql_migrations SET migration_id = 61 WHERE migration_id = 159`;
-        yield* sql`UPDATE effect_sql_migrations SET migration_id = 62 WHERE migration_id = 160`;
-      }),
-    );
+    yield* sql
+      .withTransaction(
+        Effect.gen(function* () {
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = migration_id + 100 WHERE migration_id BETWEEN 54 AND 60`;
+          yield* Migration0054;
+          yield* Migration0055;
+          yield* Migration0056;
+          yield* sql`INSERT INTO effect_sql_migrations (migration_id, name) VALUES (54, 'ProjectionThreadsAutoSettleDisabledAt'), (55, 'OrchestrationV2'), (56, 'RemoveRedundantProjectionIndexes')`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 57 WHERE migration_id = 154`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 58 WHERE migration_id = 155`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 59 WHERE migration_id = 156`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 60 WHERE migration_id = 157`;
+          yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 158`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 61 WHERE migration_id = 159`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 62 WHERE migration_id = 160`;
+        }),
+      )
+      .pipe(
+        Effect.catch((cause) =>
+          Effect.fail(
+            new Migrator.MigrationError({
+              kind: "Failed",
+              message: "Failed to reconcile the legacy fork migration history.",
+              cause,
+            }),
+          ),
+        ),
+      );
   },
 );
