@@ -51,7 +51,7 @@ export const ClickUpWorkflowModels = Schema.Struct({
   review: Schema.NullOr(ModelSelection),
 });
 export type ClickUpWorkflowModels = typeof ClickUpWorkflowModels.Type;
-export const DEFAULT_CLICKUP_WORKFLOW_MODELS: ClickUpWorkflowModels = {
+const DEFAULT_CLICKUP_WORKFLOW_MODELS: ClickUpWorkflowModels = {
   research: null,
   implementation: null,
   review: null,

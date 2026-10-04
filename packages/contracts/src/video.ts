@@ -32,7 +32,7 @@ export function videoMimeType(attachment: {
     : (VIDEO_MIME_TYPE_BY_EXTENSION.get(attachment.name.slice(dotIndex + 1).toLowerCase()) ?? null);
 }
 
-export const PROVIDER_SEND_TURN_MAX_FILE_BYTES = 50 * 1024 * 1024;
+const PROVIDER_SEND_TURN_MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const PROVIDER_SEND_TURN_MAX_VIDEO_BYTES = 250 * 1024 * 1024;
 
 export function fileAttachmentMaxBytes(attachment: {

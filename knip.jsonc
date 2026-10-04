@@ -92,6 +92,11 @@
       // These workspace packages are private to this monorepo.
       "includeEntryExports": true,
     },
+    "packages/shared": {
+      // ClickUp mapping helpers are an intentionally exposed subpath API.
+      "includeEntryExports": true,
+      "ignoreIssues": { "src/clickUpProjectMappings.ts": ["exports"] },
+    },
     "packages/effect-acp": {
       "includeEntryExports": true,
       "entry": ["test/fixtures/*.ts"],

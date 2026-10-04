@@ -65,15 +65,6 @@ const firstInstantOfCivilDate = (date: CivilDate, timeZone: string) => {
   return new Date(high).toISOString();
 };
 
-export const isIanaTimeZone = (timeZone: string) => {
-  try {
-    formatterFor(timeZone);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 /** Inclusive civil dates, converted to the same exclusive bounds used by Work queries. */
 export function workDateRange(from: string, through: string, timeZone: string) {
   const parse = (value: string): CivilDate | null => {

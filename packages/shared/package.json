@@ -391,6 +391,10 @@
     "./nerdReleaseNotes": {
       "types": "./src/nerdReleaseNotes.ts",
       "import": "./src/nerdReleaseNotes.ts"
+    },
+    "./clickUpProjectMappings": {
+      "types": "./src/clickUpProjectMappings.ts",
+      "import": "./src/clickUpProjectMappings.ts"
     }
   },
   "scripts": {

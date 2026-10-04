@@ -69,9 +69,4 @@ export * from "./taskEstimation.ts";
 export * from "./clickupWorkflow.ts";
 export * from "./clickupTaskEditing.ts";
 
-export {
-  VIDEO_FILE_EXTENSIONS,
-  videoMimeType,
-  PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
-  fileAttachmentMaxBytes,
-} from "./video.ts";
+export { VIDEO_FILE_EXTENSIONS, videoMimeType } from "./video.ts";

@@ -9,6 +9,7 @@ import {
   TrimmedNonEmptyString,
   TrimmedString,
 } from "./baseSchemas.ts";
+import { isFileAttachmentWithinSizeLimit, PROVIDER_SEND_TURN_MAX_VIDEO_BYTES } from "./video.ts";
 
 export const PROVIDER_SEND_TURN_MAX_INPUT_CHARS = 120_000;
 export const PROVIDER_SEND_TURN_MAX_ATTACHMENTS = 100;
@@ -166,13 +167,13 @@ export const ChatFileAttachment = Schema.Struct({
   mimeType: TrimmedNonEmptyString.check(Schema.isMaxLength(100)),
   sizeBytes: NonNegativeInt.check(
     Schema.isGreaterThanOrEqualTo(1),
-    Schema.isLessThanOrEqualTo(PROVIDER_SEND_TURN_MAX_FILE_BYTES),
+    Schema.isLessThanOrEqualTo(PROVIDER_SEND_TURN_MAX_VIDEO_BYTES),
   ),
   /** Clipboard text folded by a client. Providers keep these path-only so the
       agent can inspect the file selectively instead of eagerly spending the
       same context the fold is intended to preserve. */
   source: Schema.optional(PastedTextAttachmentSource),
-});
+}).check(Schema.makeFilter(isFileAttachmentWithinSizeLimit));
 export type ChatFileAttachment = typeof ChatFileAttachment.Type;
 
 /**
