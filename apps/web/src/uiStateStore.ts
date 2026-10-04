@@ -22,6 +22,7 @@ const LEGACY_PERSISTED_STATE_KEYS = [
 export interface PersistedUiState {
   projectExpandedById?: Record<string, boolean>;
   projectOrder?: string[];
+  pinnedProjectKeys?: string[];
   threadLastVisitedAtById?: Record<string, string>;
   collapsedProjectCwds?: string[];
   expandedProjectCwds?: string[];
@@ -36,6 +37,7 @@ export interface PersistedUiState {
 export interface UiProjectState {
   projectExpandedById: Record<string, boolean>;
   projectOrder: string[];
+  pinnedProjectKeys: string[];
   // Logical project key the sidebar list is scoped to, or null for "all
   // projects". Lives here so routes that unmount the sidebar (Settings)
   // cannot reset the filter.
@@ -61,6 +63,7 @@ export interface UiState
 const initialState: UiState = {
   projectExpandedById: {},
   projectOrder: [],
+  pinnedProjectKeys: [],
   sidebarProjectScopeKey: null,
   threadLastVisitedAtById: {},
   threadChangedFilesExpandedById: {},
@@ -148,6 +151,7 @@ export function parsePersistedState(parsed: PersistedUiState): UiState {
   return {
     projectExpandedById,
     projectOrder,
+    pinnedProjectKeys: sanitizeStringArray(parsed.pinnedProjectKeys),
     threadLastVisitedAtById: sanitizeTimestampRecord(parsed.threadLastVisitedAtById),
     threadChangedFilesExpandedById:
       parsed.threadChangedFilesExpansionVersion === THREAD_CHANGED_FILES_EXPANSION_VERSION
@@ -226,6 +230,7 @@ export function persistState(state: UiState): void {
       JSON.stringify({
         projectExpandedById,
         projectOrder: state.projectOrder,
+        pinnedProjectKeys: state.pinnedProjectKeys,
         threadLastVisitedAtById: state.threadLastVisitedAtById,
         defaultAdvertisedEndpointKey: state.defaultAdvertisedEndpointKey,
         sidebarProjectScopeKey: state.sidebarProjectScopeKey,
@@ -423,6 +428,16 @@ export function reorderProjects(
   };
 }
 
+export function toggleProjectPinned(state: UiState, projectKey: string): UiState {
+  if (projectKey.length === 0) return state;
+  return {
+    ...state,
+    pinnedProjectKeys: state.pinnedProjectKeys.includes(projectKey)
+      ? state.pinnedProjectKeys.filter((key) => key !== projectKey)
+      : [...state.pinnedProjectKeys, projectKey],
+  };
+}
+
 interface UiStateStore extends UiState {
   markThreadVisited: (threadId: string, visitedAt: string) => void;
   markThreadUnread: (threadId: string, latestTurnCompletedAt: string | null | undefined) => void;
@@ -431,6 +446,7 @@ interface UiStateStore extends UiState {
   setSidebarProjectScopeKey: (projectKey: string | null) => void;
   setPullRequestMergeMethod: (method: PullRequestMergeMethod) => void;
   setProjectExpanded: (projectIds: string | readonly string[], expanded: boolean) => void;
+  toggleProjectPinned: (projectKey: string) => void;
   reorderProjects: (
     currentProjectOrder: readonly string[],
     draggedProjectIds: readonly string[],
@@ -453,6 +469,7 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
   setPullRequestMergeMethod: (method) => set((state) => setPullRequestMergeMethod(state, method)),
   setProjectExpanded: (projectIds, expanded) =>
     set((state) => setProjectExpanded(state, projectIds, expanded)),
+  toggleProjectPinned: (projectKey) => set((state) => toggleProjectPinned(state, projectKey)),
   reorderProjects: (currentProjectOrder, draggedProjectIds, targetProjectIds) =>
     set((state) =>
       reorderProjects(state, currentProjectOrder, draggedProjectIds, targetProjectIds),

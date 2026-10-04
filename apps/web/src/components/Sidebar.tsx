@@ -69,6 +69,8 @@ import {
   ClockIcon,
   EyeIcon,
   FolderIcon,
+  ListIcon,
+  FolderTreeIcon,
   GitBranchIcon,
   MessageCircleQuestionIcon,
   PinIcon,
@@ -127,6 +129,18 @@ import {
   projectGroupsSpanEnvironments,
   type SidebarProjectSnapshot,
 } from "../sidebarProjectGrouping";
+import {
+  countSidebarProjectThreadStatuses,
+  getVisibleSidebarProjectThreads,
+  groupSidebarThreadsByProject,
+  planSidebarProjectGroupReorder,
+  planSidebarProjectThreadReorder,
+  type SidebarProjectThreadSection,
+} from "./Sidebar.grouped";
+import {
+  SidebarProjectThreadGroupRow,
+  SortableSidebarProjectGroupList,
+} from "./sidebar/SidebarProjectThreadGroup";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import {
   getThreadKeysToDeselectAfterDelete,
@@ -137,7 +151,7 @@ import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useTerminalFocus } from "../hooks/useTerminalFocus";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
-import { useClientSettings } from "../hooks/useSettings";
+import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useNowMinute } from "../hooks/useNowMinute";
@@ -606,21 +620,35 @@ function SnoozeMenuButton(props: {
 
 // Subset of useSortable applied to a thread row's root <li>. Listeners go
 // on the whole row (no dedicated handle): the pointer sensor's distance
-// constraint keeps plain clicks working, and we skip dnd-kit's aria
-// attributes since there is no keyboard sensor and the row body already
-// carries its own button semantics.
+// constraint keeps plain clicks working. Grouped rows also use the row body
+// as their keyboard drag activator.
 type SortableThreadRowBag = Pick<
   ReturnType<typeof useSortable>,
-  "listeners" | "setNodeRef" | "transform" | "transition" | "isDragging"
->;
+  | "listeners"
+  | "setNodeRef"
+  | "setActivatorNodeRef"
+  | "attributes"
+  | "transform"
+  | "transition"
+  | "isDragging"
+> & { readonly keyboard: boolean };
 
 function SortableThreadRow(props: {
   id: string;
   disabled: boolean;
   contextDrag: boolean;
+  keyboardSortable?: boolean;
   children: (bag: SortableThreadRowBag) => ReactNode;
 }) {
-  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    attributes,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: props.id,
     disabled: { draggable: props.disabled },
     animateLayoutChanges: animateSidebarLayoutChanges,
@@ -631,13 +659,27 @@ function SortableThreadRow(props: {
     () => ({
       listeners,
       setNodeRef,
+      setActivatorNodeRef,
+      attributes,
+      keyboard: props.keyboardSortable === true && !props.disabled,
       transform: props.contextDrag ? null : transform,
       // The lifted row normally follows the pointer without a transition.
       // When it becomes a context ghost, glide its sidebar copy back home.
       transition: props.contextDrag && isDragging ? "transform 150ms ease-out" : transition,
       isDragging: isDragging && !props.contextDrag,
     }),
-    [listeners, setNodeRef, transform, transition, isDragging, props.contextDrag],
+    [
+      listeners,
+      setNodeRef,
+      setActivatorNodeRef,
+      attributes,
+      transform,
+      transition,
+      isDragging,
+      props.contextDrag,
+      props.keyboardSortable,
+      props.disabled,
+    ],
   );
   return props.children(bag);
 }
@@ -1173,6 +1215,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   );
   const threadKey = scopedThreadKey(threadRef);
   const { leaseLiveStatus, rowRef } = useSidebarRowSubscriptionLease(props.isActive);
+  const setKeyboardActivator = props.sortable?.keyboard
+    ? props.sortable.setActivatorNodeRef
+    : undefined;
+  const attachRowRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      rowRef(node);
+      setKeyboardActivator?.(node);
+    },
+    [rowRef, setKeyboardActivator],
+  );
   const isRegeneratingTitle = thread.titleRegeneration != null;
   const localLastVisitedAt = useUiStateStore((state) => state.threadLastVisitedAtById[threadKey]);
   const lastVisitedAt = resolveThreadLastVisitedAt(thread.lastVisitedAt, localLastVisitedAt);
@@ -1379,11 +1431,24 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent) => {
       if (event.target !== event.currentTarget) return;
+      if (
+        props.sortable?.keyboard &&
+        props.sortable.isDragging &&
+        (event.key === " " || event.key === "Enter")
+      ) {
+        event.preventDefault();
+        return;
+      }
+      if (props.sortable?.keyboard && event.key === " ") {
+        event.stopPropagation();
+        props.sortable.listeners?.onKeyDown?.(event);
+        return;
+      }
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       onThreadActivate(threadRef);
     },
-    [onThreadActivate, threadRef],
+    [onThreadActivate, threadRef, props.sortable],
   );
   const handleDoubleClick = useCallback(
     (event: ReactMouseEvent) => {
@@ -1745,7 +1810,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           <TooltipTrigger
             render={
               <div
-                ref={rowRef}
+                ref={attachRowRef}
+                {...(props.sortable?.keyboard ? props.sortable.attributes : {})}
                 role="button"
                 tabIndex={0}
                 aria-label={accessibility.label}
@@ -1910,7 +1976,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
         <TooltipTrigger
           render={
             <div
-              ref={rowRef}
+              ref={attachRowRef}
+              {...(props.sortable?.keyboard ? props.sortable.attributes : {})}
               role="button"
               tabIndex={0}
               aria-label={accessibility.label}
@@ -2314,6 +2381,12 @@ const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props: {
 export default function Sidebar() {
   const projects = useProjects();
   const projectOrder = useUiStateStore((store) => store.projectOrder);
+  const pinnedProjectKeys = useUiStateStore((store) => store.pinnedProjectKeys);
+  const toggleProjectPinned = useUiStateStore((store) => store.toggleProjectPinned);
+  const reorderProjects = useUiStateStore((store) => store.reorderProjects);
+  const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
+  const groupedSidebar = useClientSettings((s) => s.sidebarViewMode === "projects");
+  const updateClientSettings = useUpdateClientSettings();
   const threads = useThreadShells();
   const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -2468,10 +2541,18 @@ export default function Sidebar() {
       sidebarProjectSortOrder,
     ],
   );
-  const projectGroups = useMemo(
-    () => sortSidebarV2ProjectGroups(unsortedProjectGroups, threads, sidebarProjectSortOrder),
-    [sidebarProjectSortOrder, threads, unsortedProjectGroups],
-  );
+  const projectGroups = useMemo(() => {
+    const sorted = sortSidebarV2ProjectGroups(
+      unsortedProjectGroups,
+      threads,
+      sidebarProjectSortOrder,
+    );
+    const pins = new Set(pinnedProjectKeys);
+    return [
+      ...sorted.filter((project) => pins.has(project.projectKey)),
+      ...sorted.filter((project) => !pins.has(project.projectKey)),
+    ];
+  }, [pinnedProjectKeys, sidebarProjectSortOrder, threads, unsortedProjectGroups]);
   const projectGroupsRef = useRef(projectGroups);
   projectGroupsRef.current = projectGroups;
   // Threads on non-primary environments (T3 Connect, hosted) resolve their
@@ -2970,15 +3051,149 @@ export default function Sidebar() {
     return routeThread === undefined ? EMPTY_THREADS : [routeThread];
   }, [routeThreadKey, workingShelfExpanded, workingThreads]);
 
-  const orderedThreads = useMemo(
+  const handleNewThreadInGroup = useCallback(
+    (project: SidebarProjectSnapshot) => {
+      if (isMobile) setOpenMobile(false);
+      void newThreadContext.handleNewThread(scopeProjectRef(project.environmentId, project.id));
+    },
+    [isMobile, setOpenMobile, newThreadContext],
+  );
+
+  const groupedSections = useMemo(
     () => [
-      ...pinnedThreads,
-      ...activeThreads,
-      ...visibleWorkingThreads,
-      ...visibleSnoozedThreads,
-      ...renderedSettledThreads,
+      {
+        section: "active" as const,
+        groups: groupSidebarThreadsByProject(
+          projectGroups,
+          [...pinnedThreads, ...activeThreads],
+          pinnedProjectKeys.filter((key) => projectScopeKey === null || key === projectScopeKey),
+        ),
+      },
+      {
+        section: "working" as const,
+        groups: groupSidebarThreadsByProject(projectGroups, visibleWorkingThreads),
+      },
+      {
+        section: "snoozed" as const,
+        groups: groupSidebarThreadsByProject(projectGroups, visibleSnoozedThreads),
+      },
+      {
+        section: "settled" as const,
+        groups: groupSidebarThreadsByProject(projectGroups, renderedSettledThreads),
+      },
     ],
     [
+      projectGroups,
+      pinnedProjectKeys,
+      projectScopeKey,
+      pinnedThreads,
+      activeThreads,
+      visibleWorkingThreads,
+      visibleSnoozedThreads,
+      renderedSettledThreads,
+    ],
+  );
+  const groupedVisibleThreads = useMemo(
+    () =>
+      getVisibleSidebarProjectThreads(
+        groupedSections,
+        projectExpandedById,
+        groupedSections
+          .flatMap(({ groups }) => groups.flatMap((group) => group.threads))
+          .find(
+            (thread) =>
+              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)) === routeThreadKey,
+          ),
+      ),
+    [groupedSections, projectExpandedById, routeThreadKey],
+  );
+  const handleProjectGroupReorder = useCallback(
+    (activeKey: string, overKey: string) => {
+      if (pinnedProjectKeys.includes(activeKey) !== pinnedProjectKeys.includes(overKey)) return;
+      const plan = planSidebarProjectGroupReorder(projectGroups, activeKey, overKey);
+      if (plan === null) return;
+      reorderProjects(plan.currentProjectOrder, plan.draggedProjectIds, plan.targetProjectIds);
+      if (sidebarProjectSortOrder !== "manual")
+        void updateClientSettings({ sidebarProjectSortOrder: "manual" });
+    },
+    [
+      pinnedProjectKeys,
+      projectGroups,
+      reorderProjects,
+      sidebarProjectSortOrder,
+      updateClientSettings,
+    ],
+  );
+  const [groupReorderPending, setGroupReorderPending] = useState(false);
+  const handleGroupedThreadReorder = useCallback(
+    (groupThreads: readonly EnvironmentThreadShell[], activeKey: string, overKey: string) => {
+      if (activeKey === overKey || groupReorderPending) return;
+      const keyOf = (thread: EnvironmentThreadShell) =>
+        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+      const plan = planSidebarProjectThreadReorder(groupThreads, threads, activeKey, overKey);
+      if (plan === null) return;
+      const { pinned, assignments } = plan;
+      if (
+        groupThreads
+          .filter((thread) => (thread.pinnedAt != null) === pinned)
+          .some((thread) => {
+            const capabilities = serverConfigs.get(thread.environmentId)?.environment.capabilities;
+            return pinned
+              ? capabilities?.threadPinReorder !== true
+              : capabilities?.threadActiveReorder !== true;
+          })
+      )
+        return;
+      setGroupReorderPending(true);
+      void (async () => {
+        if (!pinned && workingShelfEnabled)
+          await updateClientSettings({ sidebarWorkingShelfEnabled: false });
+        for (const assignment of assignments) {
+          const thread = groupThreads.find((candidate) => keyOf(candidate) === assignment.id);
+          if (!thread) continue;
+          const result = await (pinned ? reorderPinnedThread : reorderActiveThread)(
+            scopeThreadRef(thread.environmentId, thread.id),
+            assignment.orderKey,
+          );
+          if (result._tag === "Failure") {
+            if (!isAtomCommandInterrupted(result))
+              toastManager.add(
+                stackedThreadToast({
+                  type: "error",
+                  title: "Failed to reorder chats",
+                  description: String(squashAtomCommandFailure(result)),
+                }),
+              );
+            break;
+          }
+        }
+      })().finally(() => setGroupReorderPending(false));
+    },
+    [
+      groupReorderPending,
+      serverConfigs,
+      threads,
+      reorderPinnedThread,
+      reorderActiveThread,
+      workingShelfEnabled,
+      updateClientSettings,
+    ],
+  );
+
+  const orderedThreads = useMemo(
+    () =>
+      groupedSidebar
+        ? groupedVisibleThreads
+        : [
+            ...pinnedThreads,
+            ...activeThreads,
+            ...visibleWorkingThreads,
+            ...visibleSnoozedThreads,
+            ...renderedSettledThreads,
+          ],
+    [
+      groupedSidebar,
+      groupedVisibleThreads,
       pinnedThreads,
       activeThreads,
       visibleWorkingThreads,
@@ -4827,6 +5042,32 @@ export default function Sidebar() {
             <SidebarThreadHeader
               searchFieldRef={headerSearchRef}
               hasProjects={projectGroups.length > 0}
+              viewToggle={
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <SidebarHeaderIconButton
+                        label={groupedSidebar ? "Show flat chat list" : "Group chats by project"}
+                        onClick={() => {
+                          clearSelection();
+                          void updateClientSettings({
+                            sidebarViewMode: groupedSidebar ? "threads" : "projects",
+                          });
+                        }}
+                      />
+                    }
+                  >
+                    {groupedSidebar ? (
+                      <ListIcon className="size-4" />
+                    ) : (
+                      <FolderTreeIcon className="size-4" />
+                    )}
+                  </TooltipTrigger>
+                  <TooltipPopup side="bottom">
+                    {groupedSidebar ? "Show flat chat list" : "Group chats by project"}
+                  </TooltipPopup>
+                </Tooltip>
+              }
               projectScope={
                 <Combobox
                   items={projectScopeItems}
@@ -5217,10 +5458,18 @@ export default function Sidebar() {
                             key={threadKey}
                             id={threadKey}
                             contextDrag={isContextDrag}
+                            keyboardSortable={groupedSidebar}
                             disabled={
                               renamingThreadKey === threadKey ||
                               section === "working" ||
-                              !draggableThreadKeys.has(threadKey) ||
+                              (groupedSidebar &&
+                                (section === "snoozed" || section === "settled")) ||
+                              (groupedSidebar
+                                ? groupReorderPending ||
+                                  (thread.pinnedAt != null
+                                    ? !draggableThreadKeys.has(threadKey)
+                                    : !activeReorderableThreadKeys.has(threadKey))
+                                : !draggableThreadKeys.has(threadKey)) ||
                               optimisticDrop !== null
                             }
                           >
@@ -5240,6 +5489,126 @@ export default function Sidebar() {
                           onDraftContextMenu={handleDraftContextMenu}
                         />,
                       ];
+                      if (groupedSidebar) {
+                        const renderGroups = (section: SidebarProjectThreadSection) => {
+                          const groups = groupedSections.find(
+                            (entry) => entry.section === section,
+                          )!.groups;
+                          return (
+                            <SortableSidebarProjectGroupList
+                              key={`groups:${section}`}
+                              groups={groups}
+                              pinnedProjectKeys={pinnedProjectKeys}
+                              onReorder={handleProjectGroupReorder}
+                              renderGroup={(group) => (
+                                <SidebarProjectThreadGroupRow
+                                  key={`${section}:${group.key}`}
+                                  group={group}
+                                  section={section}
+                                  sortable={group.project !== null}
+                                  pinned={pinnedProjectKeys.includes(group.key)}
+                                  onTogglePinned={() => toggleProjectPinned(group.key)}
+                                  activeThreadKey={routeThreadKey}
+                                  threadSensors={dndSensors}
+                                  contextDrag={isContextDrag}
+                                  onThreadDragStart={handleThreadDragStart}
+                                  onThreadDragFinish={() => finishThreadDrag(true)}
+                                  onThreadDragUnmount={cancelThreadDrag}
+                                  onReorderThread={(activeKey, overKey) =>
+                                    handleGroupedThreadReorder(group.threads, activeKey, overKey)
+                                  }
+                                  statusCounts={countSidebarProjectThreadStatuses(group.threads)}
+                                  renderThread={(thread) =>
+                                    renderThreadRow(
+                                      thread,
+                                      section === "active" && thread.pinnedAt != null
+                                        ? "pinned"
+                                        : section,
+                                    )
+                                  }
+                                  onContextMenu={(position) => {
+                                    void (async () => {
+                                      const api = readLocalApi();
+                                      if (!api) return;
+                                      const pinned = pinnedProjectKeys.includes(group.key);
+                                      const clicked = await settlePromise(() =>
+                                        api.contextMenu.show(
+                                          [
+                                            {
+                                              id: "pin",
+                                              label: pinned ? "Unpin group" : "Pin group",
+                                            },
+                                            ...(group.project
+                                              ? [
+                                                  { id: "new", label: "New thread" },
+                                                  { id: "settings", label: "Project settings" },
+                                                ]
+                                              : []),
+                                          ],
+                                          position,
+                                        ),
+                                      );
+                                      if (clicked._tag === "Failure") return;
+                                      if (clicked.value === "pin") toggleProjectPinned(group.key);
+                                      if (clicked.value === "settings" && group.project)
+                                        openProjectSettings(group.project);
+                                      if (clicked.value === "new" && group.project)
+                                        handleNewThreadInGroup(group.project);
+                                    })();
+                                  }}
+                                  onNewThread={
+                                    group.project
+                                      ? () => {
+                                          if (group.project) handleNewThreadInGroup(group.project);
+                                        }
+                                      : undefined
+                                  }
+                                />
+                              )}
+                            />
+                          );
+                        };
+                        items.push(renderGroups("active"));
+                        if (workingThreads.length > 0)
+                          items.push(
+                            <SidebarSectionHeader
+                              key="working"
+                              marker="working-header"
+                              label={`Working (${workingThreads.length})`}
+                              toggle={{
+                                expanded: workingShelfExpanded,
+                                onToggle: toggleWorkingShelf,
+                              }}
+                            />,
+                            renderGroups("working"),
+                          );
+                        if (snoozedThreads.length > 0)
+                          items.push(
+                            <SidebarSectionHeader
+                              key="snoozed"
+                              marker="snoozed-header"
+                              label={`Snoozed (${snoozedThreads.length})`}
+                              toggle={{
+                                expanded: snoozedShelfExpanded,
+                                onToggle: toggleSnoozedShelf,
+                              }}
+                            />,
+                            renderGroups("snoozed"),
+                          );
+                        items.push(
+                          <SidebarSectionHeader
+                            key="settled"
+                            marker="settled-header"
+                            label={`Settled (${settledThreads.length})`}
+                            toggle={{
+                              expanded: settledShelfExpanded,
+                              onToggle: toggleSettledShelf,
+                            }}
+                          />,
+                          renderGroups("settled"),
+                        );
+                        return items;
+                      }
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
                           items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));

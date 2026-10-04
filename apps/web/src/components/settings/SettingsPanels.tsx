@@ -562,6 +562,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.sidebarThreadPreviewCount !== DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount
         ? ["Visible threads"]
         : []),
+      ...(settings.sidebarViewMode !== DEFAULT_UNIFIED_SETTINGS.sidebarViewMode
+        ? ["Sidebar view"]
+        : []),
       ...(settings.sidebarProjectGroupingMode !==
       DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
         ? ["Project Grouping"]
@@ -706,6 +709,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.sidebarAutoSettleOnMerge,
       settings.autoResumeLimitedThreads,
       settings.snoozeLimitedThreads,
+      settings.sidebarViewMode,
       settings.sidebarProjectGroupingMode,
       settings.sidebarProjectSortOrder,
       settings.sidebarWorkingShelfEnabled,
@@ -806,6 +810,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
+      sidebarViewMode: DEFAULT_UNIFIED_SETTINGS.sidebarViewMode,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
       sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
@@ -2255,6 +2260,29 @@ export function GeneralSettingsPanel() {
       <ProjectDefaultsSettings category="general" />
       <SettingsSection id="organization" title="Organization">
         <SettingsRow
+          {...searchableSetting("sidebar-view")}
+          description="Keep chats in project groups. Pin groups and drag groups or chats to arrange them."
+          resetAction={
+            settings.sidebarViewMode !== DEFAULT_UNIFIED_SETTINGS.sidebarViewMode ? (
+              <SettingResetButton
+                label="sidebar view"
+                onClick={() =>
+                  updateSettings({ sidebarViewMode: DEFAULT_UNIFIED_SETTINGS.sidebarViewMode })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.sidebarViewMode === "projects"}
+              onCheckedChange={(checked) =>
+                updateSettings({ sidebarViewMode: checked ? "projects" : "threads" })
+              }
+              aria-label="Group sidebar chats by project"
+            />
+          }
+        />
+        <SettingsRow
           {...searchableSetting("project-grouping")}
           description="Combine matching repositories across environments."
           resetAction={
@@ -2291,7 +2319,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("project-order")}
-          description="Order of projects in the sidebar project picker and command palette."
+          description="Order of project groups, the project picker, and the command palette. Dragging groups switches to manual order."
           resetAction={
             settings.sidebarProjectSortOrder !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder ? (

@@ -15,6 +15,7 @@ import {
   setProjectExpanded,
   setSidebarProjectScopeKey,
   setThreadChangedFilesExpanded,
+  toggleProjectPinned,
   type UiState,
 } from "./uiStateStore";
 
@@ -22,6 +23,7 @@ function makeUiState(overrides: Partial<UiState> = {}): UiState {
   return {
     projectExpandedById: {},
     projectOrder: [],
+    pinnedProjectKeys: [],
     sidebarProjectScopeKey: null,
     threadLastVisitedAtById: {},
     threadChangedFilesExpandedById: {},
@@ -32,6 +34,18 @@ function makeUiState(overrides: Partial<UiState> = {}): UiState {
 }
 
 describe("uiStateStore pure functions", () => {
+  it("pins and unpins logical project groups independently across environments", () => {
+    const first = toggleProjectPinned(makeUiState(), "environment-a:repo");
+    const both = toggleProjectPinned(first, "environment-b:repo");
+    const restored = parsePersistedState({
+      pinnedProjectKeys: [...both.pinnedProjectKeys, "", "environment-a:repo"],
+    });
+    expect(restored.pinnedProjectKeys).toEqual(["environment-a:repo", "environment-b:repo"]);
+    expect(toggleProjectPinned(restored, "environment-a:repo").pinnedProjectKeys).toEqual([
+      "environment-b:repo",
+    ]);
+  });
+
   it("stores server timestamps without moving visit state backwards", () => {
     const threadId = ThreadId.make("thread-1");
     const initialState = makeUiState();
@@ -197,6 +211,7 @@ describe("parsePersistedState", () => {
         logical: false,
       },
       projectOrder: ["physical-b", "physical-a"],
+      pinnedProjectKeys: [],
       threadLastVisitedAtById: {
         "environment:thread-1": "2026-02-25T12:35:00.000Z",
       },
@@ -297,6 +312,7 @@ describe("uiStateStore persistence", () => {
         logical: false,
       },
       projectOrder: ["physical-b", "physical-a"],
+      pinnedProjectKeys: ["logical"],
       threadLastVisitedAtById: {
         "environment:thread-1": "2026-02-25T12:35:00.000Z",
       },
@@ -319,6 +335,7 @@ describe("uiStateStore persistence", () => {
         logical: false,
       },
       projectOrder: ["physical-b", "physical-a"],
+      pinnedProjectKeys: ["logical"],
       threadLastVisitedAtById: {
         "environment:thread-1": "2026-02-25T12:35:00.000Z",
       },

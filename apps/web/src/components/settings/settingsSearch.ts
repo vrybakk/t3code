@@ -275,6 +275,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/appearance",
   },
   {
+    id: "sidebar-view",
+    title: "Group sidebar chats by project",
+    to: "/settings/general",
+    searchTerms: ["sidebar", "groups", "chats", "flat", "pin", "reorder"],
+  },
+  {
     id: "project-grouping",
     title: "Project grouping",
     to: "/settings/general",

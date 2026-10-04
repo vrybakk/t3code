@@ -58,17 +58,19 @@ your next message. The same per-message file limits apply as when attaching
 files directly; see [Attach files](./composer.md#attach-files).
 
 On web and desktop, use the project-tree button beside search to switch between the flat thread
-list and project groups. Project groups start collapsed and show counts for all, running, and
-pending threads. Open a project to choose a thread, or drag its handle to set a manual project
-order. Snoozed and settled threads remain in their own shelves and use the same project order when
-those shelves are open. Switch back to the flat list when you want to drag threads between
-lifecycle sections or reorder pinned and active work.
+list and project groups. You can also choose **Group sidebar chats by project** in
+**Settings → General → Organization**. Active project groups start open and show chat,
+running, and pending counts. Pin a group to keep it above other groups. Pinned chats stay
+at the top of their own group.
 
-Hover over a project group to start a thread or settle its active chats. Right-click a group to
-start a thread, open project settings, filter the list, rename or regroup a checkout, copy its
-path, or remove that checkout. The same menu can settle or snooze active chats, wake snoozed chats, and
-un-settle settled chats. A group lifecycle action applies to that shelf, including chats hidden
-beyond the settled shelf's visible page.
+Drag group headers to set a manual project order. Drag chats within a group to reorder
+its pinned or active chats. Unpin a group or chat before moving it into the unpinned order.
+Group pins and project order are saved on this device; chat order is saved on the server.
+Snoozed and settled chats remain in their own shelves and use the same project order.
+Switch to the flat list to drag chats between lifecycle sections.
+
+Hover over a project group to start a thread. Its context menu also provides project
+settings and pinning.
 
 On web and desktop, pinning or unpinning a thread keeps the sidebar at your current
 scroll position instead of following the thread to its new place in the list.
