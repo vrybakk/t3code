@@ -68,6 +68,7 @@ export const v2Projection: OrchestrationV2ThreadProjection = {
     runtimeMode: v2ThreadShell.runtimeMode,
     interactionMode: v2ThreadShell.interactionMode,
     branch: v2ThreadShell.branch,
+    clickUpTasks: [],
     worktreePath: v2ThreadShell.worktreePath,
     activeProviderThreadId: v2ThreadShell.activeProviderThreadId,
     lineage: v2ThreadShell.lineage,
