@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
 import {
   collectAssistantCitations,
@@ -6,19 +6,6 @@ import {
 } from "@t3tools/shared/assistantCitations";
 
 import { removeLocalStorageItem } from "./hooks/useLocalStorage";
-
-vi.hoisted(() => {
-  const values = new Map<string, string>();
-  vi.stubGlobal("localStorage", {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-    removeItem: (key: string) => {
-      values.delete(key);
-    },
-  });
-});
 
 import {
   MAX_STASH_ENTRIES,
@@ -160,12 +147,17 @@ describe("promptStashStore", () => {
     expect(entries[0]?.id).toBe("overflow");
   });
 
-  it("reports a successful stash only after persisting it", () => {
+  // This test environment has no `localStorage`, so the store runs on its
+  // in-memory fallback — the exact "kept for this session, gone on reload"
+  // case the composer must distinguish from an outright write failure.
+  it("distinguishes a memory-only write (written, not durable) from a failed one", () => {
     const store = usePromptStashStore.getState();
-    const result = store.stashEntry(makeEntry({ id: "persisted" }));
+    const result = store.stashEntry(makeEntry({ id: "memory-only" }));
     expect(result.written).toBe(true);
-    expect(result.durable).toBe(true);
-    expect(usePromptStashStore.getState().entries.map((entry) => entry.id)).toEqual(["persisted"]);
+    expect(result.durable).toBe(false);
+    expect(usePromptStashStore.getState().entries.map((entry) => entry.id)).toEqual([
+      "memory-only",
+    ]);
   });
 
   it("takeEntry removes and returns the entry; second take returns null", () => {

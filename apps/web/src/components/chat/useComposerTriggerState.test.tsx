@@ -133,13 +133,13 @@ describe("composer suggestion dismissal", () => {
     expect(composer.resolveTrigger(candidate)).toEqual(candidate);
   });
 
-  it.each(["/plan", "$skill", "#123", "~src"])("also dismisses %s suggestions", async (text) => {
+  it.each(["/plan", "$skill", "#123"])("also dismisses %s suggestions", async (text) => {
     await updatePrompt(text);
     await act(() => composer.dismissTrigger(composer.trigger));
     await updatePrompt(`${text}x`);
 
     expect(composer.trigger).toBeNull();
-    await updatePrompt(`${text}x ~src`);
+    await updatePrompt("@src");
     expect(composer.trigger?.kind).toBe("path");
   });
 });

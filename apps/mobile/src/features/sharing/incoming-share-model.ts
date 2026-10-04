@@ -5,7 +5,7 @@ import {
 import {
   isProviderSendTurnSupportedImageMimeType,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
-  fileAttachmentMaxBytes,
+  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -127,10 +127,7 @@ export function selectIncomingShareAttachments(input: {
       warnings.push(`'${attachment.name}' was skipped because this server does not support files.`);
       continue;
     }
-    const maxFileAttachmentBytes = clampFileAttachmentUploadBytes(
-      input.maxFileAttachmentBytes,
-      attachment,
-    );
+    const maxFileAttachmentBytes = clampFileAttachmentUploadBytes(input.maxFileAttachmentBytes);
     if (attachment.sizeBytes > maxFileAttachmentBytes) {
       warnings.push(fileAttachmentTooLargeMessage(attachment.name, maxFileAttachmentBytes));
       continue;
@@ -332,10 +329,8 @@ export async function buildIncomingShareDraft(input: {
           }
           continue;
         }
-        if (sizeBytes > fileAttachmentMaxBytes({ name, mimeType })) {
-          warnings.push(
-            fileAttachmentTooLargeMessage(name, fileAttachmentMaxBytes({ name, mimeType })),
-          );
+        if (sizeBytes > PROVIDER_SEND_TURN_MAX_FILE_BYTES) {
+          warnings.push(fileAttachmentTooLargeMessage(name, PROVIDER_SEND_TURN_MAX_FILE_BYTES));
           if (persistedFileUri) {
             await releaseOwnedFiles(input.fileReader, [persistedFileUri]);
           }
@@ -356,10 +351,8 @@ export async function buildIncomingShareDraft(input: {
             await releaseOwnedFiles(input.fileReader, [persistedFileUri]);
             continue;
           }
-          if (sizeBytes > fileAttachmentMaxBytes({ name, mimeType })) {
-            warnings.push(
-              fileAttachmentTooLargeMessage(name, fileAttachmentMaxBytes({ name, mimeType })),
-            );
+          if (sizeBytes > PROVIDER_SEND_TURN_MAX_FILE_BYTES) {
+            warnings.push(fileAttachmentTooLargeMessage(name, PROVIDER_SEND_TURN_MAX_FILE_BYTES));
             await releaseOwnedFiles(input.fileReader, [persistedFileUri]);
             continue;
           }

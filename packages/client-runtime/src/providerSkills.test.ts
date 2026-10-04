@@ -3,7 +3,6 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   dedupeProviderSkillsByName,
-  getComposerSkills,
   formatProviderSkillDisplayName,
   getProviderSlashCommandsForSlashMenu,
   getProviderSkillsForSlashMenu,
@@ -253,39 +252,3 @@ describe("workspace provider snapshots", () => {
     expect(resolveProviderSlashCommandsForCwd(provider, null)).toEqual(provider.slashCommands);
   });
 });
-
-describe("getComposerSkills", () => {
-  it("exposes the bundled workflow without modifying the provider catalog", () => {
-    const nativeSkills = resolveProviderSkillsForCwd(provider, "/workspace/project-a");
-    const skills = getComposerSkills(nativeSkills, true);
-    expect(skills.map((skill) => skill.name)).toEqual(["studio-task-workflow", "project"]);
-    expect(skills[0]?.path).toBeUndefined();
-    expect(resolveProviderSkillSourceKind(skills[0]!)).toBe("app");
-    expect(nativeSkills.map((skill) => skill.name)).toEqual(["project"]);
-    expect(getProviderSkillsForSlashMenu(skills, true)).toEqual(skills);
-    expect(getProviderSkillsForSlashMenu(skills, false)).toEqual([]);
-  });
-
-  it("does not advertise task tools on environments without ClickUp support", () => {
-    expect(getComposerSkills(provider.skills, false)).toEqual(provider.skills);
-    expect(getComposerSkills([], false)).toEqual([]);
-  });
-
-  it("does not depend on a provider having a native skills catalog", () => {
-    expect(getComposerSkills([], true).map((skill) => skill.name)).toEqual([
-      "studio-task-workflow",
-    ]);
-  });
-});
-
-it.each([{ enabled: false }, { enabled: true, userInvocable: false }])(
-  "keeps unavailable duplicates from hiding an invocable slash skill: %j",
-  (unavailable) => {
-    const hidden = { name: "review", path: "/hidden/SKILL.md", ...unavailable };
-    const visible = { name: "review", path: "/visible/SKILL.md", enabled: true };
-    const skills = getComposerSkills([hidden, visible], true);
-    expect(
-      getProviderSkillsForSlashMenu(skills, true).filter((skill) => skill.name === "review"),
-    ).toEqual([visible]);
-  },
-);

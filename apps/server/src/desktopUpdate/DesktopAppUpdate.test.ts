@@ -56,7 +56,6 @@ function report(
 interface HarnessOptions {
   readonly mode?: "web" | "desktop";
   readonly controlFd?: number | undefined;
-  readonly enabled?: boolean | undefined;
   /** Reports emitted for the run, given the requestId the service generated.
       The stream ends after the last one unless `keepOpen` is set. */
   readonly reports?: (requestId: string) => readonly DesktopUpdateStatusReport[];
@@ -75,13 +74,11 @@ const makeHarness = Effect.fn("test.make_desktop_app_update_harness")(function* 
   const config: ServerConfig.ServerConfig["Service"] = {
     ...baseConfig,
     mode: options.mode ?? "desktop",
-    desktopAppUpdateEnabled: "enabled" in options ? options.enabled : true,
     ...("controlFd" in options
       ? { desktopTelemetryControlFd: options.controlFd }
       : { desktopTelemetryControlFd: 5 }),
   };
   const reportsForRun = options.reports ?? (() => []);
-  const requests: string[] = [];
   const changes = Stream.unwrap(
     Deferred.await(requestIdDeferred).pipe(
       Effect.map((requestId) => {
@@ -96,10 +93,7 @@ const makeHarness = Effect.fn("test.make_desktop_app_update_harness")(function* 
       Layer.mergeAll(
         DesktopTelemetryReceiver.layerTest({
           requestDesktopUpdate: (requestId) =>
-            Effect.sync(() => requests.push(requestId)).pipe(
-              Effect.andThen(Deferred.succeed(requestIdDeferred, requestId)),
-              Effect.asVoid,
-            ),
+            Deferred.succeed(requestIdDeferred, requestId).pipe(Effect.asVoid),
           desktopUpdates: Effect.succeed({
             latest: Option.none<DesktopUpdateStatusReport>(),
             changes,
@@ -109,7 +103,7 @@ const makeHarness = Effect.fn("test.make_desktop_app_update_harness")(function* 
       ),
     ),
   );
-  return { service, requests };
+  return { service };
 });
 
 it.layer(NodeServices.layer)("desktop app update", (it) => {
@@ -125,19 +119,6 @@ it.layer(NodeServices.layer)("desktop app update", (it) => {
       const desktop = yield* makeHarness();
       expect(desktop.service.available).toBe(true);
     }),
-  );
-
-  it.effect.each([false, undefined])(
-    "rejects unavailable desktop updater %s before sending a request",
-    (enabled) =>
-      Effect.gen(function* () {
-        const { service, requests } = yield* makeHarness({ enabled });
-        expect(service.available).toBe(false);
-        expect((yield* service.run(() => Effect.void).pipe(Effect.flip)).reason).toContain(
-          "Install an updated desktop app manually",
-        );
-        expect(requests).toEqual([]);
-      }),
   );
 
   it.effect("collapses state reports into progress stages and succeeds on installing", () =>

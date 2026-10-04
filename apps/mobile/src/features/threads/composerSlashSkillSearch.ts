@@ -1,6 +1,6 @@
-import type { ComposerSkill } from "@t3tools/client-runtime/providerSkills";
+import type { ServerProviderSkill } from "@t3tools/contracts";
 
-export function matchesSlashSkillQuery(skill: ComposerSkill, query: string): boolean {
+export function matchesSlashSkillQuery(skill: ServerProviderSkill, query: string): boolean {
   if (!skill.enabled) return false;
   const normalizedQuery = query.toLowerCase();
   const skillQuery =

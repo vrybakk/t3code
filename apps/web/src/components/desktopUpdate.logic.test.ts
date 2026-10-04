@@ -203,15 +203,6 @@ describe("desktop update UI helpers", () => {
     );
   });
 
-  it("builds Nerd release links from the fork feed", () => {
-    expect(getDesktopUpdateReleaseUrl("0.0.42-nightly.20260921.1", true)).toBe(
-      "https://github.com/vrybakk/t3code/releases/tag/v0.0.42-nightly.20260921.1",
-    );
-    expect(getDesktopUpdateReleaseHistoryUrl(true)).toBe(
-      "https://github.com/vrybakk/t3code/releases",
-    );
-  });
-
   it("toasts only for actionable updater errors", () => {
     expect(
       shouldToastDesktopUpdateActionResult({

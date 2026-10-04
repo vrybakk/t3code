@@ -1,8 +1,3 @@
-import {
-  TaskAnalysis,
-  TaskEstimationResponse,
-  TaskEstimationFinalResponse,
-} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -13,7 +8,7 @@ import {
   type ModelSelection,
   type OpenCodeSettings,
 } from "@t3tools/contracts";
-import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
+import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@t3tools/shared/git";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { extractJsonObject } from "@t3tools/shared/schemaJson";
 
@@ -39,8 +34,6 @@ const OpenCodeTextGenerationOperation = Schema.Literals([
   "generatePrContent",
   "generateBranchName",
   "generateThreadTitle",
-  "generateTaskAnalysis",
-  "researchTaskEstimate",
 ]);
 
 type OpenCodeTextGenerationOperation = typeof OpenCodeTextGenerationOperation.Type;
@@ -366,6 +359,23 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
     );
   });
 
+  return makeOpenCodeOperations(runOpenCodeJson);
+});
+
+/** Runs one prompt and decodes its reply as `outputSchemaJson`, for either OpenCode runtime. */
+export type OpenCodeJsonRunner = <S extends Schema.Top>(input: {
+  readonly operation: OpenCodeTextGenerationOperation;
+  readonly cwd: string;
+  readonly prompt: string;
+  readonly outputSchemaJson: S;
+  readonly modelSelection: ModelSelection;
+  readonly attachments?: ReadonlyArray<ChatAttachment> | undefined;
+}) => Effect.Effect<S["Type"], TextGenerationError, S["DecodingServices"]>;
+
+/** The four text generation operations over an OpenCode prompt runner. */
+export function makeOpenCodeOperations(
+  runOpenCodeJson: OpenCodeJsonRunner,
+): TextGeneration.TextGeneration["Service"] {
   const generateCommitMessage: TextGeneration.TextGeneration["Service"]["generateCommitMessage"] =
     Effect.fn("OpenCodeTextGeneration.generateCommitMessage")(function* (input) {
       const { prompt, outputSchema } = buildCommitMessagePrompt({
@@ -422,6 +432,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       const { prompt, outputSchema } = buildBranchNamePrompt({
         message: input.message,
         attachments: input.attachments,
+        naming: input.naming,
       });
       const generated = yield* runOpenCodeJson({
         operation: "generateBranchName",
@@ -433,31 +444,8 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       });
 
       return {
-        branch: sanitizeBranchFragment(generated.branch),
+        branch: formatGeneratedBranchName(generated.branch, input.naming),
       };
-    });
-
-  const researchTaskEstimate: TextGeneration.TextGeneration["Service"]["researchTaskEstimate"] = (
-    input,
-  ) =>
-    runOpenCodeJson({
-      operation: "researchTaskEstimate",
-      cwd: input.cwd,
-      prompt: input.prompt,
-      outputSchemaJson:
-        input.phase === "final" ? TaskEstimationFinalResponse : TaskEstimationResponse,
-      modelSelection: input.modelSelection,
-    });
-
-  const generateTaskAnalysis: TextGeneration.TextGeneration["Service"]["generateTaskAnalysis"] = (
-    input,
-  ) =>
-    runOpenCodeJson({
-      operation: "generateTaskAnalysis",
-      cwd: input.cwd,
-      prompt: input.prompt,
-      outputSchemaJson: TaskAnalysis,
-      modelSelection: input.modelSelection,
     });
 
   const generateThreadTitle: TextGeneration.TextGeneration["Service"]["generateThreadTitle"] =
@@ -488,7 +476,5 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
-    generateTaskAnalysis,
-    researchTaskEstimate,
   } satisfies TextGeneration.TextGeneration["Service"];
-});
+}

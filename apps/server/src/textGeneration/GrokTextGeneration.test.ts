@@ -20,7 +20,7 @@ import { execScriptSource, writeFakeCli } from "../testUtils/fakeCli.ts";
 const decodeGrokSettings = Schema.decodeSync(GrokSettings);
 
 const __dirname = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
-const mockAgentPath = NodePath.join(__dirname, "../../scripts/acp-mock-agent.ts");
+const mockAgentPath = NodePath.join(__dirname, "../provider/testFixtures/grok-text-mock-agent.mjs");
 
 const GrokTextGenerationTestLayer = ServerConfig.ServerConfig.layerTest(process.cwd(), {
   prefix: "t3code-grok-text-generation-test-",
@@ -67,28 +67,6 @@ function readJsonRpcRequests(
 }
 
 it.layer(GrokTextGenerationTestLayer)("GrokTextGeneration", (it) => {
-  it.effect("generates structured task analysis with the selected model", () =>
-    withFakeAcpGrok(
-      {
-        T3_ACP_PROMPT_RESPONSE_TEXT:
-          '{"summary":"Task context estimate", "estimateMinutes":30, "findings":null}',
-      },
-      (generation) =>
-        Effect.gen(function* () {
-          const result = yield* generation.generateTaskAnalysis({
-            cwd: process.cwd(),
-            prompt: "Analyze the task context",
-            modelSelection: createModelSelection(ProviderInstanceId.make("grok"), "grok-mock-alt"),
-          });
-          expect(result).toEqual({
-            summary: "Task context estimate",
-            estimateMinutes: 30,
-            findings: null,
-          });
-        }),
-    ),
-  );
-
   it.effect("uses ACP with disabled tool capabilities and forwards the requested model id", () => {
     const requestLogDir = NodeFS.mkdtempSync(
       NodePath.join(NodeOS.tmpdir(), "t3code-grok-text-log-"),

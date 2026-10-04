@@ -24,7 +24,6 @@ function getVirtualizedScrollFadeClassName({ top, bottom }: { top: boolean; bott
 function ScrollArea({
   className,
   children,
-  viewportRef,
   scrollFade = false,
   scrollFadePadding = true,
   scrollbarGutter = false,
@@ -34,7 +33,6 @@ function ScrollArea({
   viewportTabIndex,
   ...props
 }: ScrollAreaPrimitive.Root.Props & {
-  viewportRef?: React.Ref<HTMLDivElement>;
   scrollFade?: boolean;
   /** Keep focused and highlighted items clear of the fade. Off for lists
    * whose rows take focus on click, where the scroll would nudge the list. */
@@ -57,7 +55,6 @@ function ScrollArea({
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
-        ref={viewportRef}
         {...(viewportTabIndex === undefined ? {} : { tabIndex: viewportTabIndex })}
         className={cn(
           "h-full max-h-[inherit] overflow-auto overscroll-contain rounded-[inherit] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background data-has-overflow-x:overscroll-x-contain",

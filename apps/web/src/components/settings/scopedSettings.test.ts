@@ -620,18 +620,3 @@ describe("partial object patches at project scope", () => {
     });
   });
 });
-
-it("saves GitButler integration per environment and rejects project-scoped changes", () => {
-  const plan = planScopedSettingsPatch(named, environments, { enableGitButler: false });
-  expect(plan.unavailableReason).toBeNull();
-  expect(plan.serverWrites).toHaveLength(1);
-  expect(plan.serverWrites[0]?.patch).toEqual({ enableGitButler: false });
-  const next = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, plan.serverWrites[0]!.patch);
-  expect(next.enableGitButler).toBe(false);
-  expect(applyServerSettingsPatch(next, { enableGitButler: true }).enableGitButler).toBe(true);
-  for (const scope of [project, checkout]) {
-    const scoped = planScopedSettingsPatch(scope, environments, { enableGitButler: false });
-    expect(scoped.serverWrites).toEqual([]);
-    expect(scoped.unavailableReason).not.toBeNull();
-  }
-});

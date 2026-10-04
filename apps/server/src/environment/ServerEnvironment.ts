@@ -1,7 +1,7 @@
 import {
   EnvironmentId,
   ORCHESTRATION_PROTOCOL_VERSION,
-  PROVIDER_SEND_TURN_MAX_VIDEO_BYTES,
+  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   type ExecutionEnvironmentDescriptor,
 } from "@t3tools/contracts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
@@ -196,10 +196,12 @@ export const make = Effect.gen(function* () {
     desktopManaged: serverConfig.mode === "desktop",
     launcherManaged: launcher.managed,
   });
+  // Static is correct: the control fd is known at bootstrap, and the desktop
+  // app and its bundled server ship in one artifact, so a present fd means
+  // the app speaks the requestDesktopUpdate protocol. WSL backends never get
+  // the fd and correctly do not advertise.
   const desktopAppUpdate =
-    serverSelfUpdate === "desktop-managed" &&
-    serverConfig.desktopTelemetryControlFd !== undefined &&
-    serverConfig.desktopAppUpdateEnabled === true;
+    serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
 
   const descriptor: ExecutionEnvironmentDescriptor = {
     environmentId,
@@ -216,26 +218,15 @@ export const make = Effect.gen(function* () {
       connectionProbe: true,
       attachmentUploads: true,
       questionAttachments: true,
-      fileAttachments: { maxUploadBytes: PROVIDER_SEND_TURN_MAX_VIDEO_BYTES },
+      fileAttachments: { maxUploadBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES },
       pullRequests: true,
-      inlineMessageContext: true,
-      clickUpTasks: true,
       threadTaskLinks: true,
-      clickUpWorkflowTaskSelection: true,
-      clickUpMergedHandoffs: true,
-      clickUpCommentReconciliation: true,
-      composerTaskMentions: true,
-      clickUpTimeSync: true,
-      clickUpRepositorySetup: true,
-      clickUpLocalRepositories: true,
-      clickUpOAuthConfiguration: true,
+      pullRequestChecks: true,
+      inlineMessageContext: true,
       requiredWorktreeBootstrap: true,
-      gitButlerWorkspace: true,
       threadSettlement: true,
       threadAutoSettlement: true,
       storageCleanup: true,
-      storageUsage: true,
-      nativeHistoryCleanup: true,
       projectWorktreeCleanup: true,
       threadRestartContinuation: true,
       projectSettingsOverrides: true,
@@ -243,22 +234,25 @@ export const make = Effect.gen(function* () {
       environmentThemes: true,
       usageLimitSources: true,
       usagePriceOverrides: true,
+      usageModelAliases: true,
       threadPinning: true,
       threadPinReorder: true,
       threadActiveReorder: true,
       threadAutoSettleOptOut: true,
       threadTitleRegeneration: true,
+      threadVisitedTracking: true,
       threadPullRequests: true,
+      threadPullRequestWatch: true,
       pullRequestStackActions: true,
       threadPullRequestLinking: true,
+      serverResolvedCommandContext: true,
       environmentIcon: true,
       projectCloneTracking: true,
       ...(serverSelfUpdate === null ? {} : { serverSelfUpdate }),
+      // V2 restart recovery uses the environment-owned opt-in. The old
+      // per-update request flag is not wired into the V2 update RPC path.
       ...(serverSelfUpdate === "boot-service" || desktopAppUpdate
-        ? {
-            serverSelfUpdateProgress: true,
-            serverUpdateThreadContinuation: true,
-          }
+        ? { serverSelfUpdateProgress: true }
         : {}),
       ...(desktopAppUpdate ? { desktopAppUpdate: true } : {}),
     },

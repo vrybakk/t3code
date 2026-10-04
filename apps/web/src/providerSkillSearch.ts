@@ -1,4 +1,4 @@
-import type { ComposerSkill } from "@t3tools/client-runtime/providerSkills";
+import type { ServerProviderSkill } from "@t3tools/contracts";
 import {
   dedupeProviderSkillsByName,
   formatProviderSkillDisplayName,
@@ -10,7 +10,7 @@ import {
   scoreQueryMatch,
 } from "@t3tools/shared/searchRanking";
 
-export function scoreProviderSkill(skill: ComposerSkill, query: string): number | null {
+export function scoreProviderSkill(skill: ServerProviderSkill, query: string): number | null {
   const normalizedName = skill.name.toLowerCase();
   const normalizedLabel = formatProviderSkillDisplayName(skill).toLowerCase();
   const normalizedShortDescription = skill.shortDescription?.toLowerCase() ?? "";
@@ -70,10 +70,10 @@ export function scoreProviderSkill(skill: ComposerSkill, query: string): number 
 }
 
 export function searchProviderSkills(
-  skills: ReadonlyArray<ComposerSkill>,
+  skills: ReadonlyArray<ServerProviderSkill>,
   query: string,
   limit = Number.POSITIVE_INFINITY,
-): ComposerSkill[] {
+): ServerProviderSkill[] {
   const enabledSkills = dedupeProviderSkillsByName(skills.filter(isProviderSkillUserInvocable));
   const normalizedQuery = normalizeSearchQuery(query, { trimLeadingPattern: /^\p{Sc}+/u });
 
@@ -82,7 +82,7 @@ export function searchProviderSkills(
   }
 
   const ranked: Array<{
-    item: ComposerSkill;
+    item: ServerProviderSkill;
     score: number;
     tieBreaker: string;
   }> = [];

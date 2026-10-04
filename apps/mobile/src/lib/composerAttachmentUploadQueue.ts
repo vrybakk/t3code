@@ -71,7 +71,7 @@ export function canUploadComposerAttachment(
     (attachment.type === "image" ||
       (capabilities.fileAttachments !== undefined &&
         attachment.sizeBytes <=
-          clampFileAttachmentUploadBytes(capabilities.fileAttachments.maxUploadBytes, attachment)))
+          clampFileAttachmentUploadBytes(capabilities.fileAttachments.maxUploadBytes)))
   );
 }
 

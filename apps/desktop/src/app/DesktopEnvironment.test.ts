@@ -120,23 +120,6 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
-  it.effect("shares production state while preserving the packaged Nerd identity", () =>
-    Effect.gen(function* () {
-      const environment = yield* makeEnvironment({
-        appName: "t3code",
-        appEdition: "nerd",
-        isPackaged: true,
-      });
-
-      assert.equal(environment.isNerdEdition, true);
-      assert.equal(environment.displayName, "T3 Code Nerd");
-      assert.equal(environment.baseDir, "/Users/alice/.t3");
-      assert.equal(environment.stateDir, "/Users/alice/.t3/userdata");
-      assert.equal(environment.userDataDirName, "t3code");
-      assert.equal(environment.appUserModelId, "com.vrybakk.t3code.nerd");
-    }),
-  );
-
   it.effect("uses the packaged Windows server sidecar as the backend root", () =>
     Effect.gen(function* () {
       const environment = yield* makeEnvironment({

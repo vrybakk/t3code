@@ -58,8 +58,6 @@ import {
 } from "../Icons";
 import { BitbucketCredentialsSettings } from "./BitbucketCredentialsSettings";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
-import { ScopedSwitch } from "./ScopedSwitch";
-import { GitButlerDiscoveryRow } from "./GitButlerDiscoveryRow";
 import { SourceControlWritingSettingsSection } from "./SourceControlWritingSettings";
 import {
   PolicyTooltip,
@@ -98,10 +96,6 @@ type BackgroundActivityOverridePatch = Partial<{
     | undefined;
 }>;
 
-function optionLabel(value: Option.Option<string>): string | null {
-  return Option.getOrNull(value);
-}
-
 function durationToSeconds(duration: Duration.Duration): number {
   return Math.round(Duration.toMillis(duration) / 1_000);
 }
@@ -134,6 +128,10 @@ function backgroundActivityOverrideSettings(
       overrides: nextOverrides as BackgroundActivitySettings["overrides"],
     },
   };
+}
+
+function optionLabel(value: Option.Option<string>): string | null {
+  return Option.getOrNull(value);
 }
 
 function isProviderDiscoveryItem(
@@ -509,8 +507,6 @@ function EmptySourceControlDiscovery({
 }
 
 export function SourceControlSettingsPanel() {
-  const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
   const { scope, environment, connectedEnvironments } = useSettingsScope();
   // Discovery scans one machine's tools, so it shows the representative
   // environment (named in the section title when several are selected);
@@ -529,10 +525,7 @@ export function SourceControlSettingsPanel() {
   );
   const result = discovery.data ?? EMPTY_DISCOVERY_RESULT;
   const hasVersionControlSystems = result.versionControlSystems.length > 0;
-  const hasDiscoveryItems =
-    hasVersionControlSystems ||
-    result.sourceControlProviders.length > 0 ||
-    result.gitButler !== undefined;
+  const hasDiscoveryItems = hasVersionControlSystems || result.sourceControlProviders.length > 0;
   const isInitialScanPending = discovery.isPending && discovery.data === null;
   const handleScan = () => {
     discovery.refresh();
@@ -613,25 +606,6 @@ export function SourceControlSettingsPanel() {
                   ) : undefined}
                 </DiscoveryItemRow>
               ))}
-            </SettingsSection>
-          ) : null}
-
-          {result.gitButler ? (
-            <SettingsSection title={`Workspace Management${environmentSuffix}`}>
-              <GitButlerDiscoveryRow
-                item={result.gitButler}
-                enabled={settings.enableGitButler}
-                environmentOnly={scope.kind === "project" || scope.kind === "checkout"}
-                control={
-                  <ScopedSwitch
-                    settingKeys={["enableGitButler"]}
-                    checked={settings.enableGitButler}
-                    disabled={scope.kind === "project" || scope.kind === "checkout"}
-                    onCheckedChange={(enabled) => updateSettings({ enableGitButler: enabled })}
-                    aria-label="Enable GitButler integration"
-                  />
-                }
-              />
             </SettingsSection>
           ) : null}
         </>

@@ -13,10 +13,6 @@ export interface ContextPresentationDefinition {
 
 const DEFINITIONS = [
   {
-    kind: "task",
-    capabilities: { details: "tooltip", expanded: "none", defaultDraftView: "compact" },
-  },
-  {
     kind: "image",
     capabilities: { details: "tooltip", expanded: "modal", defaultDraftView: "compact" },
   },
@@ -46,6 +42,14 @@ const DEFINITIONS = [
   },
   {
     kind: "skill",
+    capabilities: { details: "tooltip", expanded: "none", defaultDraftView: "compact" },
+  },
+  {
+    kind: "task",
+    capabilities: { details: "tooltip", expanded: "none", defaultDraftView: "compact" },
+  },
+  {
+    kind: "thread",
     capabilities: { details: "tooltip", expanded: "none", defaultDraftView: "compact" },
   },
 ] as const satisfies ReadonlyArray<ContextPresentationDefinition>;

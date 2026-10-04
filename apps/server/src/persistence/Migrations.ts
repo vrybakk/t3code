@@ -1,7 +1,3 @@
-import Migration0060 from "./Migrations/060_ClickUpTimeExports.ts";
-import Migration0059 from "./Migrations/059_ThreadTaskLinks.ts";
-import Migration0057 from "./Migrations/057_ClickUpWorkflow.ts";
-import Migration0056 from "./Migrations/056_ClickUpThreadTasks.ts";
 /**
  * Migration runner with an inline loader.
  *
@@ -14,6 +10,8 @@ import Migration0056 from "./Migrations/056_ClickUpThreadTasks.ts";
 
 import * as Migrator from "effect/unstable/sql/Migrator";
 import * as Effect from "effect/Effect";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
+import { reconcileV2PreviewMigration } from "./reconcileV2PreviewMigration.ts";
 
 // Import all migrations statically
 import Migration0001 from "./Migrations/001_OrchestrationEvents.ts";
@@ -69,9 +67,9 @@ import Migration0050 from "./Migrations/050_ProjectionThreadPullRequests.ts";
 import Migration0051 from "./Migrations/051_ProjectionThreadMessageContext.ts";
 import Migration0052 from "./Migrations/052_ProjectionThreadTitleState.ts";
 import Migration0053 from "./Migrations/053_PullRequestFilesViewed.ts";
-import Migration0054 from "./Migrations/054_WorkTracking.ts";
-import Migration0055 from "./Migrations/055_WorkTrackingReportSnapshots.ts";
-import Migration0058 from "./Migrations/054_ProjectionThreadsAutoSettleDisabledAt.ts";
+import Migration0054 from "./Migrations/054_ProjectionThreadsAutoSettleDisabledAt.ts";
+import Migration0055 from "./Migrations/055_OrchestrationV2.ts";
+import Migration0056 from "./Migrations/056_RemoveRedundantProjectionIndexes.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -83,7 +81,7 @@ import Migration0058 from "./Migrations/054_ProjectionThreadsAutoSettleDisabledA
  * Uses Migrator.fromRecord which parses the key format and
  * returns migrations sorted by ID.
  */
-const migrationEntries = [
+export const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
   [2, "OrchestrationCommandReceipts", Migration0002],
   [3, "CheckpointDiffBlobs", Migration0003],
@@ -137,13 +135,11 @@ const migrationEntries = [
   [51, "ProjectionThreadMessageContext", Migration0051],
   [52, "ProjectionThreadTitleState", Migration0052],
   [53, "PullRequestFilesViewed", Migration0053],
-  [54, "WorkTracking", Migration0054],
-  [55, "WorkTrackingReportSnapshots", Migration0055],
-  [56, "ClickUpThreadTasks", Migration0056],
-  [57, "ClickUpWorkflow", Migration0057],
-  [58, "ProjectionThreadsAutoSettleDisabledAt", Migration0058],
-  [59, "ThreadTaskLinks", Migration0059],
-  [60, "ClickUpTimeExports", Migration0060],
+  [54, "ProjectionThreadsAutoSettleDisabledAt", Migration0054],
+  // Released as 53 and 54 in V2 previews; reconcileV2PreviewMigration preserves their ledger.
+  // Preserve this migration's schema. Future V2 schema changes need new migrations.
+  [55, "OrchestrationV2", Migration0055],
+  [56, "RemoveRedundantProjectionIndexes", Migration0056],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -180,10 +176,102 @@ export interface RunMigrationsOptions {
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {
-  const executedMigrations = yield* run({ loader: makeMigrationLoader(toMigrationInclusive) });
+  yield* reconcileLegacyForkMigrationHistory();
+  const previewMigrations =
+    toMigrationInclusive === undefined || toMigrationInclusive >= 55
+      ? yield* reconcileV2PreviewMigration()
+      : [];
+  const executedMigrations = [
+    ...previewMigrations,
+    ...(yield* run({ loader: makeMigrationLoader(toMigrationInclusive) })),
+  ];
   const migrations = executedMigrations.map(([id, name]) => `${id}_${name}`);
   yield* migrations.length === 0
     ? Effect.logDebug("Database schema is current")
     : Effect.log("Migrations ran successfully").pipe(Effect.annotateLogs({ migrations }));
+
+  // The migrator keys on migration_id: a database that recorded a different
+  // migration under a shared id (local or fork builds) keeps that id and
+  // silently skips this build's migration at it. Surface the divergence so the
+  // skipped schema change is diagnosable.
+  const sql = yield* SqlClient.SqlClient;
+  const recorded = yield* sql<{
+    readonly migration_id: number;
+    readonly name: string;
+  }>`SELECT migration_id, name FROM effect_sql_migrations`;
+  const manifestNames = new Map<number, string>(migrationEntries.map(([id, name]) => [id, name]));
+  const divergent = recorded.flatMap((row) => {
+    const expected = manifestNames.get(row.migration_id);
+    if (expected === undefined) {
+      return [`${row.migration_id}:${row.name} (unknown to this build)`];
+    }
+    return expected === row.name
+      ? []
+      : [`${row.migration_id}:${row.name} (this build: ${expected})`];
+  });
+  if (divergent.length > 0) {
+    yield* Effect.logWarning(
+      "Database migration history diverges from this build; recorded migration ids are skipped, not reconciled by name.",
+    ).pipe(Effect.annotateLogs({ divergent }));
+  }
   return executedMigrations;
 });
+
+const reconcileLegacyForkMigrationHistory = Effect.fn("reconcileLegacyForkMigrationHistory")(
+  function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const tables = yield* sql<{ readonly name: string }>`
+    SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'effect_sql_migrations'
+  `;
+    if (tables.length === 0) return;
+    const history = yield* sql<{ readonly migration_id: number; readonly name: string }>`
+    SELECT migration_id, name FROM effect_sql_migrations WHERE migration_id BETWEEN 54 AND 60
+  `;
+    const legacyNames = [
+      "WorkTracking",
+      "WorkTrackingReportSnapshots",
+      "ClickUpThreadTasks",
+      "ClickUpWorkflow",
+      "ProjectionThreadsAutoSettleDisabledAt",
+      "ThreadTaskLinks",
+      "ClickUpTimeExports",
+    ];
+    if (
+      history.length !== legacyNames.length ||
+      legacyNames.some((name, index) =>
+        history.every((row) => row.migration_id !== 54 + index || row.name !== name),
+      )
+    ) {
+      return;
+    }
+
+    yield* sql
+      .withTransaction(
+        Effect.gen(function* () {
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = migration_id + 100 WHERE migration_id BETWEEN 54 AND 60`;
+          yield* Migration0054;
+          yield* Migration0055;
+          yield* Migration0056;
+          yield* sql`INSERT INTO effect_sql_migrations (migration_id, name) VALUES (54, 'ProjectionThreadsAutoSettleDisabledAt'), (55, 'OrchestrationV2'), (56, 'RemoveRedundantProjectionIndexes')`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 57 WHERE migration_id = 154`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 58 WHERE migration_id = 155`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 59 WHERE migration_id = 156`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 60 WHERE migration_id = 157`;
+          yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 158`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 61 WHERE migration_id = 159`;
+          yield* sql`UPDATE effect_sql_migrations SET migration_id = 62 WHERE migration_id = 160`;
+        }),
+      )
+      .pipe(
+        Effect.catch((cause) =>
+          Effect.fail(
+            new Migrator.MigrationError({
+              kind: "Failed",
+              message: "Failed to reconcile the legacy fork migration history.",
+              cause,
+            }),
+          ),
+        ),
+      );
+  },
+);

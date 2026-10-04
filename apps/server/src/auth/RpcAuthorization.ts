@@ -1,18 +1,21 @@
 import {
   type DeviceListInput,
   AuthAccessReadScope,
-  AuthAccessWriteScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthRelayReadScope,
   AuthRelayWriteScope,
   AuthReviewWriteScope,
   AuthTerminalOperateScope,
-  ORCHESTRATION_WS_METHODS,
+  ORCHESTRATION_V2_WS_METHODS,
   type AuthEnvironmentScope,
+  EnvironmentAuthorizationError,
+  RpcScopeAuthorization,
   WS_METHODS,
   WsRpcGroup,
 } from "@t3tools/contracts";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import type * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
 type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
@@ -23,14 +26,18 @@ type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
  * runtime failure.
  */
 export const RPC_REQUIRED_SCOPES = {
-  [ORCHESTRATION_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
-  [ORCHESTRATION_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
-  [ORCHESTRATION_WS_METHODS.getTurnDiff]: AuthOrchestrationReadScope,
-  [ORCHESTRATION_WS_METHODS.getFullThreadDiff]: AuthOrchestrationReadScope,
-  [ORCHESTRATION_WS_METHODS.searchThreads]: AuthOrchestrationReadScope,
-  [ORCHESTRATION_WS_METHODS.subscribeShell]: AuthOrchestrationReadScope,
-  [ORCHESTRATION_WS_METHODS.getArchivedShellSnapshot]: AuthOrchestrationReadScope,
-  [ORCHESTRATION_WS_METHODS.subscribeThread]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
+  [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.getTurnDiff]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.getFullThreadDiff]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.searchThreads]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.getArchivedShellSnapshot]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.getThreadProjection]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.launchThread]: AuthOrchestrationOperateScope,
+  [ORCHESTRATION_V2_WS_METHODS.subscribeArchivedShell]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.subscribeShell]: AuthOrchestrationReadScope,
+  [ORCHESTRATION_V2_WS_METHODS.subscribeThread]: AuthOrchestrationReadScope,
+  [WS_METHODS.projectsMutate]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverProbe]: AuthOrchestrationReadScope,
   [WS_METHODS.serverGetConfig]: AuthOrchestrationReadScope,
   [WS_METHODS.serverRefreshProviders]: AuthOrchestrationOperateScope,
@@ -57,34 +64,18 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.serverRemoveKeybinding]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverGetSettings]: AuthOrchestrationReadScope,
   [WS_METHODS.serverUpdateSettings]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverSearchAcpRegistry]: AuthOrchestrationReadScope,
+  [WS_METHODS.serverPrepareAcpRegistryAgent]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverUninstallAcpRegistryManagedBinary]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverAcceptAcpRegistryUrlAuth]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverListAcpRegistrySessions]: AuthOrchestrationReadScope,
+  [WS_METHODS.serverImportAcpRegistrySession]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverDeleteAcpRegistrySession]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverListAcpRegistryProviders]: AuthOrchestrationReadScope,
+  [WS_METHODS.serverSetAcpRegistryProvider]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverDisableAcpRegistryProvider]: AuthOrchestrationOperateScope,
+  [WS_METHODS.serverLogoutAcpRegistry]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverDiscoverSourceControl]: AuthOrchestrationReadScope,
-  [WS_METHODS.gitButlerWorkspaceStatus]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpOAuthConfig]: AuthAccessWriteScope,
-  [WS_METHODS.clickUpSaveOAuthConfig]: AuthAccessWriteScope,
-  [WS_METHODS.clickUpClearOAuthConfig]: AuthAccessWriteScope,
-  [WS_METHODS.clickUpConnection]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpConnect]: AuthAccessWriteScope,
-  [WS_METHODS.clickUpDisconnect]: AuthAccessWriteScope,
-  [WS_METHODS.clickUpTasks]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpTask]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpThreads]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpLocalRepositories]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpSprints]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpTaskOptions]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpAnalyzeTask]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpTimePreview]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpTimeSync]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpWorkflow]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpSubmitWorkflow]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpSetStatus]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpSetTag]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpComments]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpCommentReplies]: AuthOrchestrationReadScope,
-  [WS_METHODS.clickUpCreateComment]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpCreateReply]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpSetCommentResolution]: AuthOrchestrationOperateScope,
-  [WS_METHODS.clickUpSetChecklistItemResolution]: AuthOrchestrationOperateScope,
-
   [WS_METHODS.serverGetTraceDiagnostics]: AuthOrchestrationReadScope,
   [WS_METHODS.serverGetProcessDiagnostics]: AuthOrchestrationReadScope,
   [WS_METHODS.serverGetHostResources]: AuthOrchestrationReadScope,
@@ -93,26 +84,16 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.serverRetryResourceTelemetry]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverGetUsageSummary]: AuthOrchestrationReadScope,
   [WS_METHODS.serverRefreshUsageRates]: AuthOrchestrationReadScope,
-  [WS_METHODS.workGetOverview]: AuthOrchestrationReadScope,
-  [WS_METHODS.workGetManualRecords]: AuthOrchestrationReadScope,
-  [WS_METHODS.workDiscoverRepositories]: AuthOrchestrationReadScope,
-  [WS_METHODS.workExportJson]: AuthOrchestrationReadScope,
-  [WS_METHODS.workImportJson]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workExportCsv]: AuthOrchestrationReadScope,
-  [WS_METHODS.workExportReportCsv]: AuthOrchestrationReadScope,
-  [WS_METHODS.workGetReportSnapshot]: AuthOrchestrationReadScope,
-  [WS_METHODS.workUpsertProfile]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workUpsertProject]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workUpsertRepository]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workUpsertManualEntry]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workMarkDelivery]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workReopenDelivery]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workCreateReport]: AuthOrchestrationOperateScope,
-  [WS_METHODS.workTransitionReport]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverSignalProcess]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverReportClientActivity]: AuthOrchestrationReadScope,
   [WS_METHODS.serverReportHostPowerState]: AuthOrchestrationOperateScope,
   [WS_METHODS.serverGetBackgroundPolicy]: AuthOrchestrationReadScope,
+  [WS_METHODS.scheduledTasksList]: AuthOrchestrationReadScope,
+  [WS_METHODS.scheduledTasksSubscribe]: AuthOrchestrationReadScope,
+  [WS_METHODS.scheduledTasksUpsert]: AuthOrchestrationOperateScope,
+  [WS_METHODS.scheduledTasksSetEnabled]: AuthOrchestrationOperateScope,
+  [WS_METHODS.scheduledTasksDelete]: AuthOrchestrationOperateScope,
+  [WS_METHODS.scheduledTasksRunNow]: AuthOrchestrationOperateScope,
   [WS_METHODS.cloudGetRelayClientStatus]: AuthRelayReadScope,
   [WS_METHODS.cloudInstallRelayClient]: AuthRelayWriteScope,
   [WS_METHODS.pullRequestsList]: AuthOrchestrationReadScope,
@@ -124,6 +105,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.pullRequestsLinkedThreads]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsDetail]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsPreview]: AuthOrchestrationReadScope,
+  [WS_METHODS.pullRequestsChecks]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsActivity]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsThreadComments]: AuthOrchestrationReadScope,
   [WS_METHODS.pullRequestsDiffFileContents]: AuthOrchestrationReadScope,
@@ -164,11 +146,9 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.shellOpenInEditor]: AuthOrchestrationOperateScope,
   [WS_METHODS.filesystemBrowse]: AuthOrchestrationReadScope,
   [WS_METHODS.agentSessionsScan]: AuthOrchestrationReadScope,
-  [WS_METHODS.storageUsageGet]: AuthOrchestrationReadScope,
-  [WS_METHODS.storageReviewCleanup]: AuthOrchestrationOperateScope,
-  [WS_METHODS.storageExecuteCleanup]: AuthOrchestrationOperateScope,
   [WS_METHODS.agentSessionsImport]: AuthOrchestrationOperateScope,
   [WS_METHODS.assetsCreateUrl]: AuthOrchestrationReadScope,
+  [WS_METHODS.assetsPersistChatAttachments]: AuthOrchestrationOperateScope,
   [WS_METHODS.attachmentsCreateUploadUrl]: AuthOrchestrationOperateScope,
   [WS_METHODS.attachmentsDelete]: AuthOrchestrationOperateScope,
   [WS_METHODS.providerUploadFeedback]: AuthOrchestrationOperateScope,
@@ -235,6 +215,21 @@ export function requiredScopeForRpcMethod(method: string): AuthEnvironmentScope 
   }
   return requiredScope;
 }
+
+export const rpcAuthorizationError = (requiredScope: AuthEnvironmentScope) =>
+  new EnvironmentAuthorizationError({
+    message: `The authenticated token is missing required scope: ${requiredScope}.`,
+    requiredScope,
+  });
+
+/** Authorizes every RPC on one connection against that connection's session scopes. */
+export const rpcScopeAuthorizationLayer = (scopes: ReadonlyArray<AuthEnvironmentScope>) =>
+  Layer.succeed(RpcScopeAuthorization)((effect, { rpc }) => {
+    const requiredScope = requiredScopeForRpcMethod(rpc._tag);
+    return scopes.includes(requiredScope)
+      ? effect
+      : Effect.fail(rpcAuthorizationError(requiredScope));
+  });
 
 /** Retrying can install or restart tools even though ordinary listing is readable. */
 export const requiredScopeForDeviceList = (input: DeviceListInput): AuthEnvironmentScope =>

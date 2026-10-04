@@ -21,11 +21,12 @@ describe("task estimation phases", () => {
         ?.implementationMinutes,
     ).toBe(4);
   });
-  for (const field of ["searches", "files"]) {
-    it(`allows ${field} during research but rejects them in a final estimate`, () => {
+  it.each(["searches", "files"] as const)(
+    "allows %s during research but rejects it in a final estimate",
+    (field) => {
       const pending = { ...response, [field]: [{ repository: 0, value: "src/product.ts" }] };
       expect(() => Schema.decodeUnknownSync(TaskEstimationResponse)(pending)).not.toThrow();
       expect(() => Schema.decodeUnknownSync(TaskEstimationFinalResponse)(pending)).toThrow();
-    });
-  }
+    },
+  );
 });
