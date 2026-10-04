@@ -572,9 +572,9 @@ describe("ClientSettings environment identification", () => {
 });
 
 describe("ClientSettings sidebar", () => {
-  it("defaults to the current sidebar", () => {
+  it("defaults to the project-grouped sidebar", () => {
     expect(decodeClientSettings({}).legacySidebarEnabled).toBe(false);
-    expect(decodeClientSettings({}).sidebarViewMode).toBe("threads");
+    expect(decodeClientSettings({}).sidebarViewMode).toBe("projects");
   });
 
   it("drops the retired sidebar v2 beta keys, resetting everyone to the default", () => {
