@@ -2852,6 +2852,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                       : []),
                   ],
                 }),
+            ...(command.clickUpTasks === undefined ? {} : { clickUpTasks: command.clickUpTasks }),
             // regenerateTitle: true arms the in-flight marker; a landing title
             // or an explicit false (generation failed/abandoned) clears it.
             ...(command.regenerateTitle === true

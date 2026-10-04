@@ -108,6 +108,7 @@ export interface EnvironmentThreadShell {
   readonly pendingBackgroundTasks: ReadonlyArray<
     NonNullable<OrchestrationV2ThreadShell["pendingBackgroundTasks"]>[number]
   >;
+  readonly clickUpTasks: NonNullable<OrchestrationV2ThreadShell["clickUpTasks"]>;
   /** Provider instances that have owned the root conversation, oldest first. */
   readonly providerInstanceHistory: ReadonlyArray<ProviderInstanceId>;
   readonly itemCount: number;
@@ -248,6 +249,7 @@ export function presentThreadShell(
     hasPendingUserInput: thread.pendingRuntimeRequest?.kind === "user_input",
     hasActionableProposedPlan: thread.hasActionableProposedPlan,
     pendingBackgroundTasks: thread.pendingBackgroundTasks ?? [],
+    clickUpTasks: thread.clickUpTasks ?? [],
     providerInstanceHistory: thread.providerInstanceHistory ?? [],
     itemCount: thread.itemCount,
     visibleItemCount: thread.visibleItemCount,

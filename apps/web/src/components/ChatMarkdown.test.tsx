@@ -8,6 +8,7 @@ import { getSyntaxHighlighterPromise } from "../lib/syntaxHighlighting";
 import { GitHubIcon } from "./Icons";
 import { Button } from "./ui/button";
 import { setMarkdownTaskChecked } from "./files/filePreviewMode";
+import { remarkSelfMentions } from "./clickup/commentMentions";
 
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
 vi.mock("../hooks/useTheme", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
@@ -541,6 +542,24 @@ describe("ChatMarkdown skill chips", () => {
       await act(async () => renderer?.unmount());
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("ChatMarkdown third-party plain text", () => {
+  it("marks the reader's mention and shows raw HTML as text", () => {
+    const html = renderToStaticMarkup(
+      <ChatMarkdown
+        cwd={undefined}
+        text={'@Me check the <Button> prop\n<img src="https://tracker.test/pixel.png">'}
+        lineBreaks
+        parseRawHtml={false}
+        extraRemarkPlugins={[[remarkSelfMentions, { username: "Me" }]]}
+      />,
+    );
+
+    expect(html).toContain("<mark>@Me</mark>");
+    expect(html).toContain("&lt;Button&gt;");
+    expect(html).not.toContain("<img");
   });
 });
 

@@ -276,6 +276,7 @@ import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavaila
 import { RightPanelTabs } from "./RightPanelTabs";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
+import { ThreadTasksPanel } from "./clickup/ThreadTasksPanel";
 import { useDeviceState } from "~/state/device";
 import { DeviceSetup } from "./device/DeviceSetup";
 import { Dialog } from "./ui/dialog";
@@ -2913,6 +2914,7 @@ export default function ChatView(props: ChatViewProps) {
   const serverConfig = activeThread
     ? (activeEnvironment?.serverConfig ?? null)
     : (primaryEnvironment?.serverConfig ?? null);
+  const supportsTaskLinks = serverConfig?.environment.capabilities.threadTaskLinks === true;
   const providerStatuses = serverConfig?.providers ?? EMPTY_PROVIDERS;
   const selectedProviderByThreadId = composerActiveProvider ?? null;
   const threadProvider =
@@ -4490,6 +4492,11 @@ export default function ChatView(props: ChatViewProps) {
       focusComposer();
     });
   }, [focusComposer]);
+  const addTasksSurface = useCallback(() => {
+    if (activeThreadRef && supportsTaskLinks) {
+      useRightPanelStore.getState().open(activeThreadRef, "tasks");
+    }
+  }, [activeThreadRef, supportsTaskLinks]);
   const useArtifactTemplate = useCallback(
     (template: CodexArtifactTemplate) => {
       const composer = composerRef.current;
@@ -10592,6 +10599,8 @@ export default function ChatView(props: ChatViewProps) {
       />
     ) : renderedRightPanelSurface?.kind === "pull-requests" && activeThreadRef ? (
       <ThreadPullRequestsPanel threadRef={activeThreadRef} />
+    ) : renderedRightPanelSurface?.kind === "tasks" && activeThreadRef ? (
+      <ThreadTasksPanel threadRef={activeThreadRef} />
     ) : renderedRightPanelSurface?.kind === "device" ? (
       <Suspense fallback={null}>
         <DevicePanel
@@ -11464,6 +11473,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddFiles={addFilesSurface}
           onAddPullRequest={addPullRequestSurface}
           onAddPullRequests={addPullRequestsSurface}
+          onAddTasks={addTasksSurface}
           onAddDevice={addDeviceSurface}
           browserAvailable={isPreviewSupportedInRuntime()}
           terminalAvailable={activeProject !== null}
@@ -11471,6 +11481,7 @@ export default function ChatView(props: ChatViewProps) {
           filesAvailable={activeProject !== null}
           pullRequestAvailable={pullRequestSurfaceAvailable}
           pullRequestsAvailable={pullRequestsSurfaceAvailable}
+          tasksAvailable={isServerThread && supportsTaskLinks}
           deviceAvailable={activeThreadRef !== null}
         >
           {rightPanelContent}
@@ -11519,6 +11530,7 @@ export default function ChatView(props: ChatViewProps) {
             onAddFiles={addFilesSurface}
             onAddPullRequest={addPullRequestSurface}
             onAddPullRequests={addPullRequestsSurface}
+            onAddTasks={addTasksSurface}
             onAddDevice={addDeviceSurface}
             browserAvailable={isPreviewSupportedInRuntime()}
             terminalAvailable={activeProject !== null}
@@ -11526,6 +11538,7 @@ export default function ChatView(props: ChatViewProps) {
             filesAvailable={activeProject !== null}
             pullRequestAvailable={pullRequestSurfaceAvailable}
             pullRequestsAvailable={pullRequestsSurfaceAvailable}
+            tasksAvailable={isServerThread && supportsTaskLinks}
             deviceAvailable={activeThreadRef !== null}
           >
             {rightPanelContent}

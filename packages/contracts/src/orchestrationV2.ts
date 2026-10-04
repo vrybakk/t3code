@@ -2611,6 +2611,7 @@ export const OrchestrationV2Command = Schema.Union([
     limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecoveryUpdate)),
     /** Link (object) or unlink (null) a pull request (#8160); absent leaves it unchanged. */
     linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+    clickUpTasks: Schema.optional(Schema.Array(ThreadClickUpTaskLink)),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pull-request.link"),
