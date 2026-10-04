@@ -124,6 +124,7 @@ import {
   EyeIcon,
   GitForkIcon,
   GlobeIcon,
+  ListTodoIcon,
   type LucideIcon,
   MessageCircleIcon,
   MousePointerClickIcon,
@@ -4098,6 +4099,23 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
             tooltip={`$${record.name}`}
             copyMarkdown={context.copyMarkdown}
             kind="skill"
+          />
+        ) : (
+          <UnavailableUserMessageContextChip {...context} />
+        ),
+    },
+    {
+      kind: "task",
+      canRender: (record) => record.kind === "task",
+      render: (record, context) =>
+        record.kind === "task" ? (
+          <UserMessageContextChip
+            icon={<ListTodoIcon />}
+            label={record.name}
+            kindLabel="ClickUp task"
+            tooltip={`${record.taskId} · ${record.workspaceId}`}
+            copyMarkdown={context.copyMarkdown}
+            kind="task"
           />
         ) : (
           <UnavailableUserMessageContextChip {...context} />
