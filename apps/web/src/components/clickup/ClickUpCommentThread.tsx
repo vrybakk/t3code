@@ -5,6 +5,7 @@ import type {
   ClickUpCommentRepliesInput,
   ClickUpTaskInput,
   EnvironmentId,
+  ScopedThreadRef,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -20,6 +21,7 @@ export function ClickUpCommentThread({
   comment,
   username,
   environmentId,
+  threadRef,
   input,
   cursor,
   refreshing,
@@ -28,6 +30,7 @@ export function ClickUpCommentThread({
   comment: ClickUpComment;
   username: string | undefined;
   environmentId: EnvironmentId;
+  threadRef: ScopedThreadRef | undefined;
   input: ClickUpTaskInput;
   cursor: ClickUpCommentCursor | undefined;
   refreshing: boolean;
@@ -63,6 +66,8 @@ export function ClickUpCommentThread({
       comment={comment}
       userId={input.userId}
       username={username}
+      environmentId={environmentId}
+      threadRef={threadRef}
       resolution={{ busy, refreshing, error, toggle: () => void toggle() }}
     >
       <div className="border-t border-border pt-2">
@@ -84,6 +89,7 @@ export function ClickUpCommentThread({
         {expanded !== null && (
           <Replies
             environmentId={environmentId}
+            threadRef={threadRef}
             input={replyInput}
             username={username}
             onSent={() => {
@@ -99,11 +105,13 @@ export function ClickUpCommentThread({
 
 function Replies({
   environmentId,
+  threadRef,
   input,
   username,
   onSent,
 }: {
   environmentId: EnvironmentId;
+  threadRef: ScopedThreadRef | undefined;
   input: ClickUpCommentRepliesInput;
   username: string | undefined;
   onSent: () => void;
@@ -139,6 +147,8 @@ function Replies({
             comment={reply}
             userId={input.userId}
             username={username}
+            environmentId={environmentId}
+            threadRef={threadRef}
           />
         ))
       )}

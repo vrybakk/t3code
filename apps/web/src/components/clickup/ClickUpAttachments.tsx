@@ -1,16 +1,21 @@
-import type { ClickUpAttachment } from "@t3tools/contracts";
+import type { ClickUpAttachment, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { filePreviewKind } from "@t3tools/shared/filePreview";
 import { ExternalLinkIcon, FileIcon, ImageIcon, PlayIcon } from "lucide-react";
 import { useState } from "react";
 import { ExpandedImageDialog } from "../chat/ExpandedImageDialog";
+import { ExternalLink } from "../ExternalLink";
 import type { ExpandedImagePreview } from "../chat/ExpandedImagePreview";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { safeClickUpAttachmentUrl } from "./taskPrompt";
 
 export function ClickUpAttachments({
   attachments,
+  environmentId,
+  threadRef,
 }: {
   attachments: ReadonlyArray<ClickUpAttachment>;
+  environmentId: EnvironmentId;
+  threadRef: ScopedThreadRef | undefined;
 }) {
   const [preview, setPreview] = useState<ExpandedImagePreview | null>(null);
   const media = attachments.flatMap((attachment) => {
@@ -78,15 +83,16 @@ export function ClickUpAttachments({
                   <TooltipPopup>{attachment.name}</TooltipPopup>
                 </Tooltip>
                 {url && (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <ExternalLink
+                    url={url}
+                    environmentId={environmentId}
+                    threadRef={threadRef}
+                    favicon={false}
                     aria-label={`Open original ${attachment.name}`}
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    className="shrink-0 text-muted-foreground hover:text-foreground hover:no-underline"
                   >
                     <ExternalLinkIcon className="size-3.5" />
-                  </a>
+                  </ExternalLink>
                 )}
               </div>
               {!url && (

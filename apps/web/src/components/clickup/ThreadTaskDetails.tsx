@@ -1,4 +1,9 @@
-import type { ClickUpTaskDetails, ClickUpTaskReference, EnvironmentId } from "@t3tools/contracts";
+import type {
+  ClickUpTaskDetails,
+  ClickUpTaskReference,
+  EnvironmentId,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
 import { ArrowLeftIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
@@ -9,11 +14,13 @@ import { ClickUpTaskPanel } from "./ClickUpTaskPanel";
 
 export function ThreadTaskDetails({
   environmentId,
+  threadRef,
   task,
   onStartTask,
   onBack,
 }: {
   environmentId: EnvironmentId;
+  threadRef: ScopedThreadRef | undefined;
   task: ClickUpTaskReference;
   onStartTask?: ((details: ClickUpTaskDetails) => void) | undefined;
   onBack?: (() => void) | undefined;
@@ -56,6 +63,7 @@ export function ThreadTaskDetails({
       <ClickUpTaskPanel
         key={`${environmentId}:${account.user.id}:${task.workspaceId}:${task.taskId}`}
         environmentId={environmentId}
+        threadRef={threadRef}
         input={{ workspaceId: task.workspaceId, taskId: task.taskId, userId: account.user.id }}
         {...(onStartTask ? { onStartTask } : {})}
       />
