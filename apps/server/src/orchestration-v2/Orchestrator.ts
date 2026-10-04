@@ -5,6 +5,7 @@ import {
   usageLimitBlockedRun,
 } from "@t3tools/shared/orchestrationV2ThreadError";
 import { threadPullRequestsOf } from "@t3tools/shared/threadPullRequests";
+import { updateThreadTaskLinks } from "./threadTaskLinks.ts";
 import {
   normalizeThreadPullRequestKey,
   visibleThreadPullRequests,
@@ -2853,6 +2854,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                   ],
                 }),
             ...(command.clickUpTasks === undefined ? {} : { clickUpTasks: command.clickUpTasks }),
+            ...(command.clickUpTaskLinkUpdate === undefined
+              ? {}
+              : {
+                  clickUpTasks: updateThreadTaskLinks(
+                    thread.clickUpTasks ?? [],
+                    command.clickUpTaskLinkUpdate,
+                  ),
+                }),
             // regenerateTitle: true arms the in-flight marker; a landing title
             // or an explicit false (generation failed/abandoned) clears it.
             ...(command.regenerateTitle === true

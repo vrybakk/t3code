@@ -1,4 +1,4 @@
-import type { ScopedThreadRef, ThreadClickUpTaskLink } from "@t3tools/contracts";
+import type { ScopedThreadRef } from "@t3tools/contracts";
 import { useState } from "react";
 import { useThreadShell } from "../../state/entities";
 import { threadEnvironment } from "../../state/threads";
@@ -43,7 +43,7 @@ export function LinkThreadTask({
           setError("Enter a task URL or ID, workspace ID, and task name.");
           return;
         }
-        const existing: ReadonlyArray<ThreadClickUpTaskLink> = thread?.clickUpTasks ?? [];
+        const existing = thread?.clickUpTasks ?? [];
         if (
           existing.some((task) => task.workspaceId === workspaceId.trim() && task.taskId === taskId)
         ) {
@@ -57,15 +57,14 @@ export function LinkThreadTask({
             environmentId: threadRef.environmentId,
             input: {
               threadId: threadRef.threadId,
-              clickUpTasks: [
-                ...existing,
-                {
+              clickUpTaskLinkUpdate: {
+                type: "link",
+                task: {
                   workspaceId: workspaceId.trim(),
                   taskId,
                   name: name.trim(),
-                  primary: existing.length === 0,
                 },
-              ],
+              },
             },
           });
           if (result._tag === "Success") onLinked();

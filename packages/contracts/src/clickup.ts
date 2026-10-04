@@ -19,6 +19,16 @@ export const ThreadClickUpTaskLink = Schema.Struct({
 });
 export type ThreadClickUpTaskLink = typeof ThreadClickUpTaskLink.Type;
 
+export const ThreadClickUpTaskLinkUpdate = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("link"), task: ClickUpTaskReference }),
+  Schema.Struct({
+    type: Schema.Literal("unlink"),
+    workspaceId: ClickUpTaskReference.fields.workspaceId,
+    taskId: ClickUpTaskReference.fields.taskId,
+  }),
+]);
+export type ThreadClickUpTaskLinkUpdate = typeof ThreadClickUpTaskLinkUpdate.Type;
+
 export const ClickUpUser = Schema.Struct({
   id: Schema.Int,
   username: Schema.String,

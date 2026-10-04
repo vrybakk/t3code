@@ -32,7 +32,11 @@ import {
   TurnItemId,
 } from "./baseSchemas.ts";
 import { ChatAttachment } from "./chatAttachment.ts";
-import { ThreadClickUpTaskLink, ClickUpTaskReference } from "./clickup.ts";
+import {
+  ThreadClickUpTaskLink,
+  ThreadClickUpTaskLinkUpdate,
+  ClickUpTaskReference,
+} from "./clickup.ts";
 import {
   OrchestrationGetFullThreadDiffInput,
   OrchestrationGetFullThreadDiffResult,
@@ -2612,6 +2616,7 @@ export const OrchestrationV2Command = Schema.Union([
     /** Link (object) or unlink (null) a pull request (#8160); absent leaves it unchanged. */
     linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
     clickUpTasks: Schema.optional(Schema.Array(ThreadClickUpTaskLink)),
+    clickUpTaskLinkUpdate: Schema.optional(ThreadClickUpTaskLinkUpdate),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pull-request.link"),

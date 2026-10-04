@@ -56,17 +56,16 @@ export function ThreadTasksPanel({ threadRef }: { threadRef: ScopedThreadRef }) 
                 variant="ghost"
                 aria-label={`Unlink ${task.name}`}
                 onClick={() => {
-                  const remaining = links.filter(
-                    (linked) =>
-                      linked.workspaceId !== task.workspaceId || linked.taskId !== task.taskId,
-                  );
-                  const next = remaining.map((linked, index) => ({
-                    ...linked,
-                    primary: index === 0,
-                  }));
                   void updateMetadata({
                     environmentId: threadRef.environmentId,
-                    input: { threadId: threadRef.threadId, clickUpTasks: next },
+                    input: {
+                      threadId: threadRef.threadId,
+                      clickUpTaskLinkUpdate: {
+                        type: "unlink",
+                        workspaceId: task.workspaceId,
+                        taskId: task.taskId,
+                      },
+                    },
                   });
                 }}
               >

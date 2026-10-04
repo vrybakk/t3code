@@ -666,6 +666,42 @@ describe("V2 environment commands", () => {
       }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
   );
 
+  it.effect("sends task link mutations without replacing a client snapshot", () =>
+    Effect.gen(function* () {
+      const commands: OrchestrationV2Command[] = [];
+      const projectionRequests: ThreadId[] = [];
+      const supervisor = yield* makeSupervisor({ commands, projects: [], projectionRequests });
+      for (const clickUpTaskLinkUpdate of [
+        { type: "link" as const, task: { workspaceId: "workspace", taskId: "task", name: "Task" } },
+        { type: "unlink" as const, workspaceId: "workspace", taskId: "task" },
+      ]) {
+        yield* updateThreadMetadata({
+          commandId: CommandId.make(`task-${clickUpTaskLinkUpdate.type}`),
+          threadId: v2ThreadId,
+          clickUpTaskLinkUpdate,
+        }).pipe(Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor));
+      }
+      expect(commands).toEqual([
+        {
+          type: "thread.metadata.update",
+          commandId: "task-link",
+          threadId: v2ThreadId,
+          clickUpTaskLinkUpdate: {
+            type: "link",
+            task: { workspaceId: "workspace", taskId: "task", name: "Task" },
+          },
+        },
+        {
+          type: "thread.metadata.update",
+          commandId: "task-unlink",
+          threadId: v2ThreadId,
+          clickUpTaskLinkUpdate: { type: "unlink", workspaceId: "workspace", taskId: "task" },
+        },
+      ]);
+      expect(projectionRequests).toEqual([]);
+    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
+  );
+
   it.effect("delegates model selection to the server without fetching the full projection", () =>
     Effect.gen(function* () {
       const commands: OrchestrationV2Command[] = [];

@@ -122,6 +122,7 @@ export type MarkThreadUnreadInput = ThreadCommandInput;
 
 export interface UpdateThreadMetadataInput extends ThreadCommandInput {
   readonly clickUpTasks?: ReadonlyArray<import("@t3tools/contracts").ThreadClickUpTaskLink>;
+  readonly clickUpTaskLinkUpdate?: import("@t3tools/contracts").ThreadClickUpTaskLinkUpdate;
   readonly limitRecovery?: import("@t3tools/contracts").OrchestrationV2LimitRecoveryUpdate | null;
   readonly title?: string;
   readonly modelSelection?: ModelSelection;
@@ -568,6 +569,7 @@ export const updateThreadMetadata = Effect.fn("EnvironmentCommands.updateThreadM
       input.regenerateTitle !== undefined ||
       input.linkedPullRequest !== undefined ||
       input.clickUpTasks !== undefined ||
+      input.clickUpTaskLinkUpdate !== undefined ||
       input.limitRecovery !== undefined
     ) {
       result = yield* dispatch({
@@ -583,6 +585,9 @@ export const updateThreadMetadata = Effect.fn("EnvironmentCommands.updateThreadM
           ? {}
           : { linkedPullRequest: input.linkedPullRequest }),
         ...(input.clickUpTasks === undefined ? {} : { clickUpTasks: input.clickUpTasks }),
+        ...(input.clickUpTaskLinkUpdate === undefined
+          ? {}
+          : { clickUpTaskLinkUpdate: input.clickUpTaskLinkUpdate }),
       });
     }
     if (input.modelSelection !== undefined) {
