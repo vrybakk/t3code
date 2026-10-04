@@ -38,6 +38,7 @@ const SKILL_TOKEN_REGEX = new RegExp(`${SKILL_MENTION_SOURCE}(?=\\s)`, "gu");
  */
 export const SKILL_MENTION_PATTERN = new RegExp(`${SKILL_MENTION_SOURCE}(?=\\s|$)`, "gu");
 const MENTION_TOKEN_REGEX = /(^|\s)@(?:"((?:\\.|[^"\\])*)"|([^\s@"]+))(?=\s)/g;
+const EXPLICIT_PATH_TOKEN_REGEX = /(^|\s)~(?:"((?:\\.|[^"\\])*)"|([^\s~"]+))(?=\s)/g;
 /**
  * The label body is bounded rather than `*`. Unbounded, every whitespace in
  * the composer is a candidate start: the engine scans the rest of the text for
@@ -95,9 +96,30 @@ function collectMentionTokens(text: string): ComposerInlineToken[] {
     const prefix = match[1] ?? "";
     const quotedPath = match[2];
     const path = quotedPath !== undefined ? quotedPath.replace(/\\(.)/g, "$1") : (match[3] ?? "");
-    if (!path || (quotedPath === undefined && SCOPED_PACKAGE_REFERENCE_REGEX.test(path))) {
+    if (
+      !path ||
+      (quotedPath === undefined &&
+        (!/[./\\]/.test(path) || SCOPED_PACKAGE_REFERENCE_REGEX.test(path)))
+    ) {
       continue;
     }
+    const start = (match.index ?? 0) + prefix.length;
+    const end = start + fullMatch.length - prefix.length;
+    matches.push({
+      type: "mention",
+      value: path,
+      source: text.slice(start, end),
+      start,
+      end,
+    });
+  }
+
+  for (const match of text.matchAll(EXPLICIT_PATH_TOKEN_REGEX)) {
+    const fullMatch = match[0];
+    const prefix = match[1] ?? "";
+    const quotedPath = match[2];
+    const path = quotedPath !== undefined ? quotedPath.replace(/\\(.)/g, "$1") : (match[3] ?? "");
+    if (!path) continue;
     const start = (match.index ?? 0) + prefix.length;
     const end = start + fullMatch.length - prefix.length;
     matches.push({
