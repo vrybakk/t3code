@@ -1,4 +1,5 @@
-import * as NodeCrypto from "node:crypto";
+import * as Crypto from "effect/Crypto";
+import * as Hex from "effect/encoding/Hex";
 import * as NodeURL from "node:url";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -32,7 +33,9 @@ await Effect.runPromise(
     );
     const bundle = Object.fromEntries(entries);
     const serialized = yield* encodeJson(bundle);
-    const version = NodeCrypto.createHash("sha256").update(serialized).digest("hex").slice(0, 16);
+    const crypto = yield* Crypto.Crypto;
+    const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(serialized));
+    const version = Hex.encode(digest).slice(0, 16);
     const generated = `${yield* encodePrettyJson({ version, bundle })}\n`;
     if (process.argv.includes("--check")) {
       if ((yield* fs.readFileString(NodeURL.fileURLToPath(output))) !== generated) {

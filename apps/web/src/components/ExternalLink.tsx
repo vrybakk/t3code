@@ -78,7 +78,7 @@ export function ExternalLink({
         event.stopPropagation();
         void showExternalLinkContextMenu({
           href: url,
-          canOpenInPreview: canOpenLinksInApp(Boolean(threadRef)),
+          canOpenInPreview: canOpenLinksInApp(threadRef),
           position: { x: event.clientX, y: event.clientY },
           showContextMenu: (items, position) => api.contextMenu.show(items, position),
           openInPreview: async (target) => {

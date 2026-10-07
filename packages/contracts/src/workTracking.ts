@@ -11,19 +11,19 @@ import {
   TurnId,
 } from "./baseSchemas.ts";
 
-const WorkId = <Brand extends string>(brand: Brand) =>
-  TrimmedNonEmptyString.pipe(Schema.brand(brand));
-export const WorkProfileId = WorkId("WorkProfileId");
+export const WorkProfileId = TrimmedNonEmptyString.pipe(Schema.brand("WorkProfileId"));
 export type WorkProfileId = typeof WorkProfileId.Type;
-export const WorkTrackingProjectId = WorkId("WorkTrackingProjectId");
+export const WorkTrackingProjectId = TrimmedNonEmptyString.pipe(
+  Schema.brand("WorkTrackingProjectId"),
+);
 export type WorkTrackingProjectId = typeof WorkTrackingProjectId.Type;
-export const WorkRepositoryId = WorkId("WorkRepositoryId");
+export const WorkRepositoryId = TrimmedNonEmptyString.pipe(Schema.brand("WorkRepositoryId"));
 export type WorkRepositoryId = typeof WorkRepositoryId.Type;
-export const WorkRecordId = WorkId("WorkRecordId");
+export const WorkRecordId = TrimmedNonEmptyString.pipe(Schema.brand("WorkRecordId"));
 export type WorkRecordId = typeof WorkRecordId.Type;
-export const WorkDeliveryId = WorkId("WorkDeliveryId");
+export const WorkDeliveryId = TrimmedNonEmptyString.pipe(Schema.brand("WorkDeliveryId"));
 export type WorkDeliveryId = typeof WorkDeliveryId.Type;
-export const WorkReportId = WorkId("WorkReportId");
+export const WorkReportId = TrimmedNonEmptyString.pipe(Schema.brand("WorkReportId"));
 export type WorkReportId = typeof WorkReportId.Type;
 
 export const WorkCoverage = Schema.Literals(["complete", "partial", "unavailable"]);

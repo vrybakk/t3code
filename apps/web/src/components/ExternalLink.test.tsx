@@ -1,4 +1,4 @@
-import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -49,7 +49,7 @@ vi.mock("../rightPanelStore", () => ({
 }));
 vi.mock("../browser/useOpenLink", () => ({ useOpenLink: () => state.openLink }));
 vi.mock("../browser/browserLinkTarget", () => ({
-  canOpenLinksInApp: (hasThread: boolean) => hasThread,
+  canOpenLinksInApp: (threadRef: ScopedThreadRef | undefined) => threadRef != null,
 }));
 vi.mock("../browser/openFileInPreview", () => ({ openUrlInPreview: state.openPreview }));
 vi.mock("../browserHistoryStore", () => ({ recordVisitForThread: state.recordVisit }));
